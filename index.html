@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · fixed top 10 leaderboard</title>
+    <title>🐝 BEE SWARM · fixed leaderboard + boost display</title>
     <style>
         * {
             box-sizing: border-box;
@@ -136,7 +136,8 @@
             color: #1f431f;
             cursor: pointer;
             box-shadow: 0 3px 0 #655126;
-            min-width: 100px;
+            min-width: 120px;
+            white-space: nowrap;
         }
         .tool-btn:active {
             transform: translateY(4px);
@@ -211,7 +212,7 @@
             border: 3px solid #ffd966;
             color: #ffefc0;
             width: 100%;
-            max-height: 250px;
+            max-height: 280px;
             overflow-y: auto;
         }
         .leaderboard-title {
@@ -220,6 +221,10 @@
             text-align: center;
             margin-bottom: 8px;
             color: #ffd966;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
         .leaderboard-entry {
             display: flex;
@@ -231,16 +236,20 @@
         .leaderboard-rank {
             font-weight: bold;
             color: #ffd966;
-            width: 30px;
+            width: 35px;
             display: inline-block;
         }
         .leaderboard-name {
             flex-grow: 1;
             margin-left: 10px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .leaderboard-score {
             font-weight: bold;
             color: #fff4c2;
+            min-width: 80px;
+            text-align: right;
         }
         .name-modal {
             position: fixed;
@@ -321,10 +330,14 @@
             padding: 2px 10px;
             font-size: 0.8rem;
             cursor: pointer;
-            margin-left: 10px;
         }
         .refresh-btn:hover {
             background: #5b7c4b;
+        }
+        .boost-value {
+            font-size: 0.8rem;
+            color: #ffaa00;
+            margin-left: 5px;
         }
     </style>
 </head>
@@ -382,8 +395,8 @@
         <div class="rebirth-shop-row">
             <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
             <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO <span id="autoStatus">(2 RP)</span></button>
-            <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED <span id="speedStatus">(1 RP)</span></button>
-            <button class="tool-btn" id="buyCapacity">📦 CAPACITY <span id="capacityStatus">(3 RP)</span></button>
+            <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED <span id="speedStatus">(1 RP)</span><span id="speedBoost" class="boost-value"></span></button>
+            <button class="tool-btn" id="buyCapacity">📦 CAPACITY <span id="capacityStatus">(3 RP)</span><span id="capacityBoost" class="boost-value"></span></button>
             <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 <span id="honeyMultStatus">(2 RP)</span></button>
             <button class="tool-btn" id="buyCompounding">📈 COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
@@ -420,8 +433,8 @@
 <script>
 // ================== JSONBIN.IO CONFIGURATION ==================
 // REPLACE THESE WITH YOUR ACTUAL VALUES FROM JSONBIN.IO
-const JSONBIN_API_KEY = '$2a$10$XyZ123AbCdEfGhIjKlMnOpQrStUvWxYzAbCd'; // ← YOUR MASTER KEY
-const JSONBIN_BIN_ID = '67b9c0b2d3e4f5a6b7c8d9e0'; // ← YOUR BIN ID
+const JSONBIN_API_KEY = 'YOUR_ACTUAL_API_KEY_HERE'; // ← YOUR MASTER KEY
+const JSONBIN_BIN_ID = 'YOUR_ACTUAL_BIN_ID_HERE'; // ← YOUR BIN ID
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
 // ========== GLOBAL VARIABLES ==========
@@ -429,7 +442,9 @@ let leaderboard = [];
 let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
 let totalHoneyEarned = 0;
 let lastUpdate = 0;
-const UPDATE_COOLDOWN = 5000; // 5 seconds
+let updateRetryCount = 0;
+const UPDATE_COOLDOWN = 3000; // 3 seconds
+const MAX_RETRIES = 3;
 
 // ========== UI ELEMENTS ==========
 const nameModal = document.getElementById('nameModal');
@@ -440,27 +455,61 @@ const nameError = document.getElementById('nameError');
 const refreshBtn = document.getElementById('refreshLeaderboard');
 
 // ========== LEADERBOARD FUNCTIONS ==========
-async function fetchLeaderboard() {
+async function fetchLeaderboard(showLoading = true) {
+    if (showLoading) {
+        document.getElementById('leaderboardList').innerHTML = '<div class="loading">Loading leaderboard...</div>';
+    }
+    
     try {
         const response = await fetch(JSONBIN_URL, {
             headers: {
                 'X-Master-Key': JSONBIN_API_KEY
             }
         });
-        const data = await response.json();
         
-        // Check if data.record.players exists
-        if (data && data.record && data.record.players) {
-            leaderboard = data.record.players;
-        } else {
-            // If structure is different, try to adapt
-            leaderboard = data.record || [];
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
         
+        const data = await response.json();
+        
+        // Check different possible JSON structures
+        if (data && data.record) {
+            if (Array.isArray(data.record)) {
+                leaderboard = data.record;
+            } else if (data.record.players && Array.isArray(data.record.players)) {
+                leaderboard = data.record.players;
+            } else {
+                leaderboard = [];
+            }
+        } else if (Array.isArray(data)) {
+            leaderboard = data;
+        } else {
+            leaderboard = [];
+        }
+        
+        // Filter out invalid entries
+        leaderboard = leaderboard.filter(entry => 
+            entry && 
+            typeof entry === 'object' && 
+            entry.name && 
+            typeof entry.name === 'string' &&
+            typeof entry.total === 'number'
+        );
+        
         renderLeaderboard();
+        updateRetryCount = 0; // Reset retry count on success
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
-        document.getElementById('leaderboardList').innerHTML = '<div class="leaderboard-entry">Failed to load leaderboard</div>';
+        updateRetryCount++;
+        
+        if (updateRetryCount < MAX_RETRIES) {
+            // Retry after 2 seconds
+            setTimeout(() => fetchLeaderboard(showLoading), 2000);
+        } else {
+            document.getElementById('leaderboardList').innerHTML = 
+                '<div class="leaderboard-entry">⚠️ Failed to load leaderboard</div>';
+        }
     }
 }
 
@@ -471,14 +520,21 @@ async function saveLeaderboard() {
             leaderboard = [];
         }
         
-        await fetch(JSONBIN_URL, {
+        // Prepare data in the format JSONBin expects
+        const dataToSave = { players: leaderboard };
+        
+        const response = await fetch(JSONBIN_URL, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Master-Key': JSONBIN_API_KEY
             },
-            body: JSON.stringify({ players: leaderboard })
+            body: JSON.stringify(dataToSave)
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
     } catch (error) {
         console.error('Failed to save leaderboard:', error);
     }
@@ -494,7 +550,7 @@ async function updateLeaderboard() {
     
     try {
         // First fetch latest leaderboard
-        await fetchLeaderboard();
+        await fetchLeaderboard(false);
         
         // Find or create player entry
         let playerEntry = leaderboard.find(entry => entry && entry.name === playerName);
@@ -508,7 +564,8 @@ async function updateLeaderboard() {
             await saveLeaderboard();
         }
         
-        renderLeaderboard();
+        // Fetch again to confirm save
+        await fetchLeaderboard(false);
     } catch (error) {
         console.error('Error updating leaderboard:', error);
     }
@@ -517,19 +574,16 @@ async function updateLeaderboard() {
 function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
     
-    // Filter out any invalid entries
-    const validLeaderboard = leaderboard.filter(entry => entry && entry.name && typeof entry.total === 'number');
-    
-    // Sort by total descending (highest first)
-    const sorted = [...validLeaderboard].sort((a, b) => b.total - a.total);
-    
-    // Take only top 10
-    const top10 = sorted.slice(0, 10);
-    
-    if (top10.length === 0) {
+    if (!leaderboard || leaderboard.length === 0) {
         listDiv.innerHTML = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
         return;
     }
+    
+    // Sort by total descending (highest first)
+    const sorted = [...leaderboard].sort((a, b) => b.total - a.total);
+    
+    // Take only top 10
+    const top10 = sorted.slice(0, 10);
     
     let html = '';
     top10.forEach((entry, index) => {
@@ -543,7 +597,7 @@ function renderLeaderboard() {
         
         html += `<div class="leaderboard-entry ${isYou}">
             <span class="leaderboard-rank">${rankSymbol}</span>
-            <span class="leaderboard-name">${escapeHtml(entry.name)}</span>
+            <span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
             <span class="leaderboard-score">🍯 ${entry.total.toLocaleString()}</span>
         </div>`;
     });
@@ -576,7 +630,7 @@ function escapeHtml(unsafe) {
 
 // Check if name is available (case-insensitive)
 async function isNameAvailable(name) {
-    await fetchLeaderboard(); // Refresh leaderboard first
+    await fetchLeaderboard(false);
     const lowerName = name.toLowerCase();
     return !leaderboard.some(entry => entry && entry.name && entry.name.toLowerCase() === lowerName);
 }
@@ -601,7 +655,7 @@ saveNameBtn.addEventListener('click', async () => {
     // Add to leaderboard
     leaderboard.push({ name: playerName, total: 0 });
     await saveLeaderboard();
-    renderLeaderboard();
+    await fetchLeaderboard();
     
     // If this is Opleoni, show a secret message
     if (playerName === 'Opleoni') {
@@ -624,12 +678,12 @@ if (playerName) {
     fetchLeaderboard();
 }
 
-// Update leaderboard periodically (every 30 seconds)
+// Update leaderboard periodically (every 15 seconds)
 setInterval(() => {
     if (playerName) {
         updateLeaderboard();
     }
-}, 30000);
+}, 15000);
 
 // ========== GAME CONSTANTS ==========
 const HIVE_X = 100, HIVE_Y = 200;
@@ -707,6 +761,8 @@ const capacityStatus = document.getElementById('capacityStatus');
 const honeyMultStatus = document.getElementById('honeyMultStatus');
 const compoundingLevelSpan = document.getElementById('compoundingLevel');
 const compoundingCostSpan = document.getElementById('compoundingCost');
+const speedBoost = document.getElementById('speedBoost');
+const capacityBoost = document.getElementById('capacityBoost');
 
 // Tool buttons
 const buyClippers = document.getElementById('buyClippers');
@@ -895,6 +951,7 @@ function updateRebirthUI() {
         rebirthInfo.textContent = `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
     }
 
+    // Update one-time upgrade buttons with MAXED status
     if (autoUnlocked) {
         autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
         buyAutoUpgrade.disabled = true;
@@ -903,19 +960,25 @@ function updateRebirthUI() {
         buyAutoUpgrade.disabled = rebirthPoints < 2;
     }
     
+    // Speed boost display
     if (beeSpeedMultiplier > 1.0) {
         speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        speedBoost.textContent = `(x${beeSpeedMultiplier.toFixed(1)})`;
         buyBeeSpeed.disabled = true;
     } else {
         speedStatus.textContent = '(1 RP)';
+        speedBoost.textContent = '(x1.5)';
         buyBeeSpeed.disabled = rebirthPoints < 1;
     }
     
+    // Capacity boost display
     if (capacityMultiplier > 1.0) {
         capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        capacityBoost.textContent = `(x${capacityMultiplier.toFixed(1)})`;
         buyCapacity.disabled = true;
     } else {
         capacityStatus.textContent = '(3 RP)';
+        capacityBoost.textContent = '(x2.0)';
         buyCapacity.disabled = rebirthPoints < 3;
     }
     
