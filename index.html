@@ -617,8 +617,18 @@
                     <option value="rp">🔁 RP</option>
                     <option value="sp">🔴 SP</option>
                 </select>
-                <input type="number" id="menuAdminAmount" class="adder-input" value="1000" min="0" style="width:100px;">
+                <input type="text" id="menuAdminAmount" class="adder-input" value="1000" inputmode="decimal" style="width:110px;" placeholder="1000 / 1e9">
                 <button class="menu-btn" id="menuAdminAddBtn">➕ ADD</button>
+            </div>
+            
+            <div class="menu-row" style="border-top: 2px solid #ffd966; padding-top: 10px; margin-top: 10px;">
+                <select id="menuAdminResetStatSelect" class="admin-select" style="width:100%;">
+                    <option value="honey">Reset Honey</option>
+                    <option value="rp">Reset RP</option>
+                    <option value="sp">Reset SP</option>
+                    <option value="all">Reset ALL (Honey + RP + SP)</option>
+                </select>
+                <button class="menu-btn remove-btn" id="menuAdminResetBtn">RESET PLAYER STAT</button>
             </div>
             
             <!-- NEW REMOVE SECTION -->
@@ -681,8 +691,13 @@
         <div class="menu-section">
             <div class="menu-section-title">🔄 RESET</div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuResetAllBtn">🔄 RESET ALL</button>
-                <button class="menu-btn" id="menuResetHoneyBtn">🍯 RESET HONEY</button>
+                <select id="menuResetStatSelect" class="admin-select" style="width:100%;">
+                    <option value="honey">Reset My Honey</option>
+                    <option value="rp">Reset My RP</option>
+                    <option value="sp">Reset My SP</option>
+                    <option value="all">Reset My ALL (Honey + RP + SP)</option>
+                </select>
+                <button class="menu-btn remove-btn" id="menuResetSelectedBtn">RESET SELECTED</button>
             </div>
         </div>
     </div>
@@ -849,6 +864,8 @@ const menuAdminPlayerSelect = document.getElementById('menuAdminPlayerSelect');
 const menuAdminStatSelect = document.getElementById('menuAdminStatSelect');
 const menuAdminAmount = document.getElementById('menuAdminAmount');
 const menuAdminAddBtn = document.getElementById('menuAdminAddBtn');
+const menuAdminResetStatSelect = document.getElementById('menuAdminResetStatSelect');
+const menuAdminResetBtn = document.getElementById('menuAdminResetBtn');
 const menuOpenAnnouncementBtn = document.getElementById('menuOpenAnnouncementBtn');
 const menuRedeemCodeInput = document.getElementById('menuRedeemCodeInput');
 const menuRedeemCodeBtn = document.getElementById('menuRedeemCodeBtn');
@@ -859,8 +876,8 @@ const menuCopySaveBtn = document.getElementById('menuCopySaveBtn');
 const menuLoadCodeInput = document.getElementById('menuLoadCodeInput');
 const menuLoadSaveBtn = document.getElementById('menuLoadSaveBtn');
 const menuPerformanceBtn = document.getElementById('menuPerformanceBtn');
-const menuResetAllBtn = document.getElementById('menuResetAllBtn');
-const menuResetHoneyBtn = document.getElementById('menuResetHoneyBtn');
+const menuResetStatSelect = document.getElementById('menuResetStatSelect');
+const menuResetSelectedBtn = document.getElementById('menuResetSelectedBtn');
 const menuRemoveNameInput = document.getElementById('menuRemoveNameInput');
 const menuRemovePlayerBtn = document.getElementById('menuRemovePlayerBtn');
 const menuRemoveMessage = document.getElementById('menuRemoveMessage');
@@ -1155,41 +1172,21 @@ menuLoadSaveBtn.addEventListener('click', () => {
 });
 
 // ========== RESET BUTTONS ==========
-menuResetAllBtn.addEventListener('click', () => {
-    if (confirm('Reset ALL progress? Name will stay on leaderboard.')) {
-        honey = 0; totalHoneyEarned = 0; bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
-        hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
-        hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
-        rebirthPoints = 0; sacrificePoints = 0;
-        autoUnlocked = false; beeSpeedMultiplier = 1.0; capacityMultiplier = 1.0; honeyMultUpgrade = 1.0;
-        compoundingLevel = 0; compoundingMultiplier = 1.0;
-        x10HoneyPurchased = false; rpAutoBuyActive = false; rpGeneratorLevel = 0;
-        rpCompoundingLevel = 0; rpCompoundingMultiplier = 1.0;
-        autoActive = false; rpAutobuyEnabled = false;
-        performanceMode = false;
-        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-        if (rpGeneratorInterval) { clearInterval(rpGeneratorInterval); rpGeneratorInterval = null; }
-        if (rpAutoBuyInterval) { clearInterval(rpAutoBuyInterval); rpAutoBuyInterval = null; }
-        toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
-        toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)'; toggleRPAutoBtn.classList.remove('rp-autobuy-active');
-        updatePerformanceButton();
-        addBee();
-        for (let i = 0; i < 14; i++) spawnFlower();
-        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
-        hireCostSpan.textContent = formatNumber(nextHireCost);
-        localStorage.removeItem(SAVE_KEY);
-        
-        submitScore(0);
-        saveGame();
+menuResetSelectedBtn.addEventListener('click', () => {
+    const resetStat = menuResetStatSelect.value;
+    if (!['honey', 'rp', 'sp', 'all'].includes(resetStat)) {
+        alert('Invalid reset stat');
+        return;
     }
-});
+    if (!confirm(`Reset your ${resetStat.toUpperCase()} stats?`)) return;
 
-menuResetHoneyBtn.addEventListener('click', () => {
-    honey = 0;
-    totalHoneyEarned = 0;
-    submitScore(0);
+    applyLocalCurrencyReset(resetStat);
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
     saveGame();
-    alert('Honey and leaderboard score reset to 0!');
+    alert(`Reset completed for: ${resetStat.toUpperCase()}`);
 });
 
 // ========== ANNOUNCEMENT FUNCTIONS ==========
@@ -1324,7 +1321,7 @@ function normalizePlayerName(name) {
 }
 
 function toSafeAmount(value) {
-    const parsed = Number(value);
+    const parsed = Number(String(value ?? '').replace(/,/g, '').trim());
     if (!Number.isFinite(parsed) || parsed < 0) return 0;
     return Math.floor(parsed);
 }
@@ -1359,6 +1356,45 @@ async function addHoneyToPlayerScore(targetPlayer, amount) {
     });
 }
 
+async function resetPlayerHoneyScore(targetPlayer) {
+    const normalizedName = normalizePlayerName(targetPlayer);
+    const sanitizedName = sanitizeFirebaseKey(normalizedName);
+    if (!normalizedName || !sanitizedName) {
+        throw new Error('Invalid target player');
+    }
+
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val();
+    let keyToUse = sanitizedName;
+
+    if (data) {
+        for (const [key, value] of Object.entries(data)) {
+            if (value && value.name === normalizedName) {
+                keyToUse = key;
+                break;
+            }
+        }
+    }
+
+    await leaderboardRef.child(keyToUse).set({
+        name: normalizedName,
+        total: 0
+    });
+}
+
+function applyLocalCurrencyReset(resetStat) {
+    if (resetStat === 'honey' || resetStat === 'all') {
+        honey = 0;
+        totalHoneyEarned = 0;
+    }
+    if (resetStat === 'rp' || resetStat === 'all') {
+        rebirthPoints = 0;
+    }
+    if (resetStat === 'sp' || resetStat === 'all') {
+        sacrificePoints = 0;
+    }
+}
+
 let claimingAdminGrant = false;
 let adminGrantWatchRef = null;
 
@@ -1376,12 +1412,50 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
             honey: toSafeAmount(safeCurrent.honey),
             rp: toSafeAmount(safeCurrent.rp),
             sp: toSafeAmount(safeCurrent.sp),
+            resetHoney: parseBoolean(safeCurrent.resetHoney, false),
+            resetRp: parseBoolean(safeCurrent.resetRp, false),
+            resetSp: parseBoolean(safeCurrent.resetSp, false),
+            resetAll: parseBoolean(safeCurrent.resetAll, false),
             updatedAt: Date.now()
         };
 
         if (stat === 'honey') next.honey += amount;
         if (stat === 'rp') next.rp += amount;
         if (stat === 'sp') next.sp += amount;
+        return next;
+    });
+}
+
+async function queueAdminReset(targetPlayer, resetStat) {
+    const sanitizedTarget = normalizePlayerName(targetPlayer);
+    const key = sanitizeFirebaseKey(sanitizedTarget);
+    if (!sanitizedTarget || !key) {
+        throw new Error('Invalid target player');
+    }
+
+    await adminGrantsRef.child(key).transaction((current) => {
+        const safeCurrent = current && typeof current === 'object' ? current : {};
+        const next = {
+            name: sanitizedTarget,
+            honey: toSafeAmount(safeCurrent.honey),
+            rp: toSafeAmount(safeCurrent.rp),
+            sp: toSafeAmount(safeCurrent.sp),
+            resetHoney: parseBoolean(safeCurrent.resetHoney, false),
+            resetRp: parseBoolean(safeCurrent.resetRp, false),
+            resetSp: parseBoolean(safeCurrent.resetSp, false),
+            resetAll: parseBoolean(safeCurrent.resetAll, false),
+            updatedAt: Date.now()
+        };
+
+        if (resetStat === 'all') {
+            next.resetAll = true;
+        } else if (resetStat === 'honey') {
+            next.resetHoney = true;
+        } else if (resetStat === 'rp') {
+            next.resetRp = true;
+        } else if (resetStat === 'sp') {
+            next.resetSp = true;
+        }
         return next;
     });
 }
@@ -1402,11 +1476,26 @@ async function claimAdminGrants() {
         const honeyGrant = toSafeAmount(data.honey);
         const rpGrant = toSafeAmount(data.rp);
         const spGrant = toSafeAmount(data.sp);
+        const resetAll = parseBoolean(data.resetAll, false);
+        const resetHoney = parseBoolean(data.resetHoney, false);
+        const resetRp = parseBoolean(data.resetRp, false);
+        const resetSp = parseBoolean(data.resetSp, false);
         const totalGrant = honeyGrant + rpGrant + spGrant;
 
-        if (totalGrant <= 0) {
+        if (totalGrant <= 0 && !resetAll && !resetHoney && !resetRp && !resetSp) {
             await grantRef.remove();
             return;
+        }
+
+        if (resetAll || resetHoney) {
+            honey = 0;
+            totalHoneyEarned = 0;
+        }
+        if (resetAll || resetRp) {
+            rebirthPoints = 0;
+        }
+        if (resetAll || resetSp) {
+            sacrificePoints = 0;
         }
 
         honey += honeyGrant;
@@ -1423,10 +1512,14 @@ async function claimAdminGrants() {
         saveGame();
 
         const grantParts = [];
+        if (resetAll) grantParts.push('Reset ALL');
+        if (!resetAll && resetHoney) grantParts.push('Reset Honey');
+        if (!resetAll && resetRp) grantParts.push('Reset RP');
+        if (!resetAll && resetSp) grantParts.push('Reset SP');
         if (honeyGrant > 0) grantParts.push(`${formatNumber(honeyGrant)} Honey`);
         if (rpGrant > 0) grantParts.push(`${formatNumber(rpGrant)} RP`);
         if (spGrant > 0) grantParts.push(`${formatNumber(spGrant)} SP`);
-        alert(`Admin gift claimed: ${grantParts.join(', ')}`);
+        alert(`Admin update claimed: ${grantParts.join(', ')}`);
     } catch (error) {
         console.error('Failed to claim admin grants:', error);
     } finally {
@@ -1553,6 +1646,69 @@ menuAdminAddBtn.addEventListener('click', async () => {
             return;
         }
         alert('Failed to add currency to target player. Check Firebase permissions/rules.');
+    }
+});
+
+menuAdminResetBtn.addEventListener('click', async () => {
+    if (playerName !== 'Opleoni') return;
+
+    let leaderboardResetDone = false;
+
+    try {
+        let targetPlayer = menuAdminPlayerSelect.value;
+        const resetStat = menuAdminResetStatSelect.value;
+
+        if (!['honey', 'rp', 'sp', 'all'].includes(resetStat)) {
+            alert('Invalid reset stat');
+            return;
+        }
+
+        if (!targetPlayer || targetPlayer === '') {
+            targetPlayer = 'Opleoni';
+        }
+
+        if (targetPlayer === '__NEW__') {
+            const newNameInput = prompt('Enter player name to reset:');
+            if (!newNameInput) return;
+            const newName = normalizePlayerName(newNameInput);
+            if (!newName) {
+                alert('Invalid name');
+                return;
+            }
+
+            const available = await isNameAvailable(newName);
+            if (available) {
+                alert('That player does not exist yet.');
+                return;
+            }
+            targetPlayer = newName;
+        }
+
+        if (!confirm(`Reset ${resetStat.toUpperCase()} for ${targetPlayer}?`)) return;
+
+        if (targetPlayer === playerName) {
+            applyLocalCurrencyReset(resetStat);
+        } else {
+            if (resetStat === 'honey' || resetStat === 'all') {
+                await resetPlayerHoneyScore(targetPlayer);
+                leaderboardResetDone = true;
+            }
+            await queueAdminReset(targetPlayer, resetStat);
+        }
+
+        recalcMultiplier();
+        updateRebirthUI();
+        updateToolButtons();
+        updateSPUI();
+        saveGame();
+        alert(`Reset completed: ${resetStat.toUpperCase()} for ${targetPlayer}`);
+    } catch (error) {
+        console.error('Admin reset failed:', error);
+        if (leaderboardResetDone) {
+            alert('Leaderboard honey reset worked, but queued reset failed. Check Firebase rules for adminGrants.');
+            return;
+        }
+        alert('Failed to reset stats for target player. Check Firebase permissions/rules.');
     }
 });
 
