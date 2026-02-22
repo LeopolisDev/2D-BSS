@@ -615,15 +615,15 @@
 
 <script>
 // ================== FIREBASE CONFIGURATION ==================
-// REPLACE THESE WITH YOUR FIREBASE PROJECT DETAILS
+// YOUR FIREBASE CONFIG - COPY FROM YOUR FIREBASE CONSOLE
 const firebaseConfig = {
-    apiKey: "AIzaSyC0jdWRN8mQ2HXxz4iQRWfAwO_N1SzkYQ8",
-    authDomain: "beeswarmleaderboard.firebaseapp.com",
-    databaseURL: "https://beeswarmleaderboard-default-rtdb.firebaseio.com",
-    projectId: "beeswarmleaderboard",
-    storageBucket: "beeswarmleaderboard.firebasestorage.app",
-    messagingSenderId: "851994162915",
-    appId: "1:851994162915:web:f0a10e38b96ca86d6037d6"
+    apiKey: "AIzaSyCw-Ldw_t2XV5sV3FxBROtE72dPxuH3Z-I",
+    authDomain: "bee-swarm-5b9f9.firebaseapp.com",
+    databaseURL: "https://bee-swarm-5b9f9-default-rtdb.firebaseio.com",
+    projectId: "bee-swarm-5b9f9",
+    storageBucket: "bee-swarm-5b9f9.firebasestorage.app",
+    messagingSenderId: "67074504006",
+    appId: "1:67074504006:web:ef94f1f4d0ebc13357ee4b"
 };
 
 // Initialize Firebase
@@ -672,14 +672,14 @@ closeAnnouncementBtn.addEventListener('click', () => {
     localStorage.setItem('announcementClosed', 'true');
 });
 
-// ========== NUMBER FORMATTING (supports up to 64-bit) ==========
+// ========== NUMBER FORMATTING ==========
 function formatNumber(num) {
     if (num === undefined || num === null) return '0';
-    if (num >= 1e15) return (num / 1e15).toFixed(2) + 'Qd';  // Quadrillion
-    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';  // Trillion
-    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';    // Billion
-    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';    // Million
-    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';    // Thousand
+    if (num >= 1e15) return (num / 1e15).toFixed(2) + 'Qd';
+    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
     return Math.floor(num).toString();
 }
 
@@ -692,7 +692,6 @@ function fetchLeaderboard() {
         leaderboard = [];
         
         if (data) {
-            // Convert object to array
             Object.keys(data).forEach(key => {
                 if (data[key] && data[key].name && typeof data[key].total === 'number') {
                     leaderboard.push({
@@ -721,15 +720,12 @@ async function submitScore(score) {
     try {
         console.log('Submitting score to Firebase:', { playerName, score });
         
-        // Firebase uses 64-bit integers, so no scaling needed!
         await leaderboardRef.child(playerName.replace(/[.#$\[\]]/g, '_')).set({
             name: playerName,
             total: score
         });
         
         console.log('Submit success');
-        
-        // Leaderboard will auto-update due to the on() listener
     } catch (error) {
         console.error('Failed to submit score:', error);
         debugInfo.innerHTML = `❌ Submit error: ${error.message}`;
@@ -838,7 +834,6 @@ saveNameBtn.addEventListener('click', async () => {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     
-    // Submit initial score of 0
     await submitScore(0);
     
     if (playerName === 'Opleoni') {
@@ -883,7 +878,6 @@ if (sendAnnouncementBtn) {
     });
 }
 
-// Listen for announcement changes
 window.addEventListener('storage', (e) => {
     if (e.key === 'announcementClosed') {
         announcementClosed = e.newValue === 'true';
@@ -1078,7 +1072,6 @@ function saveGame() {
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
     setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
     
-    // Submit score to Firebase
     submitScore(totalHoneyEarned);
 }
 
@@ -1148,116 +1141,94 @@ function loadGame() {
     }
 }
 
-function setupRPGenerator() {
-    if (rpGeneratorInterval) clearInterval(rpGeneratorInterval);
-    if (rpGeneratorLevel > 0) {
-        const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000);
-        rpGeneratorInterval = setInterval(() => {
-            let rpGain = Math.floor(1 * rpCompoundingMultiplier);
-            rebirthPoints += rpGain;
-            updateRebirthUI();
-            saveGame();
-        }, intervalTime);
-    }
-}
-
-function setupRPAutoBuy() {
-    if (rpAutoBuyInterval) clearInterval(rpAutoBuyInterval);
-    if (rpAutoBuyActive && rpAutobuyEnabled) {
-        rpAutoBuyInterval = setInterval(() => {
-            if (rebirthPoints >= Math.pow(2, compoundingLevel)) {
-                buyCompounding.click();
-            } else if (!autoUnlocked && rebirthPoints >= 2) {
-                buyAutoUpgrade.click();
-            } else if (beeSpeedMultiplier === 1.0 && rebirthPoints >= 1) {
-                buyBeeSpeed.click();
-            } else if (capacityMultiplier === 1.0 && rebirthPoints >= 3) {
-                buyCapacity.click();
-            } else if (honeyMultUpgrade === 1.0 && rebirthPoints >= 2) {
-                buyHoneyMult.click();
-            }
-        }, 1000);
-    }
-}
-
-setInterval(saveGame, 30000);
-window.addEventListener('beforeunload', saveGame);
-
-// ========== HELPER FUNCTIONS ==========
-function recalcMultiplier() {
-    let toolMult = 1.0;
-    if (hasClippers) toolMult *= 1.2;
-    if (hasShears) toolMult *= 1.5;
-    if (hasScythe) toolMult *= 2.0;
-    if (hasOil) toolMult *= 3.0;
-    if (hasHoneycomb) toolMult *= 1.5;
-    if (hasBeeGun) toolMult *= 2.0;
-    if (hasRoyalJelly) toolMult *= 3.0;
-    if (hasStarTreat) toolMult *= 5.0;
-    toolMultiplier = toolMult;
-    
-    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
-    if (x10HoneyPurchased) totalMult *= 10;
-    totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
-}
-
-function updateToolButtons() {
-    buyClippers.disabled = hasClippers;
-    buyShears.disabled = hasShears;
-    buyScythe.disabled = hasScythe;
-    buyOil.disabled = hasOil;
-    buyHoneycomb.disabled = hasHoneycomb;
-    buyBeeGun.disabled = hasBeeGun;
-    buyRoyalJelly.disabled = hasRoyalJelly;
-    buyStarTreat.disabled = hasStarTreat;
-}
-
-function spawnFlower() {
-    if (flowers.filter(f => f.active).length >= MAX_FLOWERS) return false;
-    for (let attempt = 0; attempt < 200; attempt++) {
-        const x = 200 + Math.random() * 550;
-        const y = 50 + Math.random() * 300;
-        if (x < 180) continue;
-        let overlap = false;
-        for (let f of flowers) {
-            if (!f.active) continue;
-            const dx = f.x - x, dy = f.y - y;
-            if (Math.hypot(dx, dy) < FLOWER_RADIUS * 2.2) {
-                overlap = true;
-                break;
-            }
-        }
-        if (!overlap) {
-            let basePollen = 8 + Math.floor(Math.random() * 12);
-            flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
-            return true;
-        }
-    }
-    return false;
-}
-
-function addBee() {
-    let capacity = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
-    bees.push({
-        x: HIVE_X + (Math.random() * 30 - 15),
-        y: HIVE_Y + (Math.random() * 30 - 15),
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 0.5) * 2,
-        carrying: 0,
-        targetFlower: null,
-        returning: false
-    });
-}
-
-function findBestFlower(beeX, beeY) {
-    let bestDist = Infinity, bestIndex = -1;
-    for (let i = 0; i < flowers.length; i++) {
+// ========== GAME MECHANICS ==========
+function update() {
+    for (let i = flowers.length - 1; i >= 0; i--) {
         const f = flowers[i];
-        if (!f.active || f.pollen <= 0) continue;
-        const dist = Math.hypot(f.x - beeX, f.y - beeY);
-        if (dist < bestDist) { bestDist = dist; bestIndex = i; }
+        if (!f.active) {
+            f.timer--;
+            if (f.timer <= 0) {
+                if (flowers.filter(fl => fl.active).length < MAX_FLOWERS) {
+                    f.active = true;
+                    f.pollen = 8 + Math.floor(Math.random() * 12);
+                    f.timer = 0;
+                }
+            }
+        }
     }
-    return bestIndex;
+    if (flowers.filter(f => f.active).length < 5) spawnFlower();
+
+    for (let b of bees) {
+        let maxCap = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
+        if (b.carrying >= maxCap) {
+            b.returning = true;
+            b.targetFlower = null;
+        }
+
+        if (b.returning) {
+            const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 20) {
+                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * (x10HoneyPurchased ? 10 : 1));
+                honey += deposited;
+                totalHoneyEarned += deposited;
+                b.carrying = 0;
+                b.returning = false;
+            } else {
+                b.vx += (dx / dist) * 0.1 * beeSpeedMultiplier;
+                b.vy += (dy / dist) * 0.1 * beeSpeedMultiplier;
+            }
+        } else {
+            if (b.targetFlower === null || b.targetFlower >= flowers.length || 
+                !flowers[b.targetFlower]?.active || flowers[b.targetFlower].pollen <= 0) {
+                b.targetFlower = findBestFlower(b.x, b.y);
+            }
+
+            if (b.targetFlower !== null && b.targetFlower < flowers.length) {
+                const target = flowers[b.targetFlower];
+                if (target.active && target.pollen > 0) {
+                    const dx = target.x - b.x, dy = target.y - b.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < FLOWER_RADIUS + 5) {
+                        const collect = Math.min(maxCap - b.carrying, target.pollen);
+                        b.carrying += collect;
+                        target.pollen -= collect;
+                        if (target.pollen <= 0) {
+                            target.active = false;
+                            target.timer = 200;
+                            b.targetFlower = null;
+                        }
+                    } else {
+                        b.vx += (dx / dist) * 0.1 * beeSpeedMultiplier;
+                        b.vy += (dy / dist) * 0.1 * beeSpeedMultiplier;
+                    }
+                } else b.targetFlower = null;
+            } else {
+                b.vx += (Math.random() - 0.5) * 0.1 * beeSpeedMultiplier;
+                b.vy += (Math.random() - 0.5) * 0.1 * beeSpeedMultiplier;
+            }
+        }
+
+        const speed = Math.hypot(b.vx, b.vy);
+        const maxSpeed = BEE_SPEED_BASE * beeSpeedMultiplier;
+        if (speed > maxSpeed) {
+            b.vx = (b.vx / speed) * maxSpeed;
+            b.vy = (b.vy / speed) * maxSpeed;
+        }
+
+        b.x += b.vx; b.y += b.vy;
+        if (b.x < 10) { b.x = 10; b.vx *= -0.5; }
+        if (b.x > 790) { b.x = 790; b.vx *= -0.5; }
+        if (b.y < 10) { b.y = 10; b.vy *= -0.5; }
+        if (b.y > 390) { b.y = 390; b.vy *= -0.5; }
+    }
+
+    beeCountSpan.textContent = bees.length;
+    const activeFlowers = flowers.filter(f => f.active).length;
+    fieldInfo.textContent = `🌸 ${activeFlowers} flowers`;
+    hireCostSpan.textContent = formatNumber(nextHireCost);
+    updateRebirthUI();
+    updateSPUI();
 }
 
 function updateRebirthUI() {
@@ -1376,6 +1347,114 @@ function updateSPUI() {
     buyRPCompounding.disabled = sacrificePoints < compCost;
 }
 
+function recalcMultiplier() {
+    let toolMult = 1.0;
+    if (hasClippers) toolMult *= 1.2;
+    if (hasShears) toolMult *= 1.5;
+    if (hasScythe) toolMult *= 2.0;
+    if (hasOil) toolMult *= 3.0;
+    if (hasHoneycomb) toolMult *= 1.5;
+    if (hasBeeGun) toolMult *= 2.0;
+    if (hasRoyalJelly) toolMult *= 3.0;
+    if (hasStarTreat) toolMult *= 5.0;
+    toolMultiplier = toolMult;
+    
+    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
+    if (x10HoneyPurchased) totalMult *= 10;
+    totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
+}
+
+function updateToolButtons() {
+    buyClippers.disabled = hasClippers;
+    buyShears.disabled = hasShears;
+    buyScythe.disabled = hasScythe;
+    buyOil.disabled = hasOil;
+    buyHoneycomb.disabled = hasHoneycomb;
+    buyBeeGun.disabled = hasBeeGun;
+    buyRoyalJelly.disabled = hasRoyalJelly;
+    buyStarTreat.disabled = hasStarTreat;
+}
+
+function setupRPGenerator() {
+    if (rpGeneratorInterval) clearInterval(rpGeneratorInterval);
+    if (rpGeneratorLevel > 0) {
+        const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000);
+        rpGeneratorInterval = setInterval(() => {
+            let rpGain = Math.floor(1 * rpCompoundingMultiplier);
+            rebirthPoints += rpGain;
+            updateRebirthUI();
+            saveGame();
+        }, intervalTime);
+    }
+}
+
+function setupRPAutoBuy() {
+    if (rpAutoBuyInterval) clearInterval(rpAutoBuyInterval);
+    if (rpAutoBuyActive && rpAutobuyEnabled) {
+        rpAutoBuyInterval = setInterval(() => {
+            if (rebirthPoints >= Math.pow(2, compoundingLevel)) {
+                buyCompounding.click();
+            } else if (!autoUnlocked && rebirthPoints >= 2) {
+                buyAutoUpgrade.click();
+            } else if (beeSpeedMultiplier === 1.0 && rebirthPoints >= 1) {
+                buyBeeSpeed.click();
+            } else if (capacityMultiplier === 1.0 && rebirthPoints >= 3) {
+                buyCapacity.click();
+            } else if (honeyMultUpgrade === 1.0 && rebirthPoints >= 2) {
+                buyHoneyMult.click();
+            }
+        }, 1000);
+    }
+}
+
+function spawnFlower() {
+    if (flowers.filter(f => f.active).length >= MAX_FLOWERS) return false;
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const x = 200 + Math.random() * 550;
+        const y = 50 + Math.random() * 300;
+        if (x < 180) continue;
+        let overlap = false;
+        for (let f of flowers) {
+            if (!f.active) continue;
+            const dx = f.x - x, dy = f.y - y;
+            if (Math.hypot(dx, dy) < FLOWER_RADIUS * 2.2) {
+                overlap = true;
+                break;
+            }
+        }
+        if (!overlap) {
+            let basePollen = 8 + Math.floor(Math.random() * 12);
+            flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
+            return true;
+        }
+    }
+    return false;
+}
+
+function addBee() {
+    let capacity = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
+    bees.push({
+        x: HIVE_X + (Math.random() * 30 - 15),
+        y: HIVE_Y + (Math.random() * 30 - 15),
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+        carrying: 0,
+        targetFlower: null,
+        returning: false
+    });
+}
+
+function findBestFlower(beeX, beeY) {
+    let bestDist = Infinity, bestIndex = -1;
+    for (let i = 0; i < flowers.length; i++) {
+        const f = flowers[i];
+        if (!f.active || f.pollen <= 0) continue;
+        const dist = Math.hypot(f.x - beeX, f.y - beeY);
+        if (dist < bestDist) { bestDist = dist; bestIndex = i; }
+    }
+    return bestIndex;
+}
+
 // ========== AUTOMATION ==========
 function autoBuy() {
     if (!autoActive || !autoUnlocked) return;
@@ -1479,7 +1558,6 @@ resetBtn.addEventListener('click', () => {
         hireCostSpan.textContent = formatNumber(nextHireCost);
         localStorage.removeItem(SAVE_KEY);
         
-        // Submit zero score to Firebase
         submitScore(0);
         saveGame();
     }
@@ -1489,7 +1567,6 @@ resetHoneyBtn.addEventListener('click', () => {
     honey = 0;
     totalHoneyEarned = 0;
     
-    // Submit zero score to Firebase
     submitScore(0);
     
     saveGame();
@@ -1704,7 +1781,6 @@ adminAddBtn.addEventListener('click', async () => {
         }
         
         targetPlayer = newName;
-        // Submit initial score
         await submitScore(0);
     }
     
@@ -1714,7 +1790,6 @@ adminAddBtn.addEventListener('click', async () => {
                 honey += amount;
                 totalHoneyEarned += amount;
             }
-            // Submit updated score
             await submitScore(totalHoneyEarned);
             break;
         case 'rp':
@@ -1747,9 +1822,50 @@ function init() {
 }
 init();
 
-function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+// ========== DRAWING ==========
+function draw() {
+    ctx.clearRect(0, 0, 800, 400);
+    const grad = ctx.createLinearGradient(0, 0, 0, 400);
+    grad.addColorStop(0, '#9ccc7c'); grad.addColorStop(1, '#5f8b4b');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 800, 400);
+
+    ctx.shadowColor = '#402d16'; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#c99a3b';
+    ctx.beginPath(); ctx.ellipse(HIVE_X-5, HIVE_Y-10, 40, 30, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#b57c2a'; ctx.beginPath(); ctx.ellipse(HIVE_X, HIVE_Y, 44, 34, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#e3b15a'; ctx.beginPath(); ctx.ellipse(HIVE_X-5, HIVE_Y-5, 30, 22, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0; ctx.font = '30px "Segoe UI"'; ctx.fillStyle = '#f5d742'; ctx.fillText('🏠', HIVE_X-30, HIVE_Y+10);
+
+    for (let f of flowers) {
+        if (!f.active) { ctx.globalAlpha = 0.3; ctx.fillStyle = '#755d3b'; ctx.beginPath(); ctx.arc(f.x, f.y, FLOWER_RADIUS-4,0,2*Math.PI); ctx.fill(); ctx.globalAlpha=1; continue; }
+        ctx.shadowBlur = 8; ctx.shadowColor = '#4f2f0a';
+        ctx.fillStyle = '#f5a3c7'; ctx.beginPath(); ctx.arc(f.x-4, f.y-4, 7,0,2*Math.PI); ctx.fill();
+        ctx.fillStyle = '#ffea9f'; ctx.beginPath(); ctx.arc(f.x+4, f.y+2, 7,0,2*Math.PI); ctx.fill();
+        ctx.fillStyle = '#e6d358'; ctx.beginPath(); ctx.arc(f.x, f.y, 9,0,2*Math.PI); ctx.fill();
+        ctx.shadowBlur = 4; ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#422b0e'; ctx.fillText(f.pollen, f.x-12, f.y-15);
+    }
+
+    for (let b of bees) {
+        ctx.shadowBlur = 6; ctx.shadowColor = '#141c0e';
+        ctx.fillStyle = '#f2b137'; ctx.beginPath(); ctx.ellipse(b.x, b.y, 12, 8, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#3f2e1c'; ctx.fillRect(b.x-8, b.y-3, 4, 6); ctx.fillRect(b.x+4, b.y-3, 4, 6);
+        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(b.x-6, b.y-4, 2,0,2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(b.x+2, b.y-4, 2,0,2*Math.PI); ctx.fill();
+        ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(b.x-7, b.y-5, 1,0,2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(b.x+1, b.y-5, 1,0,2*Math.PI); ctx.fill();
+        ctx.fillStyle = '#c9e9fa'; ctx.globalAlpha = 0.6;
+        ctx.beginPath(); ctx.ellipse(b.x-8, b.y-12, 6, 3, 0.2, 0, 2*Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(b.x+4, b.y-12, 6, 3, -0.2, 0, 2*Math.PI); ctx.fill();
+        ctx.globalAlpha = 1;
+        if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('✨', b.x-12, b.y-25); }
+    }
+    ctx.shadowBlur = 0;
+}
+
+function gameLoop() { 
+    update(); 
+    draw(); 
+    requestAnimationFrame(gameLoop); 
+}
 gameLoop();
 </script>
 </body>
 </html>
-
