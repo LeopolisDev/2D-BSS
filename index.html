@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · 2D incremental</title>
+    <title>🐝 BEE SWARM · save & honey upgrade</title>
     <style>
         * {
             box-sizing: border-box;
@@ -194,11 +194,20 @@
             background: #8fc97f;
             border-bottom-color: #427c2b;
         }
+        .save-indicator {
+            color: #e7f0ba;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
         footer {
             color: #e7f0ba;
             margin-top: 10px;
             font-size: 0.9rem;
             text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
         }
     </style>
 </head>
@@ -229,13 +238,13 @@
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
-        <!-- Rebirth shop -->
+        <!-- Rebirth shop (with Honey Upgrade) -->
         <div class="rebirth-shop-row">
             <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
             <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO (2 RP)</button>
             <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED (1 RP)</button>
             <button class="tool-btn" id="buyCapacity">📦 CAPACITY (3 RP)</button>
-            <button class="tool-btn" id="buyPollenBoost">🌼 POLLEN (2 RP)</button>
+            <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 (2 RP)</button>
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
@@ -256,7 +265,10 @@
             <button class="tool-btn" id="addHoneyBtn">➕ ADD HONEY</button>
         </div>
     </div>
-    <footer>🌸 Click flowers to boost them • Bees collect pollen automatically</footer>
+    <footer>
+        <span>🌸 Click flowers to boost them</span>
+        <span class="save-indicator" id="saveIndicator">💾 Auto-saved</span>
+    </footer>
 </div>
 
 <script>
@@ -268,6 +280,7 @@
     const BEE_SPEED = 1.1;
     const BEE_CAPACITY_BASE = 8;
     const HIRE_COST_BASE = 20;
+    const SAVE_KEY = 'beeSwarmSave';
 
     // ========== GAME STATE ==========
     let honey = 0;
@@ -287,7 +300,7 @@
     let autoUnlocked = false;
     let beeSpeedBoost = 1.0;
     let capacityBoost = 0;
-    let pollenBoost = 0;
+    let honeyMultUpgrade = 1.0;  // New: honey multiplier from rebirth shop (x5 when purchased)
 
     // Automation
     let autoActive = false;
@@ -308,6 +321,7 @@
     const fieldInfo = document.getElementById('fieldInfo');
     const totalMultDisplay = document.getElementById('totalMultDisplay');
     const rebirthCostSpan = document.getElementById('rebirthCostSpan');
+    const saveIndicator = document.getElementById('saveIndicator');
 
     // Buttons
     const hireBtn = document.getElementById('hireBtn');
@@ -316,7 +330,7 @@
     const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
     const buyBeeSpeed = document.getElementById('buyBeeSpeed');
     const buyCapacity = document.getElementById('buyCapacity');
-    const buyPollenBoost = document.getElementById('buyPollenBoost');
+    const buyHoneyMult = document.getElementById('buyHoneyMult');
     const buyClippers = document.getElementById('buyClippers');
     const buyShears = document.getElementById('buyShears');
     const buyScythe = document.getElementById('buyScythe');
@@ -324,6 +338,83 @@
     const toggleAutoBtn = document.getElementById('toggleAutoBtn');
     const addHoneyBtn = document.getElementById('addHoneyBtn');
     const honeyInput = document.getElementById('honeyInput');
+
+    // ========== SAVE / LOAD ==========
+    function saveGame() {
+        const saveData = {
+            honey,
+            bees: bees.map(b => ({
+                x: b.x, y: b.y, vx: b.vx, vy: b.vy,
+                carrying: b.carrying,
+                targetFlower: b.targetFlower,
+                returning: b.returning
+            })),
+            flowers: flowers.map(f => ({
+                x: f.x, y: f.y, pollen: f.pollen,
+                active: f.active, timer: f.timer
+            })),
+            nextHireCost,
+            hasClippers, hasShears, hasScythe, hasOil,
+            rebirthPoints, rebirthCount,
+            autoUnlocked, beeSpeedBoost, capacityBoost, honeyMultUpgrade,
+            autoActive
+        };
+        localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+        saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
+        setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
+    }
+
+    function loadGame() {
+        const saved = localStorage.getItem(SAVE_KEY);
+        if (!saved) return false;
+
+        try {
+            const data = JSON.parse(saved);
+            honey = data.honey || 0;
+            bees = data.bees || [];
+            flowers = data.flowers || [];
+            nextHireCost = data.nextHireCost || HIRE_COST_BASE;
+            hasClippers = data.hasClippers || false;
+            hasShears = data.hasShears || false;
+            hasScythe = data.hasScythe || false;
+            hasOil = data.hasOil || false;
+            rebirthPoints = data.rebirthPoints || 0;
+            rebirthCount = data.rebirthCount || 0;
+            autoUnlocked = data.autoUnlocked || false;
+            beeSpeedBoost = data.beeSpeedBoost || 1.0;
+            capacityBoost = data.capacityBoost || 0;
+            honeyMultUpgrade = data.honeyMultUpgrade || 1.0;
+            autoActive = data.autoActive || false;
+
+            // Restore automation state
+            if (autoActive && autoUnlocked) {
+                toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
+                toggleAutoBtn.classList.add('auto-active');
+                if (!autoInterval) {
+                    autoInterval = setInterval(autoBuy, 1000);
+                }
+            } else {
+                autoActive = false;
+                toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+                toggleAutoBtn.classList.remove('auto-active');
+            }
+
+            // Update UI
+            recalcMultiplier();
+            updateRebirthUI();
+            updateToolButtons();
+            return true;
+        } catch (e) {
+            console.error('Failed to load save', e);
+            return false;
+        }
+    }
+
+    // Auto-save every 30 seconds
+    setInterval(saveGame, 30000);
+
+    // Save on page unload
+    window.addEventListener('beforeunload', saveGame);
 
     // ========== HELPER FUNCTIONS ==========
     function recalcMultiplier() {
@@ -335,6 +426,13 @@
         toolMultiplier = mult;
         multiplierSpan.textContent = toolMultiplier.toFixed(2);
         totalMultDisplay.textContent = `✖️ ${toolMultiplier.toFixed(2)}`;
+    }
+
+    function updateToolButtons() {
+        buyClippers.disabled = hasClippers;
+        buyShears.disabled = hasShears;
+        buyScythe.disabled = hasScythe;
+        buyOil.disabled = hasOil;
     }
 
     function spawnFlower() {
@@ -355,7 +453,7 @@
                 }
             }
             if (!overlap) {
-                let basePollen = 8 + Math.floor(Math.random() * 12) + pollenBoost;
+                let basePollen = 8 + Math.floor(Math.random() * 12);
                 flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
                 return true;
             }
@@ -410,7 +508,7 @@
         buyAutoUpgrade.disabled = autoUnlocked || rebirthPoints < 2;
         buyBeeSpeed.disabled = beeSpeedBoost > 1.0 || rebirthPoints < 1;
         buyCapacity.disabled = capacityBoost > 0 || rebirthPoints < 3;
-        buyPollenBoost.disabled = pollenBoost > 0 || rebirthPoints < 2;
+        buyHoneyMult.disabled = honeyMultUpgrade > 1.0 || rebirthPoints < 2;
     }
 
     // ========== GAME MECHANICS ==========
@@ -423,7 +521,7 @@
                 if (f.timer <= 0) {
                     if (flowers.filter(fl => fl.active).length < MAX_FLOWERS) {
                         f.active = true;
-                        f.pollen = 8 + Math.floor(Math.random() * 12) + pollenBoost;
+                        f.pollen = 8 + Math.floor(Math.random() * 12);
                         f.timer = 0;
                     }
                 }
@@ -452,8 +550,9 @@
                 const dist = Math.hypot(dx, dy);
 
                 if (dist < 20) {
-                    // Deposit honey
-                    honey += Math.floor(b.carrying * toolMultiplier);
+                    // Deposit honey with ALL multipliers: tool * honeyMultUpgrade
+                    let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade);
+                    honey += deposited;
                     b.carrying = 0;
                     b.returning = false;
                 } else {
@@ -744,26 +843,9 @@
     });
 
     resetBtn.addEventListener('click', () => {
-        if (confirm('Reset all progress?')) {
-            honey = 0;
-            bees = [];
-            flowers = [];
-            nextHireCost = HIRE_COST_BASE;
-            hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
-            rebirthPoints = 0; rebirthCount = 0;
-            autoUnlocked = false; beeSpeedBoost = 1.0; capacityBoost = 0; pollenBoost = 0;
-            autoActive = false;
-            if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-            
-            addBee();
-            for (let i = 0; i < 14; i++) spawnFlower();
-            
-            recalcMultiplier();
-            updateRebirthUI();
-            toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
-            toggleAutoBtn.classList.remove('auto-active');
-            buyClippers.disabled = false; buyShears.disabled = false;
-            buyScythe.disabled = false; buyOil.disabled = false;
+        if (confirm('Reset all progress? This will clear your save.')) {
+            localStorage.removeItem(SAVE_KEY);
+            location.reload();
         }
     });
 
@@ -785,8 +867,8 @@
             
             recalcMultiplier();
             updateRebirthUI();
-            buyClippers.disabled = false; buyShears.disabled = false;
-            buyScythe.disabled = false; buyOil.disabled = false;
+            updateToolButtons();
+            saveGame();
         }
     });
 
@@ -796,6 +878,7 @@
             rebirthPoints -= 2;
             autoUnlocked = true;
             updateRebirthUI();
+            saveGame();
         }
     });
 
@@ -804,6 +887,7 @@
             rebirthPoints -= 1;
             beeSpeedBoost = 1.25;
             updateRebirthUI();
+            saveGame();
         }
     });
 
@@ -812,36 +896,39 @@
             rebirthPoints -= 3;
             capacityBoost = 4;
             updateRebirthUI();
+            saveGame();
         }
     });
 
-    buyPollenBoost.addEventListener('click', () => {
-        if (rebirthPoints >= 2 && pollenBoost === 0) {
+    // NEW: Honey Multiplier upgrade (x5 for 2 RP)
+    buyHoneyMult.addEventListener('click', () => {
+        if (rebirthPoints >= 2 && honeyMultUpgrade === 1.0) {
             rebirthPoints -= 2;
-            pollenBoost = 2;
+            honeyMultUpgrade = 5.0;
             updateRebirthUI();
+            saveGame();
         }
     });
 
     // Tool purchases
     buyClippers.addEventListener('click', () => {
         if (!hasClippers && honey >= 50) {
-            honey -= 50; hasClippers = true; recalcMultiplier(); buyClippers.disabled = true;
+            honey -= 50; hasClippers = true; recalcMultiplier(); buyClippers.disabled = true; saveGame();
         }
     });
     buyShears.addEventListener('click', () => {
         if (!hasShears && honey >= 150) {
-            honey -= 150; hasShears = true; recalcMultiplier(); buyShears.disabled = true;
+            honey -= 150; hasShears = true; recalcMultiplier(); buyShears.disabled = true; saveGame();
         }
     });
     buyScythe.addEventListener('click', () => {
         if (!hasScythe && honey >= 400) {
-            honey -= 400; hasScythe = true; recalcMultiplier(); buyScythe.disabled = true;
+            honey -= 400; hasScythe = true; recalcMultiplier(); buyScythe.disabled = true; saveGame();
         }
     });
     buyOil.addEventListener('click', () => {
         if (!hasOil && honey >= 900) {
-            honey -= 900; hasOil = true; recalcMultiplier(); buyOil.disabled = true;
+            honey -= 900; hasOil = true; recalcMultiplier(); buyOil.disabled = true; saveGame();
         }
     });
 
@@ -856,17 +943,22 @@
 
     // ========== INITIALIZATION ==========
     function init() {
-        // Start with 1 bee
-        addBee();
-        
-        // Create initial flowers
-        for (let i = 0; i < 14; i++) {
-            spawnFlower();
+        // Try to load saved game
+        if (!loadGame()) {
+            // No save, start fresh
+            addBee();
+            for (let i = 0; i < 14; i++) {
+                spawnFlower();
+            }
         }
         
         recalcMultiplier();
         updateRebirthUI();
+        updateToolButtons();
         hireCostSpan.textContent = nextHireCost;
+        
+        // Save initial state
+        saveGame();
     }
 
     init();
