@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · infinite RP compounding + compact admin</title>
+    <title>🐝 BEE SWARM · RP generator 5 levels + compounding rebirths</title>
     <style>
         * {
             box-sizing: border-box;
@@ -402,11 +402,21 @@
             font-size: 1rem;
             border-bottom: 4px solid #bd9f4b;
             outline: none;
+            min-width: 120px;
         }
         .reset-btn-bottom {
             background: #cab577;
             border-bottom: 5px solid #7e6237;
             color: #1f3d16;
+        }
+        .rp-autobuy-toggle {
+            background: #5b8c5a;
+            border-bottom-color: #2d5a2c;
+            color: white;
+        }
+        .rp-autobuy-active {
+            background: #4caf50;
+            border-bottom-color: #2e7d32;
         }
     </style>
 </head>
@@ -426,7 +436,7 @@
     <div class="canvas-panel">
         <canvas id="gameCanvas" width="800" height="400"></canvas>
 
-        <!-- Main stats panel (RESET button removed from here) -->
+        <!-- Main stats panel -->
         <div class="hive-panel">
             <div class="stats">
                 <div class="stat-item">🍯 <span id="honeyDisplay">0</span></div>
@@ -461,9 +471,9 @@
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
-        <!-- SACRIFICE Row -->
+        <!-- SACRIFICE Row (wipes everything) -->
         <div class="sacrifice-row">
-            <span style="color:#ffcccc; font-weight:bold;">🔴 SACRIFICE:</span>
+            <span style="color:#ffcccc; font-weight:bold;">🔴 SACRIFICE (WIPES EVERYTHING):</span>
             <button class="tool-btn sacrifice-btn" id="sacrificeBtn">🔥 SACRIFICE</button>
             <span class="multiplier-badge" id="sacrificeInfo">1 SP = 100M + 10 RP</span>
             <span class="multiplier-badge" id="spBadge">SP: 0</span>
@@ -504,17 +514,19 @@
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
-        <!-- Controls row (without RESET button) -->
+        <!-- Controls row - Only AUTO toggles and name display -->
         <div class="shop-row" style="background:#8f6d3c;">
             <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
-            <input type="number" id="honeyInput" class="adder-input" value="1000" min="0">
-            <button class="tool-btn" id="addHoneyBtn">➕ ADD HONEY</button>
+            <button class="tool-btn rp-autobuy-toggle" id="toggleRPAutoBtn">🤖 RP AUTO (OFF)</button>
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
         </div>
 
-        <!-- Compact Admin Panel for Opleoni (only 2 values) -->
+        <!-- Compact Admin Panel for Opleoni (with player selector) -->
         <div id="adminPanel" class="admin-panel-compact" style="display: none;">
             <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN:</span>
+            <select id="adminPlayerSelect" class="admin-select">
+                <option value="">Select Player</option>
+            </select>
             <select id="adminStatSelect" class="admin-select">
                 <option value="honey">🍯 Honey</option>
                 <option value="rp">🔁 RP</option>
@@ -524,7 +536,7 @@
             <button class="tool-btn" id="adminAddBtn">➕ ADD</button>
         </div>
 
-        <!-- Footer with RESET button moved down -->
+        <!-- Footer with RESET buttons -->
         <footer>
             <div class="footer-row">
                 <span>🌸 Click flowers to boost them</span>
@@ -532,6 +544,7 @@
             </div>
             <div class="footer-row">
                 <button class="bee-btn reset-btn-bottom" id="resetBtn">🔄 RESET ALL PROGRESS</button>
+                <button class="bee-btn reset-btn-bottom" id="resetHoneyBtn">🍯 RESET HONEY (leaderboard too)</button>
             </div>
         </footer>
     </div>
@@ -564,6 +577,20 @@ const adminPanel = document.getElementById('adminPanel');
 const spDisplay = document.getElementById('spDisplay');
 const spBadge = document.getElementById('spBadge');
 const spShopDisplay = document.getElementById('spShopDisplay');
+const adminPlayerSelect = document.getElementById('adminPlayerSelect');
+const adminStatSelect = document.getElementById('adminStatSelect');
+const adminAmount = document.getElementById('adminAmount');
+const adminAddBtn = document.getElementById('adminAddBtn');
+
+// ========== NUMBER FORMATTING FUNCTION (abbreviates) ==========
+function formatNumber(num) {
+    if (num === undefined || num === null) return '0';
+    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
+    return Math.floor(num).toString();
+}
 
 // ========== LEADERBOARD FUNCTIONS ==========
 async function fetchLeaderboard(showLoading = true) {
@@ -592,6 +619,7 @@ async function fetchLeaderboard(showLoading = true) {
         
         leaderboard = players.filter(entry => entry && typeof entry === 'object' && entry.name && typeof entry.name === 'string' && typeof entry.total === 'number');
         renderLeaderboard();
+        updateAdminPlayerSelect();
         updateRetryCount = 0;
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
@@ -631,6 +659,20 @@ async function saveLeaderboard() {
     }
 }
 
+function updateAdminPlayerSelect() {
+    if (playerName !== 'Opleoni') return;
+    const select = adminPlayerSelect;
+    select.innerHTML = '<option value="">Select Player</option>';
+    leaderboard.forEach(entry => {
+        if (entry && entry.name) {
+            const option = document.createElement('option');
+            option.value = entry.name;
+            option.textContent = entry.name;
+            select.appendChild(option);
+        }
+    });
+}
+
 async function updateLeaderboard() {
     if (!playerName) return;
     const now = Date.now();
@@ -668,14 +710,14 @@ function renderLeaderboard() {
         const isYou = entry.name === playerName ? 'you-row' : '';
         const rank = index + 1;
         let rankSymbol = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
-        html += `<div class="leaderboard-entry ${isYou}"><span class="leaderboard-rank">${rankSymbol}</span><span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span><span class="leaderboard-score">🍯 ${entry.total.toLocaleString()}</span></div>`;
+        html += `<div class="leaderboard-entry ${isYou}"><span class="leaderboard-rank">${rankSymbol}</span><span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span><span class="leaderboard-score">🍯 ${formatNumber(entry.total)}</span></div>`;
     });
     const playerInTop10 = top10.some(entry => entry.name === playerName);
     if (!playerInTop10 && playerName) {
         const playerRank = sorted.findIndex(entry => entry.name === playerName) + 1;
         if (playerRank > 0) {
             const playerEntry = sorted.find(entry => entry.name === playerName);
-            html += `<div class="leaderboard-entry you-row"><span class="leaderboard-rank">${playerRank}.</span><span class="leaderboard-name">${escapeHtml(playerName)}</span><span class="leaderboard-score">🍯 ${playerEntry.total.toLocaleString()}</span></div>`;
+            html += `<div class="leaderboard-entry you-row"><span class="leaderboard-rank">${playerRank}.</span><span class="leaderboard-name">${escapeHtml(playerName)}</span><span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span></div>`;
         }
     }
     listDiv.innerHTML = html;
@@ -800,17 +842,20 @@ let compoundingMultiplier = 1.0;
 // SP Upgrades
 let x10HoneyPurchased = false;
 let rpAutoBuyActive = false;
-let rpGeneratorLevel = 0; // 0-4
+let rpGeneratorLevel = 0; // 0-5 now
 let rpGeneratorInterval = null;
 let rpAutoBuyInterval = null;
 
-// NEW: RP Compounding upgrade (infinite)
+// RP Compounding upgrade (infinite)
 let rpCompoundingLevel = 0;
-let rpCompoundingMultiplier = 1.0; // 1.25^level, affects RP generation
+let rpCompoundingMultiplier = 1.0; // 1.25^level, affects RP gain from rebirth and generator
 
 // Automation
 let autoActive = false;
 let autoInterval = null;
+
+// RP Autobuy toggle (separate from purchased upgrade)
+let rpAutobuyEnabled = false;
 
 // ========== UI ELEMENTS ==========
 const canvas = document.getElementById('gameCanvas');
@@ -867,10 +912,10 @@ const buyRoyalJelly = document.getElementById('buyRoyalJelly');
 const buyStarTreat = document.getElementById('buyStarTreat');
 
 const toggleAutoBtn = document.getElementById('toggleAutoBtn');
-const addHoneyBtn = document.getElementById('addHoneyBtn');
-const honeyInput = document.getElementById('honeyInput');
+const toggleRPAutoBtn = document.getElementById('toggleRPAutoBtn');
 const sacrificeBtn = document.getElementById('sacrificeBtn');
 const resetBtn = document.getElementById('resetBtn');
+const resetHoneyBtn = document.getElementById('resetHoneyBtn');
 
 // Admin elements
 const adminStatSelect = document.getElementById('adminStatSelect');
@@ -899,7 +944,7 @@ function saveGame() {
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
-        rpCompoundingLevel, rpCompoundingMultiplier
+        rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
@@ -939,6 +984,7 @@ function loadGame() {
         rpGeneratorLevel = data.rpGeneratorLevel || 0;
         rpCompoundingLevel = data.rpCompoundingLevel || 0;
         rpCompoundingMultiplier = data.rpCompoundingMultiplier || 1.0;
+        rpAutobuyEnabled = data.rpAutobuyEnabled || false;
 
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
@@ -956,6 +1002,15 @@ function loadGame() {
         // Setup RP AutoBuy if active
         setupRPAutoBuy();
 
+        // Update RP Autobuy toggle button
+        if (rpAutobuyEnabled && rpAutoBuyActive) {
+            toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
+            toggleRPAutoBtn.classList.add('rp-autobuy-active');
+        } else {
+            toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+            toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+        }
+
         recalcMultiplier();
         updateRebirthUI();
         updateToolButtons();
@@ -970,9 +1025,10 @@ function loadGame() {
 function setupRPGenerator() {
     if (rpGeneratorInterval) clearInterval(rpGeneratorInterval);
     if (rpGeneratorLevel > 0) {
-        const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000); // 5s,4s,3s,2s,1s
+        // Level 1: 5s, Level 2: 4s, Level 3: 3s, Level 4: 2s, Level 5: 1s
+        const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000);
         rpGeneratorInterval = setInterval(() => {
-            // Apply RP compounding multiplier
+            // Apply RP compounding multiplier to generator
             let rpGain = Math.floor(1 * rpCompoundingMultiplier);
             rebirthPoints += rpGain;
             updateRebirthUI();
@@ -983,7 +1039,7 @@ function setupRPGenerator() {
 
 function setupRPAutoBuy() {
     if (rpAutoBuyInterval) clearInterval(rpAutoBuyInterval);
-    if (rpAutoBuyActive) {
+    if (rpAutoBuyActive && rpAutobuyEnabled) {
         rpAutoBuyInterval = setInterval(() => {
             // Auto-buy RP upgrades (compounding first, then others if enough RP)
             if (rebirthPoints >= Math.pow(2, compoundingLevel)) {
@@ -1082,21 +1138,28 @@ function findBestFlower(beeX, beeY) {
 }
 
 function updateRebirthUI() {
-    rpSpan.textContent = rebirthPoints;
-    rpBadge.textContent = `RP: ${rebirthPoints}`;
-    rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
-    spDisplay.textContent = sacrificePoints;
-    spBadge.textContent = `SP: ${sacrificePoints}`;
-    spShopDisplay.textContent = `SP: ${sacrificePoints}`;
-    totalEarnedSpan.textContent = totalHoneyEarned.toLocaleString();
+    rpSpan.textContent = formatNumber(rebirthPoints);
+    rpBadge.textContent = `RP: ${formatNumber(rebirthPoints)}`;
+    rpShopDisplay.textContent = `RP: ${formatNumber(rebirthPoints)}`;
+    spDisplay.textContent = formatNumber(sacrificePoints);
+    spBadge.textContent = `SP: ${formatNumber(sacrificePoints)}`;
+    spShopDisplay.textContent = `SP: ${formatNumber(sacrificePoints)}`;
+    honeySpan.textContent = formatNumber(honey);
+    totalEarnedSpan.textContent = formatNumber(totalHoneyEarned);
 
     const maxRP = getMaxRPFromHoney();
-    rebirthInfo.textContent = maxRP > 0 ? `${maxRP} RP = ${getRPCost(maxRP).toLocaleString()}🍯` : `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
+    if (maxRP > 0) {
+        const rawRP = maxRP;
+        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier);
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (${rpCompoundingMultiplier.toFixed(2)}x)`;
+    } else {
+        rebirthInfo.textContent = `1 RP = 10k (${rpCompoundingMultiplier.toFixed(2)}x)`;
+    }
 
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        sacrificeInfo.textContent = `${maxSP} SP = ${cost.honey.toLocaleString()}🍯 + ${cost.rp} RP`;
+        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP`;
     } else {
         sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
     }
@@ -1149,13 +1212,17 @@ function updateSPUI() {
     buyX10Honey.disabled = x10HoneyPurchased || sacrificePoints < 5;
     buyRPAuto.disabled = rpAutoBuyActive || sacrificePoints < 10;
     
+    // RP Generator: now up to level 5 (costs 1,2,3,4,5 SP)
     const nextLevel = rpGeneratorLevel + 1;
-    const genCost = nextLevel; // 1,2,3,4
+    const genCost = nextLevel; // 1,2,3,4,5
     rpGenLevel.textContent = rpGeneratorLevel;
     rpGenCost.textContent = genCost;
-    const intervalTime = rpGeneratorLevel === 0 ? 5 : Math.max(1, 5 - (rpGeneratorLevel - 1));
+    let intervalTime = 5;
+    if (rpGeneratorLevel > 0) {
+        intervalTime = Math.max(1, 5 - (rpGeneratorLevel - 1));
+    }
     rpGenTime.textContent = intervalTime + 's';
-    buyRPGen.disabled = rpGeneratorLevel >= 4 || sacrificePoints < genCost;
+    buyRPGen.disabled = rpGeneratorLevel >= 5 || sacrificePoints < genCost;
 
     // RP Compounding upgrade (infinite)
     const compCost = Math.pow(2, rpCompoundingLevel); // 1,2,4,8,16...
@@ -1247,11 +1314,10 @@ function update() {
         if (b.y > 390) { b.y = 390; b.vy *= -0.5; }
     }
 
-    honeySpan.textContent = Math.floor(honey);
     beeCountSpan.textContent = bees.length;
     const activeFlowers = flowers.filter(f => f.active).length;
     fieldInfo.textContent = `🌸 ${activeFlowers} flowers`;
-    hireCostSpan.textContent = nextHireCost;
+    hireCostSpan.textContent = formatNumber(nextHireCost);
     updateRebirthUI();
     updateSPUI();
 }
@@ -1313,7 +1379,7 @@ function autoBuy() {
         nextHireCost = Math.floor(nextHireCost * 1.5);
         saveGame();
     }
-    hireCostSpan.textContent = nextHireCost;
+    hireCostSpan.textContent = formatNumber(nextHireCost);
 }
 
 function toggleAuto() {
@@ -1323,6 +1389,26 @@ function toggleAuto() {
     toggleAutoBtn.classList.toggle('auto-active', autoActive);
     if (autoActive) { if (!autoInterval) autoInterval = setInterval(autoBuy, 1000); }
     else { if (autoInterval) { clearInterval(autoInterval); autoInterval = null; } }
+    saveGame();
+}
+
+function toggleRPAuto() {
+    if (!rpAutoBuyActive) {
+        alert('Buy RP AUTOBUY upgrade in SP Shop first!');
+        return;
+    }
+    rpAutobuyEnabled = !rpAutobuyEnabled;
+    toggleRPAutoBtn.textContent = rpAutobuyEnabled ? '🤖 RP AUTO (ON)' : '🤖 RP AUTO (OFF)';
+    toggleRPAutoBtn.classList.toggle('rp-autobuy-active', rpAutobuyEnabled);
+    
+    if (rpAutobuyEnabled) {
+        setupRPAutoBuy();
+    } else {
+        if (rpAutoBuyInterval) {
+            clearInterval(rpAutoBuyInterval);
+            rpAutoBuyInterval = null;
+        }
+    }
     saveGame();
 }
 
@@ -1350,7 +1436,7 @@ hireBtn.addEventListener('click', () => {
         honey -= nextHireCost;
         addBee();
         nextHireCost = Math.floor(nextHireCost * 1.5);
-        hireCostSpan.textContent = nextHireCost;
+        hireCostSpan.textContent = formatNumber(nextHireCost);
         saveGame();
     }
 });
@@ -1365,41 +1451,62 @@ resetBtn.addEventListener('click', () => {
         compoundingLevel = 0; compoundingMultiplier = 1.0;
         x10HoneyPurchased = false; rpAutoBuyActive = false; rpGeneratorLevel = 0;
         rpCompoundingLevel = 0; rpCompoundingMultiplier = 1.0;
-        autoActive = false; 
+        autoActive = false; rpAutobuyEnabled = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         if (rpGeneratorInterval) { clearInterval(rpGeneratorInterval); rpGeneratorInterval = null; }
         if (rpAutoBuyInterval) { clearInterval(rpAutoBuyInterval); rpAutoBuyInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
+        toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)'; toggleRPAutoBtn.classList.remove('rp-autobuy-active');
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
-        hireCostSpan.textContent = nextHireCost;
+        hireCostSpan.textContent = formatNumber(nextHireCost);
         localStorage.removeItem(SAVE_KEY);
         saveGame();
     }
 });
 
-// ========== REBIRTH ==========
+resetHoneyBtn.addEventListener('click', () => {
+    honey = 0;
+    totalHoneyEarned = 0; // Reset leaderboard total too
+    
+    // Update leaderboard
+    let playerEntry = leaderboard.find(entry => entry.name === playerName);
+    if (playerEntry) {
+        playerEntry.total = 0;
+        saveLeaderboard();
+    }
+    
+    saveGame();
+    alert('Honey and leaderboard score reset to 0!');
+});
+
+// ========== REBIRTH (now affected by RP compounding) ==========
 rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
         const cost = getRPCost(maxRP);
-        rebirthPoints += maxRP;
+        // Apply RP compounding multiplier
+        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier);
+        rebirthPoints += rpGain;
+        
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
         honey = 0;
-        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); hireCostSpan.textContent = nextHireCost;
+        
+        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
+        hireCostSpan.textContent = formatNumber(nextHireCost);
         saveGame();
-        alert(`✨ Purchased ${maxRP} RP for ${cost.toLocaleString()} honey! Honey reset to 0.`);
+        alert(`✨ Purchased ${maxRP} RP (multiplied to ${rpGain} RP) for ${formatNumber(cost)} honey! Honey reset to 0.`);
     } else {
-        alert(`❌ Need at least ${getRPCost(1).toLocaleString()} honey for 1 RP!`);
+        alert(`❌ Need at least 10,000 honey for 1 RP!`);
     }
 });
 
-// ========== SACRIFICE ==========
+// ========== SACRIFICE (wipes everything except SP) ==========
 sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
@@ -1408,19 +1515,39 @@ sacrificeBtn.addEventListener('click', () => {
         rebirthPoints -= cost.rp;
         sacrificePoints += maxSP;
         
-        // Reset game state but keep SP and SP upgrades
+        // WIPE EVERYTHING except SP and SP upgrades
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+        
+        // Reset rebirth upgrades
+        autoUnlocked = false;
+        beeSpeedMultiplier = 1.0;
+        capacityMultiplier = 1.0;
+        honeyMultUpgrade = 1.0;
+        compoundingLevel = 0;
+        compoundingMultiplier = 1.0;
+        
+        // Reset RP compounding (keeps SP upgrades but resets this)
+        rpCompoundingLevel = 0;
+        rpCompoundingMultiplier = 1.0;
+        
+        // Stop automation
+        autoActive = false;
+        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+        toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
+        
+        // Restart generator with new multiplier
+        setupRPGenerator();
         
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
         
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
-        hireCostSpan.textContent = nextHireCost;
+        hireCostSpan.textContent = formatNumber(nextHireCost);
         saveGame();
         
-        alert(`🔥 Sacrificed for ${maxSP} SP! Cost: ${cost.honey.toLocaleString()} honey + ${cost.rp} RP.`);
+        alert(`🔥 Sacrificed for ${maxSP} SP! Everything else has been wiped.`);
     } else {
         alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
     }
@@ -1442,16 +1569,18 @@ buyRPAuto.addEventListener('click', () => {
     if (sacrificePoints >= 10 && !rpAutoBuyActive) {
         sacrificePoints -= 10;
         rpAutoBuyActive = true;
-        setupRPAutoBuy();
+        if (rpAutobuyEnabled) {
+            setupRPAutoBuy();
+        }
         updateSPUI();
         saveGame();
-        alert('🤖 RP Autobuy activated!');
+        alert('🤖 RP Autobuy unlocked! Toggle the button to enable.');
     }
 });
 
 buyRPGen.addEventListener('click', () => {
     const cost = rpGeneratorLevel + 1;
-    if (rpGeneratorLevel < 4 && sacrificePoints >= cost) {
+    if (rpGeneratorLevel < 5 && sacrificePoints >= cost) {
         sacrificePoints -= cost;
         rpGeneratorLevel++;
         setupRPGenerator();
@@ -1461,7 +1590,7 @@ buyRPGen.addEventListener('click', () => {
     }
 });
 
-// NEW: RP Compounding upgrade (infinite)
+// RP Compounding upgrade (infinite)
 buyRPCompounding.addEventListener('click', () => {
     const cost = Math.pow(2, rpCompoundingLevel);
     if (sacrificePoints >= cost) {
@@ -1471,6 +1600,7 @@ buyRPCompounding.addEventListener('click', () => {
         // Update generator if active
         setupRPGenerator();
         updateSPUI();
+        updateRebirthUI(); // Update rebirth display
         saveGame();
         alert(`📈 RP Compounding upgraded to level ${rpCompoundingLevel}! (${rpCompoundingMultiplier.toFixed(2)}x RP gain)`);
     }
@@ -1537,47 +1667,54 @@ buyRoyalJelly.addEventListener('click', () => { if (!hasRoyalJelly && honey>=100
 buyStarTreat.addEventListener('click', () => { if (!hasStarTreat && honey>=250000) { honey-=250000; hasStarTreat=true; recalcMultiplier(); buyStarTreat.disabled=true; saveGame(); } });
 
 toggleAutoBtn.addEventListener('click', toggleAuto);
+toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
 
-// ========== SECRET ADDER (Opleoni only) ==========
-addHoneyBtn.addEventListener('click', () => {
-    if (playerName === 'Opleoni') {
-        let val = parseInt(honeyInput.value);
-        if (!isNaN(val) && val > 0) {
-            honey += val;
-            totalHoneyEarned += val; // Also add to leaderboard total
-            saveGame();
-            console.log('🔮 Added', val, 'honey for Opleoni');
-        }
-    } else {
-        alert('❌ Honey adder is only available for player Opleoni!');
-    }
-});
-
-// Compact admin panel for Opleoni
+// ========== ADMIN PANEL ==========
 adminAddBtn.addEventListener('click', () => {
-    if (playerName === 'Opleoni') {
-        const stat = adminStatSelect.value;
-        const amount = parseInt(adminAmount.value);
-        if (isNaN(amount) || amount < 0) return;
-        
-        switch(stat) {
-            case 'honey':
+    if (playerName !== 'Opleoni') return;
+    
+    const targetPlayer = adminPlayerSelect.value;
+    const stat = adminStatSelect.value;
+    const amount = parseInt(adminAmount.value);
+    
+    if (!targetPlayer || isNaN(amount) || amount < 0) {
+        alert('Please select a player and enter a valid amount');
+        return;
+    }
+    
+    // Find player in leaderboard
+    let playerEntry = leaderboard.find(entry => entry.name === targetPlayer);
+    if (!playerEntry) {
+        // Create new entry if doesn't exist
+        playerEntry = { name: targetPlayer, total: 0 };
+        leaderboard.push(playerEntry);
+    }
+    
+    switch(stat) {
+        case 'honey':
+            if (targetPlayer === playerName) {
                 honey += amount;
                 totalHoneyEarned += amount;
-                break;
-            case 'rp':
+            }
+            playerEntry.total += amount;
+            break;
+        case 'rp':
+            if (targetPlayer === playerName) {
                 rebirthPoints += amount;
-                break;
-            case 'sp':
+            }
+            break;
+        case 'sp':
+            if (targetPlayer === playerName) {
                 sacrificePoints += amount;
-                break;
-        }
-        
-        updateRebirthUI();
-        updateSPUI();
-        saveGame();
-        alert(`✅ Added ${amount} ${stat.toUpperCase()}`);
+            }
+            break;
     }
+    
+    saveLeaderboard();
+    updateRebirthUI();
+    updateSPUI();
+    saveGame();
+    alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
 });
 
 // ========== INIT ==========
@@ -1587,7 +1724,7 @@ function init() {
         for (let i = 0; i < 14; i++) spawnFlower();
     }
     recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
-    hireCostSpan.textContent = nextHireCost;
+    hireCostSpan.textContent = formatNumber(nextHireCost);
     saveGame();
 }
 init();
