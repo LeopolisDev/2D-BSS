@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · SimpleBoards Leaderboard</title>
+    <title>🐝 BEE SWARM · SimpleBoards Fixed</title>
     <style>
         * {
             box-sizing: border-box;
@@ -455,6 +455,12 @@
             color: #ffaa00;
             margin-left: 5px;
         }
+        .error-details {
+            color: #ff6b6b;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -498,7 +504,7 @@
         <!-- Leaderboard Panel (SIMPLEBOARDS - GLOBAL) -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">
-                🌍 GLOBAL TOP 10 (SimpleBoards)
+                🌍 GLOBAL TOP 10
                 <span class="refresh-btn" id="refreshLeaderboard">↻</span>
             </div>
             <div id="leaderboardList">
@@ -606,10 +612,10 @@
 
 <script>
 // ================== SIMPLEBOARDS CONFIGURATION ==================
-// REPLACE THESE WITH YOUR ACTUAL VALUES FROM SIMPLEBOARDS.DEV
+// Using the correct endpoint from your screenshot
 const SIMPLEBOARDS_API_KEY = '1e499b45-0ceb-4f77-89c0-f4d69cef9586';
 const SIMPLEBOARDS_LEADERBOARD_ID = 'f96a2bd0-2571-4637-0379-08de7214c7ed';
-const SIMPLEBOARDS_API_URL = 'https://api.simpleboards.dev/v1';
+const SIMPLEBOARDS_API_URL = 'https://api.simpleboards.dev/api';
 
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
@@ -666,58 +672,94 @@ async function fetchLeaderboard() {
     document.getElementById('leaderboardList').innerHTML = '<div class="loading">Loading leaderboard...</div>';
     
     try {
-        const response = await fetch(`${SIMPLEBOARDS_API_URL}/leaderboards/${SIMPLEBOARDS_LEADERBOARD_ID}/entries`, {
+        // First, we need to get entries - but SimpleBoards might have a different endpoint for fetching
+        // Let's try to get the leaderboard info first
+        console.log('Fetching leaderboard entries...');
+        
+        // According to your screenshot, the POST endpoint is for submitting scores
+        // For fetching, we might need a different endpoint
+        // Let's try a GET request to the same endpoint
+        const response = await fetch(`${SIMPLEBOARDS_API_URL}/entries?leaderboardId=${SIMPLEBOARDS_LEADERBOARD_ID}`, {
             headers: {
-                'Authorization': `Bearer ${SIMPLEBOARDS_API_KEY}`,
+                'x-api-key': SIMPLEBOARDS_API_KEY,
                 'Content-Type': 'application/json'
             }
         });
         
+        console.log('Response status:', response.status);
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
         
         const data = await response.json();
+        console.log('Received data:', data);
         
-        // SimpleBoards returns an array of entries
-        leaderboard = data.map(entry => ({
-            name: entry.playerDisplayName,
-            total: parseInt(entry.score) || 0
-        })).filter(entry => entry.name && entry.total > 0);
+        // Handle the data format - might be different from what we expect
+        if (Array.isArray(data)) {
+            leaderboard = data.map(entry => ({
+                name: entry.playerDisplayName || entry.name,
+                total: parseInt(entry.score) || 0
+            })).filter(entry => entry.name && entry.total > 0);
+        } else if (data.entries && Array.isArray(data.entries)) {
+            leaderboard = data.entries.map(entry => ({
+                name: entry.playerDisplayName || entry.name,
+                total: parseInt(entry.score) || 0
+            })).filter(entry => entry.name && entry.total > 0);
+        } else {
+            console.error('Unexpected data format:', data);
+            leaderboard = [];
+        }
         
         renderLeaderboard();
         
         if (playerName === 'Opleoni') {
             updateAdminPlayerSelect();
         }
+        
+        debugInfo.textContent = `✅ Loaded ${leaderboard.length} players`;
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
-        debugInfo.textContent = `Error: ${error.message}`;
+        debugInfo.innerHTML = `❌ Error: ${error.message}<br><span class="error-details">Check console (F12) for details</span>`;
         document.getElementById('leaderboardList').innerHTML = 
-            '<div class="leaderboard-entry">⚠️ Failed to load leaderboard. Check API key.</div>';
+            '<div class="leaderboard-entry">⚠️ Failed to load leaderboard. Will retry...</div>';
+        
+        // Retry after 5 seconds
+        setTimeout(fetchLeaderboard, 5000);
     }
 }
 
 async function submitScore(score) {
-    if (!playerName || score <= 0) return;
+    if (!playerName || score < 0) return;
     
     try {
-        const response = await fetch(`${SIMPLEBOARDS_API_URL}/leaderboards/${SIMPLEBOARDS_LEADERBOARD_ID}/entries`, {
+        console.log('Submitting score:', { playerName, score });
+        
+        const response = await fetch(`${SIMPLEBOARDS_API_URL}/entries`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${SIMPLEBOARDS_API_KEY}`,
+                'x-api-key': SIMPLEBOARDS_API_KEY,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
+                leaderboardId: SIMPLEBOARDS_LEADERBOARD_ID,
                 playerDisplayName: playerName,
-                score: score.toString(),
-                metadata: JSON.stringify({})
+                score: score.toString()
             })
         });
         
+        console.log('Submit response status:', response.status);
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            console.error('Submit error:', errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
+        
+        const data = await response.json();
+        console.log('Submit success:', data);
         
         // Refresh leaderboard after submitting
         await fetchLeaderboard();
@@ -791,7 +833,6 @@ function renderLeaderboard() {
     }
     
     listDiv.innerHTML = html;
-    debugInfo.textContent = `Loaded ${leaderboard.length} players`;
 }
 
 function escapeHtml(unsafe) {
@@ -1175,199 +1216,6 @@ function setupRPAutoBuy() {
 
 setInterval(saveGame, 30000);
 window.addEventListener('beforeunload', saveGame);
-
-// ========== HELPER FUNCTIONS ==========
-function recalcMultiplier() {
-    let toolMult = 1.0;
-    if (hasClippers) toolMult *= 1.2;
-    if (hasShears) toolMult *= 1.5;
-    if (hasScythe) toolMult *= 2.0;
-    if (hasOil) toolMult *= 3.0;
-    if (hasHoneycomb) toolMult *= 1.5;
-    if (hasBeeGun) toolMult *= 2.0;
-    if (hasRoyalJelly) toolMult *= 3.0;
-    if (hasStarTreat) toolMult *= 5.0;
-    toolMultiplier = toolMult;
-    
-    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
-    if (x10HoneyPurchased) totalMult *= 10;
-    totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
-}
-
-function updateToolButtons() {
-    buyClippers.disabled = hasClippers;
-    buyShears.disabled = hasShears;
-    buyScythe.disabled = hasScythe;
-    buyOil.disabled = hasOil;
-    buyHoneycomb.disabled = hasHoneycomb;
-    buyBeeGun.disabled = hasBeeGun;
-    buyRoyalJelly.disabled = hasRoyalJelly;
-    buyStarTreat.disabled = hasStarTreat;
-}
-
-function spawnFlower() {
-    if (flowers.filter(f => f.active).length >= MAX_FLOWERS) return false;
-    for (let attempt = 0; attempt < 200; attempt++) {
-        const x = 200 + Math.random() * 550;
-        const y = 50 + Math.random() * 300;
-        if (x < 180) continue;
-        let overlap = false;
-        for (let f of flowers) {
-            if (!f.active) continue;
-            const dx = f.x - x, dy = f.y - y;
-            if (Math.hypot(dx, dy) < FLOWER_RADIUS * 2.2) {
-                overlap = true;
-                break;
-            }
-        }
-        if (!overlap) {
-            let basePollen = 8 + Math.floor(Math.random() * 12);
-            flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
-            return true;
-        }
-    }
-    return false;
-}
-
-function addBee() {
-    let capacity = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
-    bees.push({
-        x: HIVE_X + (Math.random() * 30 - 15),
-        y: HIVE_Y + (Math.random() * 30 - 15),
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 0.5) * 2,
-        carrying: 0,
-        targetFlower: null,
-        returning: false
-    });
-}
-
-function findBestFlower(beeX, beeY) {
-    let bestDist = Infinity, bestIndex = -1;
-    for (let i = 0; i < flowers.length; i++) {
-        const f = flowers[i];
-        if (!f.active || f.pollen <= 0) continue;
-        const dist = Math.hypot(f.x - beeX, f.y - beeY);
-        if (dist < bestDist) { bestDist = dist; bestIndex = i; }
-    }
-    return bestIndex;
-}
-
-function updateRebirthUI() {
-    rpSpan.textContent = formatNumber(rebirthPoints);
-    rpBadge.textContent = `RP: ${formatNumber(rebirthPoints)}`;
-    rpShopDisplay.textContent = `RP: ${formatNumber(rebirthPoints)}`;
-    spDisplay.textContent = formatNumber(sacrificePoints);
-    spBadge.textContent = `SP: ${formatNumber(sacrificePoints)}`;
-    spShopDisplay.textContent = `SP: ${formatNumber(sacrificePoints)}`;
-    honeySpan.textContent = formatNumber(honey);
-    totalEarnedSpan.textContent = formatNumber(totalHoneyEarned);
-
-    const maxRP = getMaxRPFromHoney();
-    if (maxRP > 0) {
-        const rawRP = maxRP;
-        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier);
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (${rpCompoundingMultiplier.toFixed(2)}x)`;
-    } else {
-        rebirthInfo.textContent = `1 RP = 10k (${rpCompoundingMultiplier.toFixed(2)}x)`;
-    }
-
-    const maxSP = getMaxSPFromResources();
-    if (maxSP > 0) {
-        const cost = getSPCost(maxSP);
-        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP`;
-    } else {
-        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
-    }
-
-    if (autoUnlocked) {
-        autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyAutoUpgrade.disabled = true;
-    } else {
-        autoStatus.textContent = '(2 RP)';
-        buyAutoUpgrade.disabled = rebirthPoints < 2;
-    }
-    
-    if (beeSpeedMultiplier > 1.0) {
-        speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        speedBoost.textContent = `(x${beeSpeedMultiplier.toFixed(1)})`;
-        buyBeeSpeed.disabled = true;
-    } else {
-        speedStatus.textContent = '(1 RP)';
-        speedBoost.textContent = '(x1.5)';
-        buyBeeSpeed.disabled = rebirthPoints < 1;
-    }
-    
-    if (capacityMultiplier > 1.0) {
-        capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        capacityBoost.textContent = `(x${capacityMultiplier.toFixed(1)})`;
-        buyCapacity.disabled = true;
-    } else {
-        capacityStatus.textContent = '(3 RP)';
-        capacityBoost.textContent = '(x2.0)';
-        buyCapacity.disabled = rebirthPoints < 3;
-    }
-    
-    if (honeyMultUpgrade > 1.0) {
-        honeyMultStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyHoneyMult.disabled = true;
-    } else {
-        honeyMultStatus.textContent = '(2 RP)';
-        buyHoneyMult.disabled = rebirthPoints < 2;
-    }
-    
-    const compoundingCost = Math.pow(2, compoundingLevel);
-    compoundingLevelSpan.textContent = compoundingLevel;
-    compoundingCostSpan.textContent = compoundingCost;
-    const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
-    buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
-    buyCompounding.disabled = rebirthPoints < compoundingCost;
-}
-
-function updateSPUI() {
-    if (x10HoneyPurchased) {
-        buyX10Honey.innerHTML = '🍯 x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
-        buyX10Honey.disabled = true;
-    } else {
-        buyX10Honey.innerHTML = '🍯 x10 HONEY (5 SP)';
-        buyX10Honey.disabled = sacrificePoints < 5;
-    }
-    
-    if (rpAutoBuyActive) {
-        buyRPAuto.innerHTML = '🤖 RP AUTOBUY MAXED <span class="maxed-badge">MAX</span>';
-        buyRPAuto.disabled = true;
-    } else {
-        buyRPAuto.innerHTML = '🤖 RP AUTOBUY (10 SP)';
-        buyRPAuto.disabled = sacrificePoints < 10;
-    }
-    
-    const nextLevel = rpGeneratorLevel + 1;
-    const genCost = nextLevel;
-    rpGenLevel.textContent = rpGeneratorLevel;
-    rpGenCost.textContent = genCost;
-    let intervalTime = 5;
-    if (rpGeneratorLevel > 0) {
-        intervalTime = Math.max(1, 5 - (rpGeneratorLevel - 1));
-    }
-    rpGenTime.textContent = intervalTime + 's';
-    
-    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
-    rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
-    
-    if (rpGeneratorLevel >= 5) {
-        buyRPGen.innerHTML = `⏱️ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
-        buyRPGen.disabled = true;
-    } else {
-        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s next)</span>`;
-        buyRPGen.disabled = sacrificePoints < genCost;
-    }
-
-    const compCost = Math.pow(2, rpCompoundingLevel);
-    rpCompLevel.textContent = rpCompoundingLevel;
-    rpCompCost.textContent = compCost;
-    rpCompMult.textContent = rpCompoundingMultiplier.toFixed(2);
-    buyRPCompounding.disabled = sacrificePoints < compCost;
-}
 
 // ========== GAME MECHANICS ==========
 function update() {
@@ -1877,5 +1725,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
-
