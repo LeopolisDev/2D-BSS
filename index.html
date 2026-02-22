@@ -1391,6 +1391,7 @@ function updateMenuAdminSelect() {
     }
     menuAdminSection.style.display = 'block';
     const select = menuAdminPlayerSelect;
+    const previousSelection = select.value;
     select.innerHTML = '<option value="">Myself (Opleoni)</option>';
     
     leaderboard.forEach(entry => {
@@ -1404,8 +1405,11 @@ function updateMenuAdminSelect() {
     
     const newOption = document.createElement('option');
     newOption.value = '__NEW__';
-    newOption.textContent = '➕ Create New Player...';
+    newOption.textContent = 'Create New Player...';
     select.appendChild(newOption);
+
+    const canRestoreSelection = Array.from(select.options).some(option => option.value === previousSelection);
+    select.value = canRestoreSelection ? previousSelection : '';
 }
 
 menuAdminAddBtn.addEventListener('click', async () => {
