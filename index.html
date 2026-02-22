@@ -1315,6 +1315,39 @@ function toSafeAmount(value) {
     return Math.floor(parsed);
 }
 
+async function addHoneyToPlayerScore(targetPlayer, amount) {
+    const normalizedName = normalizePlayerName(targetPlayer);
+    const sanitizedName = sanitizeFirebaseKey(normalizedName);
+    if (!normalizedName || !sanitizedName) {
+        throw new Error('Invalid target player');
+    }
+
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val();
+    let keyToUse = sanitizedName;
+
+    if (data) {
+        for (const [key, value] of Object.entries(data)) {
+            if (value && value.name === normalizedName) {
+                keyToUse = key;
+                break;
+            }
+        }
+    }
+
+    await leaderboardRef.child(keyToUse).transaction((current) => {
+        const safeCurrent = current && typeof current === 'object' ? current : {};
+        return {
+            ...safeCurrent,
+            name: normalizedName,
+            total: toSafeAmount(safeCurrent.total) + amount
+        };
+    });
+}
+
+let claimingAdminGrant = false;
+let adminGrantWatchRef = null;
+
 async function queueAdminGrant(targetPlayer, stat, amount) {
     const sanitizedTarget = normalizePlayerName(targetPlayer);
     const key = sanitizeFirebaseKey(sanitizedTarget);
@@ -1340,9 +1373,11 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
 }
 
 async function claimAdminGrants() {
+    if (claimingAdminGrant) return;
     if (!playerName) return;
     const key = sanitizeFirebaseKey(playerName);
     if (!key) return;
+    claimingAdminGrant = true;
 
     try {
         const grantRef = adminGrantsRef.child(key);
@@ -1380,7 +1415,26 @@ async function claimAdminGrants() {
         alert(`Admin gift claimed: ${grantParts.join(', ')}`);
     } catch (error) {
         console.error('Failed to claim admin grants:', error);
+    } finally {
+        claimingAdminGrant = false;
     }
+}
+
+function startAdminGrantWatcher() {
+    if (adminGrantWatchRef) {
+        adminGrantWatchRef.off();
+        adminGrantWatchRef = null;
+    }
+    if (!playerName) return;
+    const key = sanitizeFirebaseKey(playerName);
+    if (!key) return;
+
+    adminGrantWatchRef = adminGrantsRef.child(key);
+    adminGrantWatchRef.on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            claimAdminGrants();
+        }
+    });
 }
 
 // ========== ADMIN PANEL (menu version) ==========
@@ -1414,66 +1468,77 @@ function updateMenuAdminSelect() {
 
 menuAdminAddBtn.addEventListener('click', async () => {
     if (playerName !== 'Opleoni') return;
-    
-    let targetPlayer = menuAdminPlayerSelect.value;
-    const stat = menuAdminStatSelect.value;
-    const amount = toSafeAmount(menuAdminAmount.value);
-    
-    if (!['honey', 'rp', 'sp'].includes(stat)) {
-        alert('Invalid currency type');
-        return;
-    }
 
-    if (amount <= 0) {
-        alert('Please enter an amount greater than 0');
-        return;
-    }
+    let leaderboardHoneyUpdated = false;
+
+    try {
+        let targetPlayer = menuAdminPlayerSelect.value;
+        const stat = menuAdminStatSelect.value;
+        const amount = toSafeAmount(menuAdminAmount.value);
     
-    if (!targetPlayer || targetPlayer === '') {
-        targetPlayer = 'Opleoni';
-    }
-    
-    if (targetPlayer === '__NEW__') {
-        const newNameInput = prompt('Enter new player name:');
-        if (!newNameInput) return;
-        const newName = normalizePlayerName(newNameInput);
-        if (!newName) {
-            alert('Invalid name');
+        if (!['honey', 'rp', 'sp'].includes(stat)) {
+            alert('Invalid currency type');
             return;
         }
-        
-        const available = await isNameAvailable(newName);
-        if (!available) {
-            alert('❌ That name already exists!');
+
+        if (amount <= 0) {
+            alert('Please enter an amount greater than 0');
             return;
         }
-        
-        targetPlayer = newName;
-    }
     
-    if (targetPlayer === playerName) {
-        if (stat === 'honey') {
-            honey += amount;
-            totalHoneyEarned += amount;
-            await submitScore(totalHoneyEarned);
-        } else if (stat === 'rp') {
-            rebirthPoints += amount;
-        } else if (stat === 'sp') {
-            sacrificePoints += amount;
+        if (!targetPlayer || targetPlayer === '') {
+            targetPlayer = 'Opleoni';
         }
-    } else {
-        await queueAdminGrant(targetPlayer, stat, amount);
-    }
     
-    recalcMultiplier();
-    updateRebirthUI();
-    updateToolButtons();
-    updateSPUI();
-    saveGame();
-    if (targetPlayer === playerName) {
+        if (targetPlayer === '__NEW__') {
+            const newNameInput = prompt('Enter new player name:');
+            if (!newNameInput) return;
+            const newName = normalizePlayerName(newNameInput);
+            if (!newName) {
+                alert('Invalid name');
+                return;
+            }
+        
+            const available = await isNameAvailable(newName);
+            if (!available) {
+                alert('That name already exists!');
+                return;
+            }
+        
+            targetPlayer = newName;
+        }
+    
+        if (targetPlayer === playerName) {
+            if (stat === 'honey') {
+                honey += amount;
+                totalHoneyEarned += amount;
+                await submitScore(totalHoneyEarned);
+            } else if (stat === 'rp') {
+                rebirthPoints += amount;
+            } else if (stat === 'sp') {
+                sacrificePoints += amount;
+            }
+        } else {
+            if (stat === 'honey') {
+                await addHoneyToPlayerScore(targetPlayer, amount);
+                leaderboardHoneyUpdated = true;
+            }
+            await queueAdminGrant(targetPlayer, stat, amount);
+        }
+    
+        recalcMultiplier();
+        updateRebirthUI();
+        updateToolButtons();
+        updateSPUI();
+        saveGame();
         alert(`Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
-    } else {
-        alert(`Queued ${amount} ${stat.toUpperCase()} for ${targetPlayer}. They will receive it when they load.`);
+    } catch (error) {
+        console.error('Admin add failed:', error);
+        if (leaderboardHoneyUpdated) {
+            alert('Honey score was updated, but gift delivery failed. Check Firebase rules for adminGrants.');
+            return;
+        }
+        alert('Failed to add currency to target player. Check Firebase permissions/rules.');
     }
 });
 
@@ -1639,6 +1704,7 @@ saveNameBtn.addEventListener('click', async () => {
         playerNameDisplay.textContent = `Name: ${playerName}`;
         
         await submitScore(totalHoneyEarned);
+        startAdminGrantWatcher();
         await claimAdminGrants();
         
         if (playerName === 'Opleoni') {
@@ -1666,6 +1732,7 @@ if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     fetchLeaderboard();
+    startAdminGrantWatcher();
     claimAdminGrants();
     setupAnnouncementListener();
 } else {
