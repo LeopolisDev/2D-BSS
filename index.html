@@ -612,7 +612,6 @@
 
 <script>
 // ================== SIMPLEBOARDS CONFIGURATION ==================
-// Using the correct endpoint from your screenshot
 const SIMPLEBOARDS_API_KEY = '1e499b45-0ceb-4f77-89c0-f4d69cef9586';
 const SIMPLEBOARDS_LEADERBOARD_ID = 'f96a2bd0-2571-4637-0379-08de7214c7ed';
 const SIMPLEBOARDS_API_URL = 'https://api.simpleboards.dev/api';
@@ -672,13 +671,11 @@ async function fetchLeaderboard() {
     document.getElementById('leaderboardList').innerHTML = '<div class="loading">Loading leaderboard...</div>';
     
     try {
-        // First, we need to get entries - but SimpleBoards might have a different endpoint for fetching
-        // Let's try to get the leaderboard info first
+        // According to your screenshot, the GET endpoint might be different
+        // Let's try a different approach - maybe we need to get entries from the leaderboard
         console.log('Fetching leaderboard entries...');
         
-        // According to your screenshot, the POST endpoint is for submitting scores
-        // For fetching, we might need a different endpoint
-        // Let's try a GET request to the same endpoint
+        // Try the entries endpoint with leaderboardId as query parameter
         const response = await fetch(`${SIMPLEBOARDS_API_URL}/entries?leaderboardId=${SIMPLEBOARDS_LEADERBOARD_ID}`, {
             headers: {
                 'x-api-key': SIMPLEBOARDS_API_KEY,
@@ -689,28 +686,48 @@ async function fetchLeaderboard() {
         console.log('Response status:', response.status);
         
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error response:', errorText);
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Received data:', data);
-        
-        // Handle the data format - might be different from what we expect
-        if (Array.isArray(data)) {
-            leaderboard = data.map(entry => ({
-                name: entry.playerDisplayName || entry.name,
-                total: parseInt(entry.score) || 0
-            })).filter(entry => entry.name && entry.total > 0);
-        } else if (data.entries && Array.isArray(data.entries)) {
-            leaderboard = data.entries.map(entry => ({
-                name: entry.playerDisplayName || entry.name,
-                total: parseInt(entry.score) || 0
-            })).filter(entry => entry.name && entry.total > 0);
+            // If that fails, try getting leaderboard info
+            console.log('Trying alternative endpoint...');
+            const altResponse = await fetch(`${SIMPLEBOARDS_API_URL}/leaderboards/${SIMPLEBOARDS_LEADERBOARD_ID}`, {
+                headers: {
+                    'x-api-key': SIMPLEBOARDS_API_KEY,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!altResponse.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const altData = await altResponse.json();
+            console.log('Alt data:', altData);
+            
+            // If we get here, use whatever format we got
+            if (altData.entries && Array.isArray(altData.entries)) {
+                leaderboard = altData.entries.map(entry => ({
+                    name: entry.playerDisplayName || entry.name,
+                    total: parseInt(entry.score) || 0
+                })).filter(entry => entry.name && entry.total > 0);
+            }
         } else {
-            console.error('Unexpected data format:', data);
-            leaderboard = [];
+            const data = await response.json();
+            console.log('Received data:', data);
+            
+            // Handle the data format
+            if (Array.isArray(data)) {
+                leaderboard = data.map(entry => ({
+                    name: entry.playerDisplayName || entry.name,
+                    total: parseInt(entry.score) || 0
+                })).filter(entry => entry.name && entry.total > 0);
+            } else if (data.entries && Array.isArray(data.entries)) {
+                leaderboard = data.entries.map(entry => ({
+                    name: entry.playerDisplayName || entry.name,
+                    total: parseInt(entry.score) || 0
+                })).filter(entry => entry.name && entry.total > 0);
+            } else {
+                console.error('Unexpected data format:', data);
+                leaderboard = [];
+            }
         }
         
         renderLeaderboard();
@@ -722,12 +739,24 @@ async function fetchLeaderboard() {
         debugInfo.textContent = `✅ Loaded ${leaderboard.length} players`;
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
-        debugInfo.innerHTML = `❌ Error: ${error.message}<br><span class="error-details">Check console (F12) for details</span>`;
-        document.getElementById('leaderboardList').innerHTML = 
-            '<div class="leaderboard-entry">⚠️ Failed to load leaderboard. Will retry...</div>';
+        debugInfo.innerHTML = `❌ Error: ${error.message}<br><span class="error-details">Using local storage fallback</span>`;
         
-        // Retry after 5 seconds
-        setTimeout(fetchLeaderboard, 5000);
+        // Fallback to localStorage
+        const saved = localStorage.getItem('localLeaderboard');
+        if (saved) {
+            try {
+                leaderboard = JSON.parse(saved);
+            } catch (e) {
+                leaderboard = [];
+            }
+        } else {
+            leaderboard = [];
+        }
+        
+        renderLeaderboard();
+        
+        // Try again in 10 seconds
+        setTimeout(fetchLeaderboard, 10000);
     }
 }
 
@@ -755,7 +784,19 @@ async function submitScore(score) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Submit error:', errorText);
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
+            
+            // Fallback to localStorage
+            const localLeaderboard = JSON.parse(localStorage.getItem('localLeaderboard') || '[]');
+            const existingIndex = localLeaderboard.findIndex(e => e.name === playerName);
+            if (existingIndex >= 0) {
+                localLeaderboard[existingIndex].total = Math.max(localLeaderboard[existingIndex].total, score);
+            } else {
+                localLeaderboard.push({ name: playerName, total: score });
+            }
+            localStorage.setItem('localLeaderboard', JSON.stringify(localLeaderboard));
+            leaderboard = localLeaderboard;
+            renderLeaderboard();
+            return;
         }
         
         const data = await response.json();
@@ -765,6 +806,17 @@ async function submitScore(score) {
         await fetchLeaderboard();
     } catch (error) {
         console.error('Failed to submit score:', error);
+        // Fallback to localStorage
+        const localLeaderboard = JSON.parse(localStorage.getItem('localLeaderboard') || '[]');
+        const existingIndex = localLeaderboard.findIndex(e => e.name === playerName);
+        if (existingIndex >= 0) {
+            localLeaderboard[existingIndex].total = Math.max(localLeaderboard[existingIndex].total, score);
+        } else {
+            localLeaderboard.push({ name: playerName, total: score });
+        }
+        localStorage.setItem('localLeaderboard', JSON.stringify(localLeaderboard));
+        leaderboard = localLeaderboard;
+        renderLeaderboard();
     }
 }
 
@@ -1307,42 +1359,201 @@ function update() {
     updateSPUI();
 }
 
-// ========== DRAWING ==========
-function draw() {
-    ctx.clearRect(0, 0, 800, 400);
-    const grad = ctx.createLinearGradient(0, 0, 0, 400);
-    grad.addColorStop(0, '#9ccc7c'); grad.addColorStop(1, '#5f8b4b');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, 800, 400);
+function updateRebirthUI() {
+    rpSpan.textContent = formatNumber(rebirthPoints);
+    rpBadge.textContent = `RP: ${formatNumber(rebirthPoints)}`;
+    rpShopDisplay.textContent = `RP: ${formatNumber(rebirthPoints)}`;
+    spDisplay.textContent = formatNumber(sacrificePoints);
+    spBadge.textContent = `SP: ${formatNumber(sacrificePoints)}`;
+    spShopDisplay.textContent = `SP: ${formatNumber(sacrificePoints)}`;
+    honeySpan.textContent = formatNumber(honey);
+    totalEarnedSpan.textContent = formatNumber(totalHoneyEarned);
 
-    ctx.shadowColor = '#402d16'; ctx.shadowBlur = 12;
-    ctx.fillStyle = '#c99a3b';
-    ctx.beginPath(); ctx.ellipse(HIVE_X-5, HIVE_Y-10, 40, 30, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#b57c2a'; ctx.beginPath(); ctx.ellipse(HIVE_X, HIVE_Y, 44, 34, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#e3b15a'; ctx.beginPath(); ctx.ellipse(HIVE_X-5, HIVE_Y-5, 30, 22, 0, 0, Math.PI*2); ctx.fill();
-    ctx.shadowBlur = 0; ctx.font = '30px "Segoe UI"'; ctx.fillStyle = '#f5d742'; ctx.fillText('🏠', HIVE_X-30, HIVE_Y+10);
-
-    for (let f of flowers) {
-        if (!f.active) { ctx.globalAlpha = 0.3; ctx.fillStyle = '#755d3b'; ctx.beginPath(); ctx.arc(f.x, f.y, FLOWER_RADIUS-4,0,2*Math.PI); ctx.fill(); ctx.globalAlpha=1; continue; }
-        ctx.shadowBlur = 8; ctx.shadowColor = '#4f2f0a';
-        ctx.fillStyle = '#f5a3c7'; ctx.beginPath(); ctx.arc(f.x-4, f.y-4, 7,0,2*Math.PI); ctx.fill();
-        ctx.fillStyle = '#ffea9f'; ctx.beginPath(); ctx.arc(f.x+4, f.y+2, 7,0,2*Math.PI); ctx.fill();
-        ctx.fillStyle = '#e6d358'; ctx.beginPath(); ctx.arc(f.x, f.y, 9,0,2*Math.PI); ctx.fill();
-        ctx.shadowBlur = 4; ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#422b0e'; ctx.fillText(f.pollen, f.x-12, f.y-15);
+    const maxRP = getMaxRPFromHoney();
+    if (maxRP > 0) {
+        const rawRP = maxRP;
+        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier);
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (${rpCompoundingMultiplier.toFixed(2)}x)`;
+    } else {
+        rebirthInfo.textContent = `1 RP = 10k (${rpCompoundingMultiplier.toFixed(2)}x)`;
     }
 
-    for (let b of bees) {
-        ctx.shadowBlur = 6; ctx.shadowColor = '#141c0e';
-        ctx.fillStyle = '#f2b137'; ctx.beginPath(); ctx.ellipse(b.x, b.y, 12, 8, 0, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#3f2e1c'; ctx.fillRect(b.x-8, b.y-3, 4, 6); ctx.fillRect(b.x+4, b.y-3, 4, 6);
-        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(b.x-6, b.y-4, 2,0,2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(b.x+2, b.y-4, 2,0,2*Math.PI); ctx.fill();
-        ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(b.x-7, b.y-5, 1,0,2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(b.x+1, b.y-5, 1,0,2*Math.PI); ctx.fill();
-        ctx.fillStyle = '#c9e9fa'; ctx.globalAlpha = 0.6;
-        ctx.beginPath(); ctx.ellipse(b.x-8, b.y-12, 6, 3, 0.2, 0, 2*Math.PI); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(b.x+4, b.y-12, 6, 3, -0.2, 0, 2*Math.PI); ctx.fill();
-        ctx.globalAlpha = 1;
-        if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('✨', b.x-12, b.y-25); }
+    const maxSP = getMaxSPFromResources();
+    if (maxSP > 0) {
+        const cost = getSPCost(maxSP);
+        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP`;
+    } else {
+        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
     }
-    ctx.shadowBlur = 0;
+
+    if (autoUnlocked) {
+        autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyAutoUpgrade.disabled = true;
+    } else {
+        autoStatus.textContent = '(2 RP)';
+        buyAutoUpgrade.disabled = rebirthPoints < 2;
+    }
+    
+    if (beeSpeedMultiplier > 1.0) {
+        speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        speedBoost.textContent = `(x${beeSpeedMultiplier.toFixed(1)})`;
+        buyBeeSpeed.disabled = true;
+    } else {
+        speedStatus.textContent = '(1 RP)';
+        speedBoost.textContent = '(x1.5)';
+        buyBeeSpeed.disabled = rebirthPoints < 1;
+    }
+    
+    if (capacityMultiplier > 1.0) {
+        capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        capacityBoost.textContent = `(x${capacityMultiplier.toFixed(1)})`;
+        buyCapacity.disabled = true;
+    } else {
+        capacityStatus.textContent = '(3 RP)';
+        capacityBoost.textContent = '(x2.0)';
+        buyCapacity.disabled = rebirthPoints < 3;
+    }
+    
+    if (honeyMultUpgrade > 1.0) {
+        honeyMultStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyHoneyMult.disabled = true;
+    } else {
+        honeyMultStatus.textContent = '(2 RP)';
+        buyHoneyMult.disabled = rebirthPoints < 2;
+    }
+    
+    const compoundingCost = Math.pow(2, compoundingLevel);
+    compoundingLevelSpan.textContent = compoundingLevel;
+    compoundingCostSpan.textContent = compoundingCost;
+    const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
+    buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
+    buyCompounding.disabled = rebirthPoints < compoundingCost;
+}
+
+function updateSPUI() {
+    if (x10HoneyPurchased) {
+        buyX10Honey.innerHTML = '🍯 x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
+        buyX10Honey.disabled = true;
+    } else {
+        buyX10Honey.innerHTML = '🍯 x10 HONEY (5 SP)';
+        buyX10Honey.disabled = sacrificePoints < 5;
+    }
+    
+    if (rpAutoBuyActive) {
+        buyRPAuto.innerHTML = '🤖 RP AUTOBUY MAXED <span class="maxed-badge">MAX</span>';
+        buyRPAuto.disabled = true;
+    } else {
+        buyRPAuto.innerHTML = '🤖 RP AUTOBUY (10 SP)';
+        buyRPAuto.disabled = sacrificePoints < 10;
+    }
+    
+    const nextLevel = rpGeneratorLevel + 1;
+    const genCost = nextLevel;
+    rpGenLevel.textContent = rpGeneratorLevel;
+    rpGenCost.textContent = genCost;
+    let intervalTime = 5;
+    if (rpGeneratorLevel > 0) {
+        intervalTime = Math.max(1, 5 - (rpGeneratorLevel - 1));
+    }
+    rpGenTime.textContent = intervalTime + 's';
+    
+    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
+    rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
+    
+    if (rpGeneratorLevel >= 5) {
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
+        buyRPGen.disabled = true;
+    } else {
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s next)</span>`;
+        buyRPGen.disabled = sacrificePoints < genCost;
+    }
+
+    const compCost = Math.pow(2, rpCompoundingLevel);
+    rpCompLevel.textContent = rpCompoundingLevel;
+    rpCompCost.textContent = compCost;
+    rpCompMult.textContent = rpCompoundingMultiplier.toFixed(2);
+    buyRPCompounding.disabled = sacrificePoints < compCost;
+}
+
+// ========== SPAWN FLOWER ==========
+function spawnFlower() {
+    if (flowers.filter(f => f.active).length >= MAX_FLOWERS) return false;
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const x = 200 + Math.random() * 550;
+        const y = 50 + Math.random() * 300;
+        if (x < 180) continue;
+        let overlap = false;
+        for (let f of flowers) {
+            if (!f.active) continue;
+            const dx = f.x - x, dy = f.y - y;
+            if (Math.hypot(dx, dy) < FLOWER_RADIUS * 2.2) {
+                overlap = true;
+                break;
+            }
+        }
+        if (!overlap) {
+            let basePollen = 8 + Math.floor(Math.random() * 12);
+            flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
+            return true;
+        }
+    }
+    return false;
+}
+
+// ========== ADD BEE ==========
+function addBee() {
+    let capacity = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
+    bees.push({
+        x: HIVE_X + (Math.random() * 30 - 15),
+        y: HIVE_Y + (Math.random() * 30 - 15),
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+        carrying: 0,
+        targetFlower: null,
+        returning: false
+    });
+}
+
+// ========== FIND BEST FLOWER ==========
+function findBestFlower(beeX, beeY) {
+    let bestDist = Infinity, bestIndex = -1;
+    for (let i = 0; i < flowers.length; i++) {
+        const f = flowers[i];
+        if (!f.active || f.pollen <= 0) continue;
+        const dist = Math.hypot(f.x - beeX, f.y - beeY);
+        if (dist < bestDist) { bestDist = dist; bestIndex = i; }
+    }
+    return bestIndex;
+}
+
+// ========== RECALC MULTIPLIER ==========
+function recalcMultiplier() {
+    let toolMult = 1.0;
+    if (hasClippers) toolMult *= 1.2;
+    if (hasShears) toolMult *= 1.5;
+    if (hasScythe) toolMult *= 2.0;
+    if (hasOil) toolMult *= 3.0;
+    if (hasHoneycomb) toolMult *= 1.5;
+    if (hasBeeGun) toolMult *= 2.0;
+    if (hasRoyalJelly) toolMult *= 3.0;
+    if (hasStarTreat) toolMult *= 5.0;
+    toolMultiplier = toolMult;
+    
+    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
+    if (x10HoneyPurchased) totalMult *= 10;
+    totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
+}
+
+// ========== UPDATE TOOL BUTTONS ==========
+function updateToolButtons() {
+    buyClippers.disabled = hasClippers;
+    buyShears.disabled = hasShears;
+    buyScythe.disabled = hasScythe;
+    buyOil.disabled = hasOil;
+    buyHoneycomb.disabled = hasHoneycomb;
+    buyBeeGun.disabled = hasBeeGun;
+    buyRoyalJelly.disabled = hasRoyalJelly;
+    buyStarTreat.disabled = hasStarTreat;
 }
 
 // ========== AUTOMATION ==========
