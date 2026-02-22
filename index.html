@@ -841,11 +841,16 @@ const adminGrantsRef = database.ref('adminGrants');
 
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
-let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
+let playerName = normalizePlayerName(localStorage.getItem('beeSwarmPlayerName') || '');
+if (normalizePlayerName(playerName).toLowerCase() === 'opleoni') {
+    playerName = 'Opleoni';
+    localStorage.setItem('beeSwarmPlayerName', playerName);
+}
 let totalHoneyEarned = 0;
 let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
 let announcementClosed = localStorage.getItem('announcementClosed') === 'true';
 let lastAnnouncementId = localStorage.getItem('lastAnnouncementId') || null;
+let announcementListenerInitialized = false;
 
 // ========== CANVAS ELEMENTS (MUST BE BEFORE EVENT LISTENERS) ==========
 const canvas = document.getElementById('gameCanvas');
@@ -1201,6 +1206,16 @@ menuResetSelectedBtn.addEventListener('click', () => {
 function setupAnnouncementListener() {
     announcementRef.on('value', (snapshot) => {
         const messageData = snapshot.val();
+        if (!announcementListenerInitialized) {
+            announcementListenerInitialized = true;
+            if (messageData && messageData.text) {
+                const announcementId = messageData.timestamp || messageData.text;
+                currentAnnouncement = messageData.text;
+                lastAnnouncementId = announcementId;
+                localStorage.setItem('lastAnnouncementId', announcementId);
+            }
+            return;
+        }
         
         // Check if there's a new announcement (different from last seen)
         if (messageData && messageData.text) {
@@ -1225,21 +1240,15 @@ closeAnnouncementBtn.addEventListener('click', () => {
     localStorage.setItem('announcementClosed', 'true');
 });
 
-// Check for saved announcement on load
-if (currentAnnouncement && !announcementClosed) {
-    announcementMessage.textContent = currentAnnouncement;
-    announcementPopup.style.display = 'block';
-}
-
 menuOpenAnnouncementBtn.addEventListener('click', () => {
-    if (playerName === 'Opleoni') {
+    if (isAdminUser()) {
         announcementModal.style.display = 'block';
         menuPanel.classList.remove('show');
     }
 });
 
 sendAnnouncementBtn.addEventListener('click', async () => {
-    if (playerName === 'Opleoni') {
+    if (isAdminUser()) {
         const message = announcementInput.value.trim();
         if (message) {
             await announcementRef.set({ 
@@ -1263,6 +1272,10 @@ function sanitizeFirebaseKey(name) {
 
 function normalizePlayerName(name) {
     return String(name || '').trim().slice(0, 20);
+}
+
+function isAdminUser(name = playerName) {
+    return normalizePlayerName(name).toLowerCase() === 'opleoni';
 }
 
 function getAllKnownPlayerNames() {
@@ -1503,7 +1516,7 @@ function startAdminGrantWatcher() {
 
 // ========== ADMIN PANEL (menu version) ==========
 function updateMenuAdminSelect() {
-    if (playerName !== 'Opleoni') {
+    if (!isAdminUser()) {
         menuAdminSection.style.display = 'none';
         return;
     }
@@ -1535,7 +1548,7 @@ function updateMenuAdminSelect() {
 }
 
 menuAdminAddBtn.addEventListener('click', async () => {
-    if (playerName !== 'Opleoni') return;
+    if (!isAdminUser()) return;
 
     let leaderboardHoneyUpdated = false;
 
@@ -1639,7 +1652,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
 });
 
 menuAdminResetBtn.addEventListener('click', async () => {
-    if (playerName !== 'Opleoni') return;
+    if (!isAdminUser()) return;
 
     let leaderboardResetDone = false;
 
@@ -1760,7 +1773,7 @@ function fetchLeaderboard() {
         renderLeaderboard();
         debugInfo.textContent = `✅ Loaded ${leaderboard.length} unique players`;
         
-        if (playerName === 'Opleoni') {
+        if (isAdminUser()) {
             updateMenuAdminSelect();
         }
     }, (error) => {
@@ -1869,6 +1882,7 @@ function escapeHtml(unsafe) {
 
 saveNameBtn.addEventListener('click', async () => {
     let name = playerNameInput.value.trim();
+    if (normalizePlayerName(name).toLowerCase() === 'opleoni') name = 'Opleoni';
     if (name === '') name = 'BeeKeeper';
     
     // Add loading state
@@ -1895,7 +1909,7 @@ saveNameBtn.addEventListener('click', async () => {
         startAdminGrantWatcher();
         await claimAdminGrants();
         
-        if (playerName === 'Opleoni') {
+        if (isAdminUser()) {
             updateMenuAdminSelect();
         } else {
             menuAdminSection.style.display = 'none';
