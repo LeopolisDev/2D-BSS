@@ -791,10 +791,10 @@
             <button class="tool-btn" id="buyBeeGun">🔫 2.0x (50k)</button>
             <button class="tool-btn" id="buyRoyalJelly">👑 3.0x (100k)</button>
             <button class="tool-btn" id="buyStarTreat">⭐ 5.0x (250k)</button>
-            <button class="tool-btn" id="buyMoonCharm">&#127769; MOON CHARM 1.5x (10B)</button>
-            <button class="tool-btn" id="buySunRelic">&#9728;&#65039; SUN RELIC 2.0x (50B)</button>
-            <button class="tool-btn" id="buyStormTotem">&#9889; STORM TOTEM 3.0x (250B)</button>
-            <button class="tool-btn" id="buyGalaxyCrown">&#127756; GALAXY CROWN 5.0x (1T)</button>
+            <button class="tool-btn" id="buyMoonCharm">&#127769; MOON CHARM 1.5x (5B)</button>
+            <button class="tool-btn" id="buySunRelic">&#9728;&#65039; SUN RELIC 2.0x (25B)</button>
+            <button class="tool-btn" id="buyStormTotem">&#9889; STORM TOTEM 3.0x (100B)</button>
+            <button class="tool-btn" id="buyGalaxyCrown">&#127756; GALAXY CROWN 5.0x (250B)</button>
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
@@ -846,10 +846,6 @@ const adminGrantsRef = database.ref('adminGrants');
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
 let playerName = normalizePlayerName(localStorage.getItem('beeSwarmPlayerName') || '');
-if (normalizePlayerName(playerName).toLowerCase() === 'opleoni') {
-    playerName = 'Opleoni';
-    localStorage.setItem('beeSwarmPlayerName', playerName);
-}
 let totalHoneyEarned = 0;
 let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
 let announcementClosed = localStorage.getItem('announcementClosed') === 'true';
@@ -972,13 +968,31 @@ document.addEventListener('click', (e) => {
 
 // ========== NUMBER FORMATTING ==========
 function formatNumber(num) {
-    if (num === undefined || num === null) return '0';
-    if (num >= 1e15) return (num / 1e15).toFixed(2) + 'Qd';
-    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
-    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
-    return Math.floor(num).toString();
+    if (num === undefined || num === null || Number.isNaN(num)) return '0';
+
+    const sign = num < 0 ? '-' : '';
+    const absNum = Math.abs(num);
+    const suffixes = [
+        { value: 1e33, suffix: 'Dc' },
+        { value: 1e30, suffix: 'No' },
+        { value: 1e27, suffix: 'Oc' },
+        { value: 1e24, suffix: 'Sp' },
+        { value: 1e21, suffix: 'Sx' },
+        { value: 1e18, suffix: 'Qi' },
+        { value: 1e15, suffix: 'Qa' },
+        { value: 1e12, suffix: 'T' },
+        { value: 1e9, suffix: 'B' },
+        { value: 1e6, suffix: 'M' },
+        { value: 1e3, suffix: 'k' }
+    ];
+
+    for (const entry of suffixes) {
+        if (absNum >= entry.value) {
+            return sign + (absNum / entry.value).toFixed(2) + entry.suffix;
+        }
+    }
+
+    return sign + Math.floor(absNum).toString();
 }
 
 function parseBoolean(value, fallback = false) {
@@ -1288,7 +1302,7 @@ function normalizePlayerName(name) {
 }
 
 function isAdminUser(name = playerName) {
-    return normalizePlayerName(name).toLowerCase() === 'opleoni';
+    return normalizePlayerName(name) === 'Opleoni';
 }
 
 function getAllKnownPlayerNames() {
@@ -1895,7 +1909,6 @@ function escapeHtml(unsafe) {
 
 saveNameBtn.addEventListener('click', async () => {
     let name = playerNameInput.value.trim();
-    if (normalizePlayerName(name).toLowerCase() === 'opleoni') name = 'Opleoni';
     if (name === '') name = 'BeeKeeper';
     
     // Add loading state
@@ -2381,10 +2394,10 @@ function autoBuy() {
     else if (!hasBeeGun && honey >= 50000) { honey -= 50000; hasBeeGun = true; recalcMultiplier(); buyBeeGun.disabled = true; saveGame(); }
     else if (!hasRoyalJelly && honey >= 100000) { honey -= 100000; hasRoyalJelly = true; recalcMultiplier(); buyRoyalJelly.disabled = true; saveGame(); }
     else if (!hasStarTreat && honey >= 250000) { honey -= 250000; hasStarTreat = true; recalcMultiplier(); buyStarTreat.disabled = true; saveGame(); }
-    else if (!hasMoonCharm && honey >= 10000000000) { honey -= 10000000000; hasMoonCharm = true; recalcMultiplier(); buyMoonCharm.disabled = true; saveGame(); }
-    else if (!hasSunRelic && honey >= 50000000000) { honey -= 50000000000; hasSunRelic = true; recalcMultiplier(); buySunRelic.disabled = true; saveGame(); }
-    else if (!hasStormTotem && honey >= 250000000000) { honey -= 250000000000; hasStormTotem = true; recalcMultiplier(); buyStormTotem.disabled = true; saveGame(); }
-    else if (!hasGalaxyCrown && honey >= 1000000000000) { honey -= 1000000000000; hasGalaxyCrown = true; recalcMultiplier(); buyGalaxyCrown.disabled = true; saveGame(); }
+    else if (!hasMoonCharm && honey >= 5000000000) { honey -= 5000000000; hasMoonCharm = true; recalcMultiplier(); buyMoonCharm.disabled = true; saveGame(); }
+    else if (!hasSunRelic && honey >= 25000000000) { honey -= 25000000000; hasSunRelic = true; recalcMultiplier(); buySunRelic.disabled = true; saveGame(); }
+    else if (!hasStormTotem && honey >= 100000000000) { honey -= 100000000000; hasStormTotem = true; recalcMultiplier(); buyStormTotem.disabled = true; saveGame(); }
+    else if (!hasGalaxyCrown && honey >= 250000000000) { honey -= 250000000000; hasGalaxyCrown = true; recalcMultiplier(); buyGalaxyCrown.disabled = true; saveGame(); }
 
     while (honey >= nextHireCost) {
         honey -= nextHireCost;
@@ -2635,10 +2648,10 @@ buyHoneycomb.addEventListener('click', () => { if (!hasHoneycomb && honey>=25000
 buyBeeGun.addEventListener('click', () => { if (!hasBeeGun && honey>=50000) { honey-=50000; hasBeeGun=true; recalcMultiplier(); buyBeeGun.disabled=true; saveGame(); } });
 buyRoyalJelly.addEventListener('click', () => { if (!hasRoyalJelly && honey>=100000) { honey-=100000; hasRoyalJelly=true; recalcMultiplier(); buyRoyalJelly.disabled=true; saveGame(); } });
 buyStarTreat.addEventListener('click', () => { if (!hasStarTreat && honey>=250000) { honey-=250000; hasStarTreat=true; recalcMultiplier(); buyStarTreat.disabled=true; saveGame(); } });
-buyMoonCharm.addEventListener('click', () => { if (!hasMoonCharm && honey>=10000000000) { honey-=10000000000; hasMoonCharm=true; recalcMultiplier(); buyMoonCharm.disabled=true; saveGame(); } });
-buySunRelic.addEventListener('click', () => { if (!hasSunRelic && honey>=50000000000) { honey-=50000000000; hasSunRelic=true; recalcMultiplier(); buySunRelic.disabled=true; saveGame(); } });
-buyStormTotem.addEventListener('click', () => { if (!hasStormTotem && honey>=250000000000) { honey-=250000000000; hasStormTotem=true; recalcMultiplier(); buyStormTotem.disabled=true; saveGame(); } });
-buyGalaxyCrown.addEventListener('click', () => { if (!hasGalaxyCrown && honey>=1000000000000) { honey-=1000000000000; hasGalaxyCrown=true; recalcMultiplier(); buyGalaxyCrown.disabled=true; saveGame(); } });
+buyMoonCharm.addEventListener('click', () => { if (!hasMoonCharm && honey>=5000000000) { honey-=5000000000; hasMoonCharm=true; recalcMultiplier(); buyMoonCharm.disabled=true; saveGame(); } });
+buySunRelic.addEventListener('click', () => { if (!hasSunRelic && honey>=25000000000) { honey-=25000000000; hasSunRelic=true; recalcMultiplier(); buySunRelic.disabled=true; saveGame(); } });
+buyStormTotem.addEventListener('click', () => { if (!hasStormTotem && honey>=100000000000) { honey-=100000000000; hasStormTotem=true; recalcMultiplier(); buyStormTotem.disabled=true; saveGame(); } });
+buyGalaxyCrown.addEventListener('click', () => { if (!hasGalaxyCrown && honey>=250000000000) { honey-=250000000000; hasGalaxyCrown=true; recalcMultiplier(); buyGalaxyCrown.disabled=true; saveGame(); } });
 
 toggleAutoBtn.addEventListener('click', toggleAuto);
 toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
