@@ -2548,6 +2548,12 @@ sacrificeBtn.addEventListener('click', () => {
         autoActive = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
+
+        // Prevent RP autobuy from immediately buying RP upgrades after sacrifice.
+        rpAutobuyEnabled = false;
+        if (rpAutoBuyInterval) { clearInterval(rpAutoBuyInterval); rpAutoBuyInterval = null; }
+        toggleRPAutoBtn.textContent = toggleRPAutoBtn.textContent.replace('(ON)', '(OFF)');
+        toggleRPAutoBtn.classList.remove('rp-autobuy-active');
         
         setupRPGenerator(); // This will use the preserved rpCompoundingMultiplier
         
