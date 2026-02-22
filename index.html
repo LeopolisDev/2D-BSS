@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · fixed RP calculation</title>
+    <title>🐝 BEE SWARM · fixed rebirth (honey = 0)</title>
     <style>
         * {
             box-sizing: border-box;
@@ -514,29 +514,20 @@ const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
 const SAVE_KEY = 'beeSwarmSave';
 
-// ========== UNLIMITED RP PRICING ==========
+// ========== RP PRICING (each RP has its own price) ==========
 // 1 RP = 10k, 2 RP = 15k, 3 RP = 22.5k, 4 RP = 33.75k, etc.
 function getRPCost(rpNumber) {
     // rpNumber starts at 1 for first RP
     return Math.floor(10000 * Math.pow(1.5, rpNumber - 1));
 }
 
-// Calculate how many RPs you can buy and the total cost
-function calculateRPPurchase(currentHoney) {
-    let remainingHoney = currentHoney;
-    let rpGained = 0;
-    let totalCost = 0;
-    let nextRPCost = getRPCost(1);
-    
-    // Keep buying RPs until we can't afford the next one
-    while (remainingHoney >= nextRPCost) {
-        remainingHoney -= nextRPCost;
-        totalCost += nextRPCost;
-        rpGained++;
-        nextRPCost = getRPCost(rpGained + 1); // Cost for next RP
+// Calculate how many RPs you can buy with current honey
+function getMaxRPFromHoney() {
+    let rpCount = 1;
+    while (honey >= getRPCost(rpCount)) {
+        rpCount++;
     }
-    
-    return { rpGained, totalCost, remainingHoney };
+    return rpCount - 1; // Return the number of RPs you can buy
 }
 
 function updateRebirthUI() {
@@ -545,9 +536,9 @@ function updateRebirthUI() {
     rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
     totalEarnedSpan.textContent = totalHoneyEarned.toLocaleString();
 
-    const { rpGained, totalCost } = calculateRPPurchase(honey);
-    if (rpGained > 0) {
-        rebirthInfo.textContent = `${rpGained} RP = ${totalCost.toLocaleString()}🍯`;
+    const maxRP = getMaxRPFromHoney();
+    if (maxRP > 0) {
+        rebirthInfo.textContent = `${maxRP} RP = ${getRPCost(maxRP).toLocaleString()}🍯`;
     } else {
         rebirthInfo.textContent = `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
     }
@@ -1031,13 +1022,13 @@ resetBtn.addEventListener('click', () => {
     }
 });
 
-// ========== FIXED REBIRTH ==========
+// ========== FIXED REBIRTH (honey = 0 after) ==========
 rebirthBtn.addEventListener('click', () => {
-    const { rpGained, totalCost, remainingHoney } = calculateRPPurchase(honey);
+    const maxRP = getMaxRPFromHoney();
     
-    if (rpGained > 0) {
-        honey = remainingHoney; // Set honey to remaining amount (should be 0 if exact)
-        rebirthPoints += rpGained;
+    if (maxRP > 0) {
+        const cost = getRPCost(maxRP);
+        rebirthPoints += maxRP;
         
         // Reset game state but keep rebirth points and upgrades
         bees = []; 
@@ -1056,6 +1047,9 @@ rebirthBtn.addEventListener('click', () => {
             spawnFlower();
         }
         
+        // Set honey to 0 (spend all honey)
+        honey = 0;
+        
         // Update UI
         recalcMultiplier(); 
         updateRebirthUI(); 
@@ -1063,7 +1057,7 @@ rebirthBtn.addEventListener('click', () => {
         hireCostSpan.textContent = nextHireCost;
         saveGame();
         
-        alert(`✨ Purchased ${rpGained} RP for ${totalCost.toLocaleString()} honey! Honey reset to ${Math.floor(honey)}.`);
+        alert(`✨ Purchased ${maxRP} RP for ${cost.toLocaleString()} honey! Honey reset to 0.`);
     } else {
         alert(`❌ Need at least ${getRPCost(1).toLocaleString()} honey for 1 RP!`);
     }
