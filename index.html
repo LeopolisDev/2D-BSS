@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · sacrifice layer + SP upgrades</title>
+    <title>🐝 BEE SWARM · infinite RP compounding + compact admin</title>
     <style>
         * {
             box-sizing: border-box;
@@ -330,9 +330,14 @@
             font-size: 0.9rem;
             text-align: center;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
+            gap: 10px;
+        }
+        .footer-row {
+            display: flex;
             gap: 20px;
+            align-items: center;
         }
         .you-row {
             background: #4a6b3a;
@@ -377,13 +382,31 @@
             text-align: center;
             margin-top: 5px;
         }
-        .admin-row {
+        .admin-panel-compact {
             background: #2a2a2a;
-            border-color: #ffaa00;
+            border-radius: 60px;
+            padding: 12px 20px;
+            margin-top: 12px;
+            border: 3px solid #ffaa00;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
-        .reset-honey-btn {
-            background: #ffaa00;
-            color: #1a1a1a;
+        .admin-select {
+            background: #efeac5;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 15px;
+            font-size: 1rem;
+            border-bottom: 4px solid #bd9f4b;
+            outline: none;
+        }
+        .reset-btn-bottom {
+            background: #cab577;
+            border-bottom: 5px solid #7e6237;
+            color: #1f3d16;
         }
     </style>
 </head>
@@ -403,7 +426,7 @@
     <div class="canvas-panel">
         <canvas id="gameCanvas" width="800" height="400"></canvas>
 
-        <!-- Main stats panel -->
+        <!-- Main stats panel (RESET button removed from here) -->
         <div class="hive-panel">
             <div class="stats">
                 <div class="stat-item">🍯 <span id="honeyDisplay">0</span></div>
@@ -414,7 +437,6 @@
             </div>
             <div class="button-group">
                 <button class="bee-btn" id="hireBtn">🐝 HIRE <span id="hireCostSpan">20</span>🍯</button>
-                <button class="bee-btn" id="resetBtn">🔄 RESET</button>
             </div>
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
@@ -439,7 +461,7 @@
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
-        <!-- SACRIFICE Row (new red layer) -->
+        <!-- SACRIFICE Row -->
         <div class="sacrifice-row">
             <span style="color:#ffcccc; font-weight:bold;">🔴 SACRIFICE:</span>
             <button class="tool-btn sacrifice-btn" id="sacrificeBtn">🔥 SACRIFICE</button>
@@ -458,12 +480,13 @@
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
-        <!-- SP SHOP (new) -->
+        <!-- SP SHOP -->
         <div class="sp-shop-row">
             <span style="color:#ffb3b3; font-weight:bold;">💰 SP SHOP:</span>
             <button class="tool-btn" id="buyX10Honey">🍯 x10 HONEY (5 SP)</button>
             <button class="tool-btn" id="buyRPAuto">🤖 RP AUTOBUY (10 SP)</button>
             <button class="tool-btn" id="buyRPGen">⏱️ RP GENERATOR lv<span id="rpGenLevel">0</span> (<span id="rpGenCost">1</span> SP) <span id="rpGenTime">5s</span></button>
+            <button class="tool-btn" id="buyRPCompounding">📈 RP COMPOUNDING lv<span id="rpCompLevel">0</span> (<span id="rpCompCost">1</span> SP) x<span id="rpCompMult">1.00</span></button>
             <span class="multiplier-badge" id="spShopDisplay">SP: 0</span>
         </div>
 
@@ -481,28 +504,37 @@
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
-        <!-- Controls row with ADMIN buttons for Opleoni -->
-        <div class="shop-row admin-row" style="background:#2a2a2a;">
+        <!-- Controls row (without RESET button) -->
+        <div class="shop-row" style="background:#8f6d3c;">
             <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
             <input type="number" id="honeyInput" class="adder-input" value="1000" min="0">
             <button class="tool-btn" id="addHoneyBtn">➕ ADD HONEY</button>
-            <button class="tool-btn reset-honey-btn" id="resetHoneyBtn">🔄 RESET HONEY</button>
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
         </div>
-        
-        <!-- Admin panel for Opleoni (hidden for others) -->
-        <div id="adminPanel" style="display: none; margin-top: 10px; background: #333; padding: 10px; border-radius: 30px;">
-            <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN PANEL (OPLEONI ONLY):</span>
-            <input type="number" id="adminHoney" class="adder-input" placeholder="Honey" value="0">
-            <input type="number" id="adminRP" class="adder-input" placeholder="RP" value="0">
-            <input type="number" id="adminSP" class="adder-input" placeholder="SP" value="0">
-            <button class="tool-btn" id="adminSetBtn">⚡ SET VALUES</button>
+
+        <!-- Compact Admin Panel for Opleoni (only 2 values) -->
+        <div id="adminPanel" class="admin-panel-compact" style="display: none;">
+            <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN:</span>
+            <select id="adminStatSelect" class="admin-select">
+                <option value="honey">🍯 Honey</option>
+                <option value="rp">🔁 RP</option>
+                <option value="sp">🔴 SP</option>
+            </select>
+            <input type="number" id="adminAmount" class="adder-input" value="1000" min="0">
+            <button class="tool-btn" id="adminAddBtn">➕ ADD</button>
         </div>
+
+        <!-- Footer with RESET button moved down -->
+        <footer>
+            <div class="footer-row">
+                <span>🌸 Click flowers to boost them</span>
+                <span class="save-indicator" id="saveIndicator">💾 Auto-saved</span>
+            </div>
+            <div class="footer-row">
+                <button class="bee-btn reset-btn-bottom" id="resetBtn">🔄 RESET ALL PROGRESS</button>
+            </div>
+        </footer>
     </div>
-    <footer>
-        <span>🌸 Click flowers to boost them</span>
-        <span class="save-indicator" id="saveIndicator">💾 Auto-saved</span>
-    </footer>
 </div>
 
 <script>
@@ -681,7 +713,7 @@ saveNameBtn.addEventListener('click', async () => {
     await fetchLeaderboard();
     if (playerName === 'Opleoni') {
         console.log('🔮 Admin panel activated for Opleoni');
-        adminPanel.style.display = 'block';
+        adminPanel.style.display = 'flex';
     } else {
         adminPanel.style.display = 'none';
     }
@@ -693,7 +725,7 @@ if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     fetchLeaderboard();
-    if (playerName === 'Opleoni') adminPanel.style.display = 'block';
+    if (playerName === 'Opleoni') adminPanel.style.display = 'flex';
 } else {
     nameModal.style.display = 'flex';
     fetchLeaderboard();
@@ -772,6 +804,10 @@ let rpGeneratorLevel = 0; // 0-4
 let rpGeneratorInterval = null;
 let rpAutoBuyInterval = null;
 
+// NEW: RP Compounding upgrade (infinite)
+let rpCompoundingLevel = 0;
+let rpCompoundingMultiplier = 1.0; // 1.25^level, affects RP generation
+
 // Automation
 let autoActive = false;
 let autoInterval = null;
@@ -812,9 +848,13 @@ const capacityBoost = document.getElementById('capacityBoost');
 const buyX10Honey = document.getElementById('buyX10Honey');
 const buyRPAuto = document.getElementById('buyRPAuto');
 const buyRPGen = document.getElementById('buyRPGen');
+const buyRPCompounding = document.getElementById('buyRPCompounding');
 const rpGenLevel = document.getElementById('rpGenLevel');
 const rpGenCost = document.getElementById('rpGenCost');
 const rpGenTime = document.getElementById('rpGenTime');
+const rpCompLevel = document.getElementById('rpCompLevel');
+const rpCompCost = document.getElementById('rpCompCost');
+const rpCompMult = document.getElementById('rpCompMult');
 
 // Tool buttons
 const buyClippers = document.getElementById('buyClippers');
@@ -829,14 +869,13 @@ const buyStarTreat = document.getElementById('buyStarTreat');
 const toggleAutoBtn = document.getElementById('toggleAutoBtn');
 const addHoneyBtn = document.getElementById('addHoneyBtn');
 const honeyInput = document.getElementById('honeyInput');
-const resetHoneyBtn = document.getElementById('resetHoneyBtn');
 const sacrificeBtn = document.getElementById('sacrificeBtn');
+const resetBtn = document.getElementById('resetBtn');
 
 // Admin elements
-const adminHoney = document.getElementById('adminHoney');
-const adminRP = document.getElementById('adminRP');
-const adminSP = document.getElementById('adminSP');
-const adminSetBtn = document.getElementById('adminSetBtn');
+const adminStatSelect = document.getElementById('adminStatSelect');
+const adminAmount = document.getElementById('adminAmount');
+const adminAddBtn = document.getElementById('adminAddBtn');
 
 // ========== SAVE / LOAD ==========
 function saveGame() {
@@ -859,7 +898,8 @@ function saveGame() {
         rebirthPoints, sacrificePoints,
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
-        autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel
+        autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
+        rpCompoundingLevel, rpCompoundingMultiplier
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
@@ -897,6 +937,8 @@ function loadGame() {
         x10HoneyPurchased = data.x10HoneyPurchased || false;
         rpAutoBuyActive = data.rpAutoBuyActive || false;
         rpGeneratorLevel = data.rpGeneratorLevel || 0;
+        rpCompoundingLevel = data.rpCompoundingLevel || 0;
+        rpCompoundingMultiplier = data.rpCompoundingMultiplier || 1.0;
 
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
@@ -930,7 +972,9 @@ function setupRPGenerator() {
     if (rpGeneratorLevel > 0) {
         const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000); // 5s,4s,3s,2s,1s
         rpGeneratorInterval = setInterval(() => {
-            rebirthPoints++;
+            // Apply RP compounding multiplier
+            let rpGain = Math.floor(1 * rpCompoundingMultiplier);
+            rebirthPoints += rpGain;
             updateRebirthUI();
             saveGame();
         }, intervalTime);
@@ -1106,12 +1150,19 @@ function updateSPUI() {
     buyRPAuto.disabled = rpAutoBuyActive || sacrificePoints < 10;
     
     const nextLevel = rpGeneratorLevel + 1;
-    const cost = nextLevel; // 1,2,3,4
+    const genCost = nextLevel; // 1,2,3,4
     rpGenLevel.textContent = rpGeneratorLevel;
-    rpGenCost.textContent = cost;
+    rpGenCost.textContent = genCost;
     const intervalTime = rpGeneratorLevel === 0 ? 5 : Math.max(1, 5 - (rpGeneratorLevel - 1));
     rpGenTime.textContent = intervalTime + 's';
-    buyRPGen.disabled = rpGeneratorLevel >= 4 || sacrificePoints < cost;
+    buyRPGen.disabled = rpGeneratorLevel >= 4 || sacrificePoints < genCost;
+
+    // RP Compounding upgrade (infinite)
+    const compCost = Math.pow(2, rpCompoundingLevel); // 1,2,4,8,16...
+    rpCompLevel.textContent = rpCompoundingLevel;
+    rpCompCost.textContent = compCost;
+    rpCompMult.textContent = rpCompoundingMultiplier.toFixed(2);
+    buyRPCompounding.disabled = sacrificePoints < compCost;
 }
 
 // ========== GAME MECHANICS ==========
@@ -1313,6 +1364,7 @@ resetBtn.addEventListener('click', () => {
         autoUnlocked = false; beeSpeedMultiplier = 1.0; capacityMultiplier = 1.0; honeyMultUpgrade = 1.0;
         compoundingLevel = 0; compoundingMultiplier = 1.0;
         x10HoneyPurchased = false; rpAutoBuyActive = false; rpGeneratorLevel = 0;
+        rpCompoundingLevel = 0; rpCompoundingMultiplier = 1.0;
         autoActive = false; 
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         if (rpGeneratorInterval) { clearInterval(rpGeneratorInterval); rpGeneratorInterval = null; }
@@ -1325,12 +1377,6 @@ resetBtn.addEventListener('click', () => {
         localStorage.removeItem(SAVE_KEY);
         saveGame();
     }
-});
-
-resetHoneyBtn.addEventListener('click', () => {
-    honey = 0;
-    saveGame();
-    alert('Honey reset to 0!');
 });
 
 // ========== REBIRTH ==========
@@ -1415,6 +1461,21 @@ buyRPGen.addEventListener('click', () => {
     }
 });
 
+// NEW: RP Compounding upgrade (infinite)
+buyRPCompounding.addEventListener('click', () => {
+    const cost = Math.pow(2, rpCompoundingLevel);
+    if (sacrificePoints >= cost) {
+        sacrificePoints -= cost;
+        rpCompoundingLevel++;
+        rpCompoundingMultiplier = Math.pow(1.25, rpCompoundingLevel);
+        // Update generator if active
+        setupRPGenerator();
+        updateSPUI();
+        saveGame();
+        alert(`📈 RP Compounding upgraded to level ${rpCompoundingLevel}! (${rpCompoundingMultiplier.toFixed(2)}x RP gain)`);
+    }
+});
+
 // ========== REBIRTH SHOP ==========
 buyAutoUpgrade.addEventListener('click', () => { 
     if (rebirthPoints >= 2 && !autoUnlocked) { 
@@ -1492,24 +1553,30 @@ addHoneyBtn.addEventListener('click', () => {
     }
 });
 
-// Admin panel for Opleoni
-adminSetBtn.addEventListener('click', () => {
+// Compact admin panel for Opleoni
+adminAddBtn.addEventListener('click', () => {
     if (playerName === 'Opleoni') {
-        let newHoney = parseInt(adminHoney.value);
-        let newRP = parseInt(adminRP.value);
-        let newSP = parseInt(adminSP.value);
+        const stat = adminStatSelect.value;
+        const amount = parseInt(adminAmount.value);
+        if (isNaN(amount) || amount < 0) return;
         
-        if (!isNaN(newHoney)) {
-            honey = newHoney;
-            totalHoneyEarned = Math.max(totalHoneyEarned, newHoney);
+        switch(stat) {
+            case 'honey':
+                honey += amount;
+                totalHoneyEarned += amount;
+                break;
+            case 'rp':
+                rebirthPoints += amount;
+                break;
+            case 'sp':
+                sacrificePoints += amount;
+                break;
         }
-        if (!isNaN(newRP)) rebirthPoints = newRP;
-        if (!isNaN(newSP)) sacrificePoints = newSP;
         
         updateRebirthUI();
         updateSPUI();
         saveGame();
-        alert('⚡ Values updated!');
+        alert(`✅ Added ${amount} ${stat.toUpperCase()}`);
     }
 });
 
@@ -1530,4 +1597,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
