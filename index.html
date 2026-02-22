@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · save/load with copy button</title>
+    <title>🐝 BEE SWARM · one configurable test code</title>
     <style>
         * {
             box-sizing: border-box;
@@ -519,6 +519,19 @@
             transform: translateY(2px);
             border-bottom-width: 1px;
         }
+        .test-code-btn {
+            background: #5b8c5a;
+            border-bottom-color: #2d5a2c;
+            color: white;
+            min-width: 80px;
+        }
+        .config-note {
+            font-size: 0.8rem;
+            color: #ffd966;
+            background: #2d4a2a;
+            padding: 5px 15px;
+            border-radius: 30px;
+        }
     </style>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -668,8 +681,10 @@
                 <button class="bee-btn reset-btn-bottom" id="resetHoneyBtn">🍯 RESET HONEY (leaderboard too)</button>
             </div>
             
-            <!-- SAVE/LOAD Section with Copy Button -->
+            <!-- SAVE/LOAD Section with Copy Button and ONE configurable test code -->
             <div class="save-load-row">
+                <span class="config-note" id="testCodeLabel">TEST CODE: 100k Honey, 5 RP</span>
+                <button class="tool-btn test-code-btn" id="applyTestCodeBtn">🚀 APPLY TEST CODE</button>
                 <button class="tool-btn" id="generateSaveBtn">📋 GENERATE SAVE CODE</button>
                 <div class="save-code-display" id="saveCodeDisplay">
                     <span style="flex:1; text-align:center;">Click generate to create code</span>
@@ -735,6 +750,17 @@ const saveCodeDisplay = document.getElementById('saveCodeDisplay');
 const copySaveBtn = document.getElementById('copySaveBtn');
 const loadCodeInput = document.getElementById('loadCodeInput');
 const loadSaveBtn = document.getElementById('loadSaveBtn');
+const applyTestCodeBtn = document.getElementById('applyTestCodeBtn');
+const testCodeLabel = document.getElementById('testCodeLabel');
+
+// ========== CONFIGURABLE TEST CODE ==========
+// Change these values to modify what the test code gives you
+const TEST_HONEY = 100000;      // 100k honey
+const TEST_RP = 5;               // 5 RP
+const TEST_SP = 0;                // 0 SP (change if you want)
+
+// Update the label to show current values
+testCodeLabel.textContent = `TEST CODE: ${TEST_HONEY.toLocaleString()} Honey, ${TEST_RP} RP, ${TEST_SP} SP`;
 
 // Show announcement if exists
 if (currentAnnouncement && !announcementClosed) {
@@ -868,10 +894,53 @@ function loadSaveCode(code) {
         return true;
     } catch (e) {
         console.error('Failed to load save:', e);
-        alert('❌ Invalid save code!');
         return false;
     }
 }
+
+// ========== TEST CODE HANDLER ==========
+function applyTestCode() {
+    // Reset everything first to give a clean test state
+    honey = TEST_HONEY;
+    totalHoneyEarned = TEST_HONEY;
+    rebirthPoints = TEST_RP;
+    sacrificePoints = TEST_SP;
+    
+    // Reset all tools and upgrades
+    hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
+    hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+    autoUnlocked = false;
+    beeSpeedMultiplier = 1.0;
+    capacityMultiplier = 1.0;
+    honeyMultUpgrade = 1.0;
+    compoundingLevel = 0; compoundingMultiplier = 1.0;
+    x10HoneyPurchased = false;
+    rpAutoBuyActive = false;
+    rpGeneratorLevel = 0;
+    rpCompoundingLevel = 0; rpCompoundingMultiplier = 1.0;
+    rpAutobuyEnabled = false;
+    autoActive = false;
+    
+    // Restart generators
+    setupRPGenerator();
+    setupRPAutoBuy();
+    
+    // Update UI
+    toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+    toggleAutoBtn.classList.remove('auto-active');
+    toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+    toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+    
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+    saveGame();
+    
+    alert(`✅ Test code applied! Got ${TEST_HONEY.toLocaleString()} Honey, ${TEST_RP} RP, ${TEST_SP} SP`);
+}
+
+applyTestCodeBtn.addEventListener('click', applyTestCode);
 
 generateSaveBtn.addEventListener('click', () => {
     generateSaveCode();
@@ -880,8 +949,12 @@ generateSaveBtn.addEventListener('click', () => {
 loadSaveBtn.addEventListener('click', () => {
     const code = loadCodeInput.value.trim();
     if (code) {
-        loadSaveCode(code);
-        loadCodeInput.value = ''; // Clear after loading
+        const success = loadSaveCode(code);
+        if (success) {
+            loadCodeInput.value = ''; // Clear after loading
+        } else {
+            alert('❌ Invalid save code!');
+        }
     } else {
         alert('❌ Please enter a save code');
     }
