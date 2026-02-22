@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐝 BEE SWARM · 2D incremental</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: #1a3f2c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+        }
+        .game-wrapper {
+            background: #5f8b4b;
+            border-radius: 2.5rem 2.5rem 2rem 2rem;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.6), inset 0 0 0 2px #e9d68b;
+            padding: 1.5rem;
+            max-width: 1200px;
+        }
+        .canvas-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        canvas {
+            display: block;
+            background: #7ec850;
+            border-radius: 28px;
+            box-shadow: inset 0 -5px 10px #3f6123, 0 10px 8px #2d4620;
+            border: 4px solid #f7e284;
+            cursor: crosshair;
+            width: 800px;
+            height: 400px;
+        }
+        .hive-panel {
+            background: #dba959;
+            border-radius: 60px 60px 30px 30px;
+            margin-top: 15px;
+            padding: 15px 20px;
+            border: 3px solid #fceba1;
+            box-shadow: inset 0 -4px 0 #8b6f3f, 0 8px 0 #4f3e24;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+        }
+        .stats {
+            display: flex;
+            gap: 15px;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #3f6123;
+            color: #fff9d7;
+            font-size: 1.2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .stat-item {
+            background: #446b34;
+            padding: 6px 16px;
+            border-radius: 40px;
+            border: 2px solid #ffdd88;
+            box-shadow: inset 0 -3px 0 #1e3b14;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .bee-btn {
+            background: #fecd4f;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 8px 16px;
+            color: #2a4820;
+            border-bottom: 5px solid #b57c2a;
+            cursor: pointer;
+            transition: 0.06s linear;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 0 #6b4f1c;
+            white-space: nowrap;
+        }
+        .bee-btn:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+            box-shadow: 0 1px 0 #6b4f1c;
+        }
+        .field-info {
+            font-size: 1rem;
+            background: #fdf5cf;
+            border-radius: 30px;
+            padding: 5px 15px;
+            color: #1f4a1a;
+            font-weight: bold;
+            border: 2px solid #fcd87a;
+        }
+        .shop-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 12px;
+            background: #ac803e;
+            padding: 12px 20px;
+            border-radius: 60px;
+            border: 3px solid #fadb7c;
+            width: 100%;
+        }
+        .tool-btn {
+            background: #e5d295;
+            border: none;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-bottom: 4px solid #9f8738;
+            color: #1f431f;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #655126;
+        }
+        .tool-btn:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+            box-shadow: 0 1px 0 #655126;
+        }
+        .tool-btn:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .multiplier-badge {
+            background: #5e4d23;
+            color: #ffe484;
+            padding: 5px 15px;
+            border-radius: 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .rebirth-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            background: #7b5e3b;
+            padding: 10px 20px;
+            border-radius: 60px;
+            margin-top: 12px;
+            border: 3px solid #fcd87a;
+            width: 100%;
+        }
+        .rebirth-shop-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 12px;
+            background: #5b4b79;
+            padding: 12px 20px;
+            border-radius: 60px;
+            border: 3px solid #cfb3ff;
+            width: 100%;
+        }
+        .adder-input {
+            background: #efeac5;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 15px;
+            font-size: 1rem;
+            width: 120px;
+            text-align: center;
+            border-bottom: 4px solid #bd9f4b;
+            outline: none;
+        }
+        .auto-active {
+            background: #8fc97f;
+            border-bottom-color: #427c2b;
+        }
+        footer {
+            color: #e7f0ba;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="game-wrapper">
+    <div class="canvas-panel">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+        <!-- Main stats panel -->
+        <div class="hive-panel">
+            <div class="stats">
+                <div class="stat-item">🍯 <span id="honeyDisplay">0</span></div>
+                <div class="stat-item">🐝 <span id="beeCountDisplay">1</span></div>
+                <div class="stat-item">✨ x<span id="multiplierDisplay">1.00</span></div>
+                <div class="stat-item">🔁 <span id="rpDisplay">0</span> RP</div>
+            </div>
+            <div class="button-group">
+                <button class="bee-btn" id="hireBtn">🐝 HIRE <span id="hireCostSpan">20</span>🍯</button>
+                <button class="bee-btn" id="resetBtn">🔄 RESET</button>
+            </div>
+            <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
+        </div>
+
+        <!-- Rebirth row -->
+        <div class="rebirth-row">
+            <span style="color:#fff4c2; font-weight:bold;">🌀 REBIRTH:</span>
+            <button class="tool-btn" id="rebirthBtn">🔁 REBIRTH (<span id="rebirthCostSpan">10000</span>🍯) → +1 RP</button>
+            <span class="multiplier-badge" id="rpBadge">RP: 0</span>
+        </div>
+
+        <!-- Rebirth shop -->
+        <div class="rebirth-shop-row">
+            <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
+            <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO (2 RP)</button>
+            <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED (1 RP)</button>
+            <button class="tool-btn" id="buyCapacity">📦 CAPACITY (3 RP)</button>
+            <button class="tool-btn" id="buyPollenBoost">🌼 POLLEN (2 RP)</button>
+            <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
+        </div>
+
+        <!-- Tool shop -->
+        <div class="shop-row">
+            <span style="color:#fff4c2; font-weight:bold;">🛒 TOOLS:</span>
+            <button class="tool-btn" id="buyClippers">✂️ 1.2x (50🍯)</button>
+            <button class="tool-btn" id="buyShears">⚙️ 1.5x (150🍯)</button>
+            <button class="tool-btn" id="buyScythe">🌾 2.0x (400🍯)</button>
+            <button class="tool-btn" id="buyOil">🛢️ 3.0x (900🍯)</button>
+            <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
+        </div>
+
+        <!-- Controls row -->
+        <div class="shop-row" style="background:#8f6d3c;">
+            <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
+            <input type="number" id="honeyInput" class="adder-input" value="1000" min="0">
+            <button class="tool-btn" id="addHoneyBtn">➕ ADD HONEY</button>
+        </div>
+    </div>
+    <footer>🌸 Click flowers to boost them • Bees collect pollen automatically</footer>
+</div>
+
+<script>
+(function() {
+    // ========== CONSTANTS ==========
+    const HIVE_X = 100, HIVE_Y = 200;
+    const FLOWER_RADIUS = 16;
+    const MAX_FLOWERS = 22;
+    const BEE_SPEED = 1.1;
+    const BEE_CAPACITY_BASE = 8;
+    const HIRE_COST_BASE = 20;
+
+    // ========== GAME STATE ==========
+    let honey = 0;
+    let bees = [];
+    let flowers = [];
+    let nextHireCost = HIRE_COST_BASE;
+
+    // Tools
+    let hasClippers = false, hasShears = false, hasScythe = false, hasOil = false;
+    let toolMultiplier = 1.0;
+
+    // Rebirth
+    let rebirthPoints = 0;
+    let rebirthCount = 0;
+
+    // Rebirth upgrades
+    let autoUnlocked = false;
+    let beeSpeedBoost = 1.0;
+    let capacityBoost = 0;
+    let pollenBoost = 0;
+
+    // Automation
+    let autoActive = false;
+    let autoInterval = null;
+
+    // ========== UI ELEMENTS ==========
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Display spans
+    const honeySpan = document.getElementById('honeyDisplay');
+    const beeCountSpan = document.getElementById('beeCountDisplay');
+    const multiplierSpan = document.getElementById('multiplierDisplay');
+    const rpSpan = document.getElementById('rpDisplay');
+    const rpBadge = document.getElementById('rpBadge');
+    const rpShopDisplay = document.getElementById('rpShopDisplay');
+    const hireCostSpan = document.getElementById('hireCostSpan');
+    const fieldInfo = document.getElementById('fieldInfo');
+    const totalMultDisplay = document.getElementById('totalMultDisplay');
+    const rebirthCostSpan = document.getElementById('rebirthCostSpan');
+
+    // Buttons
+    const hireBtn = document.getElementById('hireBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const rebirthBtn = document.getElementById('rebirthBtn');
+    const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
+    const buyBeeSpeed = document.getElementById('buyBeeSpeed');
+    const buyCapacity = document.getElementById('buyCapacity');
+    const buyPollenBoost = document.getElementById('buyPollenBoost');
+    const buyClippers = document.getElementById('buyClippers');
+    const buyShears = document.getElementById('buyShears');
+    const buyScythe = document.getElementById('buyScythe');
+    const buyOil = document.getElementById('buyOil');
+    const toggleAutoBtn = document.getElementById('toggleAutoBtn');
+    const addHoneyBtn = document.getElementById('addHoneyBtn');
+    const honeyInput = document.getElementById('honeyInput');
+
+    // ========== HELPER FUNCTIONS ==========
+    function recalcMultiplier() {
+        let mult = 1.0;
+        if (hasClippers) mult *= 1.2;
+        if (hasShears) mult *= 1.5;
+        if (hasScythe) mult *= 2.0;
+        if (hasOil) mult *= 3.0;
+        toolMultiplier = mult;
+        multiplierSpan.textContent = toolMultiplier.toFixed(2);
+        totalMultDisplay.textContent = `✖️ ${toolMultiplier.toFixed(2)}`;
+    }
+
+    function spawnFlower() {
+        if (flowers.filter(f => f.active).length >= MAX_FLOWERS) return false;
+
+        for (let attempt = 0; attempt < 200; attempt++) {
+            const x = 200 + Math.random() * 550;
+            const y = 50 + Math.random() * 300;
+            if (x < 180) continue;
+
+            let overlap = false;
+            for (let f of flowers) {
+                if (!f.active) continue;
+                const dx = f.x - x, dy = f.y - y;
+                if (Math.hypot(dx, dy) < FLOWER_RADIUS * 2.2) {
+                    overlap = true;
+                    break;
+                }
+            }
+            if (!overlap) {
+                let basePollen = 8 + Math.floor(Math.random() * 12) + pollenBoost;
+                flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function addBee() {
+        let capacity = BEE_CAPACITY_BASE + capacityBoost;
+        bees.push({
+            x: HIVE_X + (Math.random() * 30 - 15),
+            y: HIVE_Y + (Math.random() * 30 - 15),
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            carrying: 0,
+            targetFlower: null,
+            returning: false
+        });
+    }
+
+    function findBestFlower(beeX, beeY) {
+        let bestDist = Infinity;
+        let bestIndex = -1;
+        for (let i = 0; i < flowers.length; i++) {
+            const f = flowers[i];
+            if (!f.active || f.pollen <= 0) continue;
+            const dist = Math.hypot(f.x - beeX, f.y - beeY);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
+    function getRebirthCost() {
+        if (rebirthCount === 0) return 10000;
+        let cost = 10000;
+        for (let i = 0; i < rebirthCount; i++) {
+            cost = Math.floor(cost * 1.5);
+        }
+        return cost;
+    }
+
+    function updateRebirthUI() {
+        rpSpan.textContent = rebirthPoints;
+        rpBadge.textContent = `RP: ${rebirthPoints}`;
+        rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
+        rebirthCostSpan.textContent = getRebirthCost();
+
+        // Update rebirth shop buttons
+        buyAutoUpgrade.disabled = autoUnlocked || rebirthPoints < 2;
+        buyBeeSpeed.disabled = beeSpeedBoost > 1.0 || rebirthPoints < 1;
+        buyCapacity.disabled = capacityBoost > 0 || rebirthPoints < 3;
+        buyPollenBoost.disabled = pollenBoost > 0 || rebirthPoints < 2;
+    }
+
+    // ========== GAME MECHANICS ==========
+    function update() {
+        // Respawn flowers
+        for (let i = flowers.length - 1; i >= 0; i--) {
+            const f = flowers[i];
+            if (!f.active) {
+                f.timer--;
+                if (f.timer <= 0) {
+                    if (flowers.filter(fl => fl.active).length < MAX_FLOWERS) {
+                        f.active = true;
+                        f.pollen = 8 + Math.floor(Math.random() * 12) + pollenBoost;
+                        f.timer = 0;
+                    }
+                }
+            }
+        }
+
+        // Spawn new flowers if needed
+        if (flowers.filter(f => f.active).length < 5) {
+            spawnFlower();
+        }
+
+        // Update bees
+        for (let b of bees) {
+            let maxCap = BEE_CAPACITY_BASE + capacityBoost;
+
+            // Check if should return to hive
+            if (b.carrying >= maxCap) {
+                b.returning = true;
+                b.targetFlower = null;
+            }
+
+            if (b.returning) {
+                // Fly to hive
+                const dx = HIVE_X - b.x;
+                const dy = HIVE_Y - b.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < 20) {
+                    // Deposit honey
+                    honey += Math.floor(b.carrying * toolMultiplier);
+                    b.carrying = 0;
+                    b.returning = false;
+                } else {
+                    // Move toward hive
+                    b.vx += (dx / dist) * 0.1 * beeSpeedBoost;
+                    b.vy += (dy / dist) * 0.1 * beeSpeedBoost;
+                }
+            } else {
+                // Find target flower
+                if (b.targetFlower === null || b.targetFlower >= flowers.length || 
+                    !flowers[b.targetFlower]?.active || flowers[b.targetFlower].pollen <= 0) {
+                    b.targetFlower = findBestFlower(b.x, b.y);
+                }
+
+                if (b.targetFlower !== null && b.targetFlower < flowers.length) {
+                    const target = flowers[b.targetFlower];
+                    if (target.active && target.pollen > 0) {
+                        const dx = target.x - b.x;
+                        const dy = target.y - b.y;
+                        const dist = Math.hypot(dx, dy);
+
+                        if (dist < FLOWER_RADIUS + 5) {
+                            // Collect pollen
+                            const collect = Math.min(maxCap - b.carrying, target.pollen);
+                            b.carrying += collect;
+                            target.pollen -= collect;
+
+                            if (target.pollen <= 0) {
+                                target.active = false;
+                                target.timer = 200; // Respawn timer
+                                b.targetFlower = null;
+                            }
+                        } else {
+                            // Move toward flower
+                            b.vx += (dx / dist) * 0.1 * beeSpeedBoost;
+                            b.vy += (dy / dist) * 0.1 * beeSpeedBoost;
+                        }
+                    } else {
+                        b.targetFlower = null;
+                    }
+                } else {
+                    // Wander
+                    b.vx += (Math.random() - 0.5) * 0.1 * beeSpeedBoost;
+                    b.vy += (Math.random() - 0.5) * 0.1 * beeSpeedBoost;
+                }
+            }
+
+            // Speed limit
+            const speed = Math.hypot(b.vx, b.vy);
+            const maxSpeed = BEE_SPEED * beeSpeedBoost;
+            if (speed > maxSpeed) {
+                b.vx = (b.vx / speed) * maxSpeed;
+                b.vy = (b.vy / speed) * maxSpeed;
+            }
+
+            // Move
+            b.x += b.vx;
+            b.y += b.vy;
+
+            // Bounce off walls
+            if (b.x < 10) { b.x = 10; b.vx *= -0.5; }
+            if (b.x > 790) { b.x = 790; b.vx *= -0.5; }
+            if (b.y < 10) { b.y = 10; b.vy *= -0.5; }
+            if (b.y > 390) { b.y = 390; b.vy *= -0.5; }
+        }
+
+        // Update UI
+        honeySpan.textContent = Math.floor(honey);
+        beeCountSpan.textContent = bees.length;
+        const activeFlowers = flowers.filter(f => f.active).length;
+        fieldInfo.textContent = `🌸 ${activeFlowers} flowers`;
+        hireCostSpan.textContent = nextHireCost;
+    }
+
+    // ========== DRAWING ==========
+    function draw() {
+        ctx.clearRect(0, 0, 800, 400);
+
+        // Background
+        const grad = ctx.createLinearGradient(0, 0, 0, 400);
+        grad.addColorStop(0, '#9ccc7c');
+        grad.addColorStop(1, '#5f8b4b');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 800, 400);
+
+        // Draw hive
+        ctx.shadowColor = '#402d16';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#c99a3b';
+        ctx.beginPath();
+        ctx.ellipse(HIVE_X - 5, HIVE_Y - 10, 40, 30, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#b57c2a';
+        ctx.beginPath();
+        ctx.ellipse(HIVE_X, HIVE_Y, 44, 34, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e3b15a';
+        ctx.beginPath();
+        ctx.ellipse(HIVE_X - 5, HIVE_Y - 5, 30, 22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.font = '30px "Segoe UI"';
+        ctx.fillStyle = '#f5d742';
+        ctx.fillText('🏠', HIVE_X - 30, HIVE_Y + 10);
+
+        // Draw flowers
+        for (let f of flowers) {
+            if (!f.active) {
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = '#755d3b';
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, FLOWER_RADIUS - 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                continue;
+            }
+
+            // Flower petals
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#4f2f0a';
+            ctx.fillStyle = '#f5a3c7';
+            ctx.beginPath();
+            ctx.arc(f.x - 4, f.y - 4, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffea9f';
+            ctx.beginPath();
+            ctx.arc(f.x + 4, f.y + 2, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Center
+            ctx.fillStyle = '#e6d358';
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, 9, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pollen count
+            ctx.shadowBlur = 4;
+            ctx.font = 'bold 14px monospace';
+            ctx.fillStyle = '#422b0e';
+            ctx.fillText(f.pollen, f.x - 12, f.y - 15);
+        }
+
+        // Draw bees
+        for (let b of bees) {
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#141c0e';
+
+            // Body
+            ctx.fillStyle = '#f2b137';
+            ctx.beginPath();
+            ctx.ellipse(b.x, b.y, 12, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Stripes
+            ctx.fillStyle = '#3f2e1c';
+            ctx.fillRect(b.x - 8, b.y - 3, 4, 6);
+            ctx.fillRect(b.x + 4, b.y - 3, 4, 6);
+
+            // Eyes
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(b.x - 6, b.y - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(b.x + 2, b.y - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(b.x - 7, b.y - 5, 1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(b.x + 1, b.y - 5, 1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Wings
+            ctx.fillStyle = '#c9e9fa';
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath();
+            ctx.ellipse(b.x - 8, b.y - 12, 6, 3, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(b.x + 4, b.y - 12, 6, 3, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Carrying pollen indicator
+            if (b.carrying > 0) {
+                ctx.globalAlpha = 1;
+                ctx.font = '16px sans-serif';
+                ctx.fillStyle = '#fcdb6a';
+                ctx.fillText('✨', b.x - 12, b.y - 25);
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        ctx.shadowBlur = 0;
+    }
+
+    // ========== AUTOMATION ==========
+    function autoBuy() {
+        if (!autoActive || !autoUnlocked) return;
+
+        // Try to buy tools in order
+        if (!hasClippers && honey >= 50) {
+            honey -= 50;
+            hasClippers = true;
+            recalcMultiplier();
+            buyClippers.disabled = true;
+        } else if (!hasShears && honey >= 150) {
+            honey -= 150;
+            hasShears = true;
+            recalcMultiplier();
+            buyShears.disabled = true;
+        } else if (!hasScythe && honey >= 400) {
+            honey -= 400;
+            hasScythe = true;
+            recalcMultiplier();
+            buyScythe.disabled = true;
+        } else if (!hasOil && honey >= 900) {
+            honey -= 900;
+            hasOil = true;
+            recalcMultiplier();
+            buyOil.disabled = true;
+        }
+
+        // Hire bees
+        while (honey >= nextHireCost) {
+            honey -= nextHireCost;
+            addBee();
+            nextHireCost = Math.floor(nextHireCost * 1.5);
+        }
+        hireCostSpan.textContent = nextHireCost;
+    }
+
+    function toggleAuto() {
+        if (!autoUnlocked) {
+            alert('Buy AUTO upgrade in Rebirth Shop first!');
+            return;
+        }
+        autoActive = !autoActive;
+        toggleAutoBtn.textContent = autoActive ? '⏸️ AUTO (ON)' : '⏯️ AUTO (OFF)';
+        toggleAutoBtn.classList.toggle('auto-active', autoActive);
+
+        if (autoActive) {
+            if (!autoInterval) {
+                autoInterval = setInterval(autoBuy, 1000);
+            }
+        } else {
+            if (autoInterval) {
+                clearInterval(autoInterval);
+                autoInterval = null;
+            }
+        }
+    }
+
+    // ========== EVENT LISTENERS ==========
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+
+        // Check if clicked on flower
+        for (let f of flowers) {
+            if (!f.active) continue;
+            if (Math.hypot(f.x - x, f.y - y) < FLOWER_RADIUS + 10) {
+                f.pollen = Math.min(30, f.pollen + 5);
+                honey = Math.max(0, honey - 1);
+                return;
+            }
+        }
+
+        // Spawn new flower
+        if (flowers.length < 30) {
+            flowers.push({ x, y, pollen: 8, active: true, timer: 0 });
+        }
+    });
+
+    hireBtn.addEventListener('click', () => {
+        if (honey >= nextHireCost) {
+            honey -= nextHireCost;
+            addBee();
+            nextHireCost = Math.floor(nextHireCost * 1.5);
+            hireCostSpan.textContent = nextHireCost;
+        }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (confirm('Reset all progress?')) {
+            honey = 0;
+            bees = [];
+            flowers = [];
+            nextHireCost = HIRE_COST_BASE;
+            hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
+            rebirthPoints = 0; rebirthCount = 0;
+            autoUnlocked = false; beeSpeedBoost = 1.0; capacityBoost = 0; pollenBoost = 0;
+            autoActive = false;
+            if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+            
+            addBee();
+            for (let i = 0; i < 14; i++) spawnFlower();
+            
+            recalcMultiplier();
+            updateRebirthUI();
+            toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+            toggleAutoBtn.classList.remove('auto-active');
+            buyClippers.disabled = false; buyShears.disabled = false;
+            buyScythe.disabled = false; buyOil.disabled = false;
+        }
+    });
+
+    rebirthBtn.addEventListener('click', () => {
+        const cost = getRebirthCost();
+        if (honey >= cost) {
+            honey -= cost;
+            rebirthPoints++;
+            rebirthCount++;
+            
+            // Reset progress but keep rebirth points
+            bees = [];
+            flowers = [];
+            nextHireCost = HIRE_COST_BASE;
+            hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
+            
+            addBee();
+            for (let i = 0; i < 14; i++) spawnFlower();
+            
+            recalcMultiplier();
+            updateRebirthUI();
+            buyClippers.disabled = false; buyShears.disabled = false;
+            buyScythe.disabled = false; buyOil.disabled = false;
+        }
+    });
+
+    // Rebirth shop purchases
+    buyAutoUpgrade.addEventListener('click', () => {
+        if (rebirthPoints >= 2 && !autoUnlocked) {
+            rebirthPoints -= 2;
+            autoUnlocked = true;
+            updateRebirthUI();
+        }
+    });
+
+    buyBeeSpeed.addEventListener('click', () => {
+        if (rebirthPoints >= 1 && beeSpeedBoost === 1.0) {
+            rebirthPoints -= 1;
+            beeSpeedBoost = 1.25;
+            updateRebirthUI();
+        }
+    });
+
+    buyCapacity.addEventListener('click', () => {
+        if (rebirthPoints >= 3 && capacityBoost === 0) {
+            rebirthPoints -= 3;
+            capacityBoost = 4;
+            updateRebirthUI();
+        }
+    });
+
+    buyPollenBoost.addEventListener('click', () => {
+        if (rebirthPoints >= 2 && pollenBoost === 0) {
+            rebirthPoints -= 2;
+            pollenBoost = 2;
+            updateRebirthUI();
+        }
+    });
+
+    // Tool purchases
+    buyClippers.addEventListener('click', () => {
+        if (!hasClippers && honey >= 50) {
+            honey -= 50; hasClippers = true; recalcMultiplier(); buyClippers.disabled = true;
+        }
+    });
+    buyShears.addEventListener('click', () => {
+        if (!hasShears && honey >= 150) {
+            honey -= 150; hasShears = true; recalcMultiplier(); buyShears.disabled = true;
+        }
+    });
+    buyScythe.addEventListener('click', () => {
+        if (!hasScythe && honey >= 400) {
+            honey -= 400; hasScythe = true; recalcMultiplier(); buyScythe.disabled = true;
+        }
+    });
+    buyOil.addEventListener('click', () => {
+        if (!hasOil && honey >= 900) {
+            honey -= 900; hasOil = true; recalcMultiplier(); buyOil.disabled = true;
+        }
+    });
+
+    toggleAutoBtn.addEventListener('click', toggleAuto);
+
+    addHoneyBtn.addEventListener('click', () => {
+        let val = parseInt(honeyInput.value);
+        if (!isNaN(val) && val > 0) {
+            honey += val;
+        }
+    });
+
+    // ========== INITIALIZATION ==========
+    function init() {
+        // Start with 1 bee
+        addBee();
+        
+        // Create initial flowers
+        for (let i = 0; i < 14; i++) {
+            spawnFlower();
+        }
+        
+        recalcMultiplier();
+        updateRebirthUI();
+        hireCostSpan.textContent = nextHireCost;
+    }
+
+    init();
+
+    // ========== GAME LOOP ==========
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+})();
+</script>
+</body>
+</html>
