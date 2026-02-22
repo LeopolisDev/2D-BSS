@@ -1021,6 +1021,8 @@ function generateSaveCode() {
     const saveData = {
         honey,
         totalHoneyEarned,
+        nextHireCost,
+        beeCount: Array.isArray(bees) ? bees.length : 0,
         rebirthPoints,
         sacrificePoints,
         hasClippers, hasShears, hasScythe, hasOil,
@@ -1090,6 +1092,17 @@ function loadSaveCode(code) {
         autoActive = saveData.autoActive || false;
         performanceMode = parseBoolean(saveData.performanceMode, false);
         updatePerformanceButton();
+
+        const loadedBeeCount = Number.isFinite(saveData.beeCount) && saveData.beeCount > 0
+            ? Math.floor(saveData.beeCount)
+            : 1;
+        nextHireCost = Number.isFinite(saveData.nextHireCost) && saveData.nextHireCost > 0
+            ? Math.floor(saveData.nextHireCost)
+            : computeNextHireCostFromBeeCount(loadedBeeCount);
+        bees = [];
+        for (let i = 0; i < loadedBeeCount; i++) addBee();
+        flowers = [];
+        for (let i = 0; i < 14; i++) spawnFlower();
         
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
@@ -1113,6 +1126,7 @@ function loadSaveCode(code) {
         updateRebirthUI();
         updateToolButtons();
         updateSPUI();
+        hireCostSpan.textContent = formatNumber(nextHireCost);
         saveGame();
         
         alert('✅ Save loaded successfully!');
@@ -2119,6 +2133,21 @@ function addBee() {
     });
 }
 
+function getSafeBeeCount(value, fallback = 1) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return Math.max(1, Math.floor(parsed));
+}
+
+function computeNextHireCostFromBeeCount(beeCount) {
+    const safeBeeCount = getSafeBeeCount(beeCount, 1);
+    let cost = HIRE_COST_BASE;
+    for (let i = 1; i < safeBeeCount; i++) {
+        cost = Math.floor(cost * 1.5);
+    }
+    return cost;
+}
+
 function findBestFlower(beeX, beeY) {
     let bestDist = Infinity, bestIndex = -1;
     for (let i = 0; i < flowers.length; i++) {
@@ -2395,20 +2424,15 @@ toggleAutoBtn.addEventListener('click', toggleAuto);
 toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
 
 // ========== SAVE GAME FUNCTION ==========
-function saveGame() {
+function buildSaveData(includeWorldData = true) {
+    const safeBees = Array.isArray(bees) ? bees : [];
+    const safeFlowers = Array.isArray(flowers) ? flowers : [];
     const saveData = {
+        saveVersion: 2,
+        compactWorld: !includeWorldData,
         honey,
         totalHoneyEarned,
-        bees: bees.map(b => ({
-            x: b.x, y: b.y, vx: b.vx, vy: b.vy,
-            carrying: b.carrying,
-            targetFlower: b.targetFlower,
-            returning: b.returning
-        })),
-        flowers: flowers.map(f => ({
-            x: f.x, y: f.y, pollen: f.pollen,
-            active: f.active, timer: f.timer
-        })),
+        beeCount: safeBees.length,
         nextHireCost,
         hasClippers, hasShears, hasScythe, hasOil,
         hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
@@ -2419,9 +2443,38 @@ function saveGame() {
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
         performanceMode
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
-    saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
-    setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
+
+    if (includeWorldData) {
+        saveData.bees = safeBees.map(b => ({
+            x: b.x, y: b.y, vx: b.vx, vy: b.vy,
+            carrying: b.carrying,
+            targetFlower: b.targetFlower,
+            returning: b.returning
+        }));
+        saveData.flowers = safeFlowers.map(f => ({
+            x: f.x, y: f.y, pollen: f.pollen,
+            active: f.active, timer: f.timer
+        }));
+    }
+
+    return saveData;
+}
+
+function saveGame() {
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(buildSaveData(true)));
+        saveIndicator.textContent = 'Saved ' + new Date().toLocaleTimeString();
+        setTimeout(() => { saveIndicator.textContent = 'Auto-saved'; }, 2000);
+    } catch (fullSaveError) {
+        console.warn('Full save failed, attempting compact save.', fullSaveError);
+        try {
+            localStorage.setItem(SAVE_KEY, JSON.stringify(buildSaveData(false)));
+            saveIndicator.textContent = 'Saved (compact)';
+        } catch (compactSaveError) {
+            console.error('Compact save also failed.', compactSaveError);
+            saveIndicator.textContent = 'Save failed';
+        }
+    }
     
     submitScore(totalHoneyEarned);
 }
@@ -2431,11 +2484,16 @@ function loadGame() {
     if (!saved) return false;
     try {
         const data = JSON.parse(saved);
-        honey = data.honey || 0;
-        totalHoneyEarned = data.totalHoneyEarned || 0;
-        bees = data.bees || [];
-        flowers = data.flowers || [];
-        nextHireCost = data.nextHireCost || HIRE_COST_BASE;
+        if (!data || typeof data !== 'object') return false;
+
+        const finiteOr = (value, fallback) => {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : fallback;
+        };
+
+        honey = finiteOr(data.honey, 0);
+        totalHoneyEarned = finiteOr(data.totalHoneyEarned, 0);
+
         hasClippers = data.hasClippers || false;
         hasShears = data.hasShears || false;
         hasScythe = data.hasScythe || false;
@@ -2444,22 +2502,44 @@ function loadGame() {
         hasBeeGun = data.hasBeeGun || false;
         hasRoyalJelly = data.hasRoyalJelly || false;
         hasStarTreat = data.hasStarTreat || false;
-        rebirthPoints = data.rebirthPoints || 0;
-        sacrificePoints = data.sacrificePoints || 0;
+        rebirthPoints = finiteOr(data.rebirthPoints, 0);
+        sacrificePoints = finiteOr(data.sacrificePoints, 0);
         autoUnlocked = data.autoUnlocked || false;
-        beeSpeedMultiplier = data.beeSpeedMultiplier || 1.0;
-        capacityMultiplier = data.capacityMultiplier || 1.0;
-        honeyMultUpgrade = data.honeyMultUpgrade || 1.0;
-        compoundingLevel = data.compoundingLevel || 0;
-        compoundingMultiplier = data.compoundingMultiplier || 1.0;
+        beeSpeedMultiplier = finiteOr(data.beeSpeedMultiplier, 1.0);
+        capacityMultiplier = finiteOr(data.capacityMultiplier, 1.0);
+        honeyMultUpgrade = finiteOr(data.honeyMultUpgrade, 1.0);
+        compoundingLevel = finiteOr(data.compoundingLevel, 0);
+        compoundingMultiplier = finiteOr(data.compoundingMultiplier, 1.0);
         autoActive = data.autoActive || false;
         x10HoneyPurchased = data.x10HoneyPurchased || false;
         rpAutoBuyActive = data.rpAutoBuyActive || false;
-        rpGeneratorLevel = data.rpGeneratorLevel || 0;
-        rpCompoundingLevel = data.rpCompoundingLevel || 0;
-        rpCompoundingMultiplier = data.rpCompoundingMultiplier || 1.0;
+        rpGeneratorLevel = finiteOr(data.rpGeneratorLevel, 0);
+        rpCompoundingLevel = finiteOr(data.rpCompoundingLevel, 0);
+        rpCompoundingMultiplier = finiteOr(data.rpCompoundingMultiplier, 1.0);
         rpAutobuyEnabled = data.rpAutobuyEnabled || false;
         performanceMode = parseBoolean(data.performanceMode, false);
+
+        const savedBeeCount = getSafeBeeCount(data.beeCount, 1);
+        if (Array.isArray(data.bees) && data.bees.length > 0) {
+            bees = data.bees;
+        } else {
+            bees = [];
+            for (let i = 0; i < savedBeeCount; i++) addBee();
+        }
+        if (!Array.isArray(bees) || bees.length === 0) addBee();
+
+        if (Array.isArray(data.flowers) && data.flowers.length > 0) {
+            flowers = data.flowers;
+        } else {
+            flowers = [];
+            for (let i = 0; i < 14; i++) spawnFlower();
+        }
+
+        const savedNextHireCost = finiteOr(data.nextHireCost, 0);
+        nextHireCost = savedNextHireCost > 0
+            ? Math.floor(savedNextHireCost)
+            : computeNextHireCostFromBeeCount(bees.length);
+
         updatePerformanceButton();
 
         if (autoActive && autoUnlocked) {
