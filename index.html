@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · REAL global leaderboard</title>
+    <title>🐝 BEE SWARM · fixed top 10 leaderboard</title>
     <style>
         * {
             box-sizing: border-box;
@@ -211,7 +211,7 @@
             border: 3px solid #ffd966;
             color: #ffefc0;
             width: 100%;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
         }
         .leaderboard-title {
@@ -224,9 +224,23 @@
         .leaderboard-entry {
             display: flex;
             justify-content: space-between;
-            padding: 3px 10px;
+            padding: 5px 10px;
             border-bottom: 1px solid #6f8f5f;
             font-size: 1rem;
+        }
+        .leaderboard-rank {
+            font-weight: bold;
+            color: #ffd966;
+            width: 30px;
+            display: inline-block;
+        }
+        .leaderboard-name {
+            flex-grow: 1;
+            margin-left: 10px;
+        }
+        .leaderboard-score {
+            font-weight: bold;
+            color: #fff4c2;
         }
         .name-modal {
             position: fixed;
@@ -297,6 +311,20 @@
             text-align: center;
             padding: 10px;
             color: #ffefc0;
+            font-style: italic;
+        }
+        .refresh-btn {
+            background: #4a6b3a;
+            color: #ffd966;
+            border: 2px solid #ffd966;
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .refresh-btn:hover {
+            background: #5b7c4b;
         }
     </style>
 </head>
@@ -331,9 +359,12 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Leaderboard Panel (GLOBAL) -->
+        <!-- Leaderboard Panel (GLOBAL TOP 10) -->
         <div class="leaderboard-panel">
-            <div class="leaderboard-title">🌍 GLOBAL HONEY LEADERBOARD</div>
+            <div class="leaderboard-title">
+                🌍 GLOBAL TOP 10
+                <span class="refresh-btn" id="refreshLeaderboard">↻</span>
+            </div>
             <div id="leaderboardList">
                 <div class="loading">Loading leaderboard...</div>
             </div>
@@ -387,24 +418,26 @@
 </div>
 
 <script>
-// ================== GLOBAL LEADERBOARD USING JSONBIN.IO ==================
-// You need to create a free account at https://jsonbin.io/ and replace these values
-const JSONBIN_API_KEY = '$2a$10$ON.SJigSCL.vy4bO8AMaauHNDgTQo.PRT9aDlQbEl/dkNTQ9E/nSy'; // Replace with your actual API key
-const JSONBIN_BIN_ID = '699ab34ad0ea881f40ce4a59'; // Replace with your bin ID
+// ================== JSONBIN.IO CONFIGURATION ==================
+// REPLACE THESE WITH YOUR ACTUAL VALUES FROM JSONBIN.IO
+const JSONBIN_API_KEY = '$2a$10$XyZ123AbCdEfGhIjKlMnOpQrStUvWxYzAbCd'; // ← YOUR MASTER KEY
+const JSONBIN_BIN_ID = '67b9c0b2d3e4f5a6b7c8d9e0'; // ← YOUR BIN ID
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
+// ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
 let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
 let totalHoneyEarned = 0;
 let lastUpdate = 0;
-const UPDATE_COOLDOWN = 5000; // 5 seconds between updates to avoid rate limiting
+const UPDATE_COOLDOWN = 5000; // 5 seconds
 
-// Name modal elements
+// ========== UI ELEMENTS ==========
 const nameModal = document.getElementById('nameModal');
 const playerNameInput = document.getElementById('playerNameInput');
 const saveNameBtn = document.getElementById('saveNameBtn');
 const playerNameDisplay = document.getElementById('playerNameDisplay');
 const nameError = document.getElementById('nameError');
+const refreshBtn = document.getElementById('refreshLeaderboard');
 
 // ========== LEADERBOARD FUNCTIONS ==========
 async function fetchLeaderboard() {
@@ -415,7 +448,15 @@ async function fetchLeaderboard() {
             }
         });
         const data = await response.json();
-        leaderboard = data.record.players || [];
+        
+        // Check if data.record.players exists
+        if (data && data.record && data.record.players) {
+            leaderboard = data.record.players;
+        } else {
+            // If structure is different, try to adapt
+            leaderboard = data.record || [];
+        }
+        
         renderLeaderboard();
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
@@ -425,6 +466,11 @@ async function fetchLeaderboard() {
 
 async function saveLeaderboard() {
     try {
+        // Ensure leaderboard is an array
+        if (!Array.isArray(leaderboard)) {
+            leaderboard = [];
+        }
+        
         await fetch(JSONBIN_URL, {
             method: 'PUT',
             headers: {
@@ -446,39 +492,81 @@ async function updateLeaderboard() {
     if (now - lastUpdate < UPDATE_COOLDOWN) return;
     lastUpdate = now;
     
-    // Find or create player entry
-    let playerEntry = leaderboard.find(entry => entry.name === playerName);
-    if (playerEntry) {
-        if (totalHoneyEarned > playerEntry.total) {
-            playerEntry.total = totalHoneyEarned;
+    try {
+        // First fetch latest leaderboard
+        await fetchLeaderboard();
+        
+        // Find or create player entry
+        let playerEntry = leaderboard.find(entry => entry && entry.name === playerName);
+        if (playerEntry) {
+            if (totalHoneyEarned > playerEntry.total) {
+                playerEntry.total = totalHoneyEarned;
+                await saveLeaderboard();
+            }
+        } else {
+            leaderboard.push({ name: playerName, total: totalHoneyEarned });
             await saveLeaderboard();
         }
-    } else {
-        leaderboard.push({ name: playerName, total: totalHoneyEarned });
-        await saveLeaderboard();
+        
+        renderLeaderboard();
+    } catch (error) {
+        console.error('Error updating leaderboard:', error);
     }
-    
-    renderLeaderboard();
 }
 
 function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
-    const sorted = [...leaderboard].sort((a,b) => b.total - a.total).slice(0, 10);
     
-    if (sorted.length === 0) {
+    // Filter out any invalid entries
+    const validLeaderboard = leaderboard.filter(entry => entry && entry.name && typeof entry.total === 'number');
+    
+    // Sort by total descending (highest first)
+    const sorted = [...validLeaderboard].sort((a, b) => b.total - a.total);
+    
+    // Take only top 10
+    const top10 = sorted.slice(0, 10);
+    
+    if (top10.length === 0) {
         listDiv.innerHTML = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
         return;
     }
     
     let html = '';
-    sorted.forEach((entry, index) => {
+    top10.forEach((entry, index) => {
         const isYou = entry.name === playerName ? 'you-row' : '';
-        html += `<div class="leaderboard-entry ${isYou}"><span>${index+1}. ${escapeHtml(entry.name)}</span> <span>🍯 ${entry.total.toLocaleString()}</span></div>`;
+        const rank = index + 1;
+        let rankSymbol = '';
+        if (rank === 1) rankSymbol = '🥇';
+        else if (rank === 2) rankSymbol = '🥈';
+        else if (rank === 3) rankSymbol = '🥉';
+        else rankSymbol = `${rank}.`;
+        
+        html += `<div class="leaderboard-entry ${isYou}">
+            <span class="leaderboard-rank">${rankSymbol}</span>
+            <span class="leaderboard-name">${escapeHtml(entry.name)}</span>
+            <span class="leaderboard-score">🍯 ${entry.total.toLocaleString()}</span>
+        </div>`;
     });
+    
+    // Add player's rank if they're not in top 10
+    const playerInTop10 = top10.some(entry => entry.name === playerName);
+    if (!playerInTop10 && playerName) {
+        const playerRank = sorted.findIndex(entry => entry.name === playerName) + 1;
+        if (playerRank > 0) {
+            const playerEntry = sorted.find(entry => entry.name === playerName);
+            html += `<div class="leaderboard-entry you-row">
+                <span class="leaderboard-rank">${playerRank}.</span>
+                <span class="leaderboard-name">${escapeHtml(playerName)}</span>
+                <span class="leaderboard-score">🍯 ${playerEntry.total.toLocaleString()}</span>
+            </div>`;
+        }
+    }
+    
     listDiv.innerHTML = html;
 }
 
 function escapeHtml(unsafe) {
+    if (!unsafe) return '';
     return unsafe.replace(/[&<>"']/g, function(m) {
         if(m === '&') return '&amp;'; if(m === '<') return '&lt;'; if(m === '>') return '&gt;';
         if(m === '"') return '&quot;'; if(m === "'") return '&#039;';
@@ -490,7 +578,7 @@ function escapeHtml(unsafe) {
 async function isNameAvailable(name) {
     await fetchLeaderboard(); // Refresh leaderboard first
     const lowerName = name.toLowerCase();
-    return !leaderboard.some(entry => entry.name.toLowerCase() === lowerName);
+    return !leaderboard.some(entry => entry && entry.name && entry.name.toLowerCase() === lowerName);
 }
 
 // Save name with validation
@@ -519,6 +607,11 @@ saveNameBtn.addEventListener('click', async () => {
     if (playerName === 'Opleoni') {
         console.log('🔮 Secret adder activated for Opleoni');
     }
+});
+
+// Refresh button
+refreshBtn.addEventListener('click', () => {
+    fetchLeaderboard();
 });
 
 // Initial load
@@ -1174,4 +1267,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
