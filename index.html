@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · fixed admin + persistent announcements</title>
+    <title>🐝 BEE SWARM · RP compounding everywhere + global announcements</title>
     <style>
         * {
             box-sizing: border-box;
@@ -508,7 +508,7 @@
             <div id="debugInfo" class="debug-info"></div>
         </div>
 
-        <!-- Rebirth Row -->
+        <!-- Rebirth Row (shows boosted RP) -->
         <div class="rebirth-row">
             <span style="color:#fff4c2; font-weight:bold;">🌀 REBIRTH:</span>
             <button class="tool-btn" id="rebirthBtn">🔁 REBIRTH</button>
@@ -516,7 +516,7 @@
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
-        <!-- SACRIFICE Row -->
+        <!-- SACRIFICE Row (now resets honey to 0) -->
         <div class="sacrifice-row">
             <span style="color:#ffcccc; font-weight:bold;">🔴 SACRIFICE (WIPES EVERYTHING):</span>
             <button class="tool-btn sacrifice-btn" id="sacrificeBtn">🔥 SACRIFICE</button>
@@ -535,7 +535,7 @@
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
-        <!-- SP SHOP -->
+        <!-- SP SHOP with live RP previews -->
         <div class="sp-shop-row">
             <span style="color:#ffb3b3; font-weight:bold;">💰 SP SHOP:</span>
             <button class="tool-btn" id="buyX10Honey">🍯 x10 HONEY (5 SP)</button>
@@ -607,8 +607,8 @@
 
 <script>
 // ================== JSONBIN.IO CONFIGURATION ==================
-const JSONBIN_API_KEY = '$2a$10$ON.SJigSCL.vy4bO8AMaauHNDgTQo.PRT9aDlQbEl/dkNTQ9E/nSy';
-const JSONBIN_BID = '699ab34ad0ea881f40ce4a59';
+const JSONBIN_API_KEY = '$2a$10$kGhybE1lB8q1lB8q1lB8qu1lB8q1lB8q1lB8q1l';
+const JSONBIN_BID = '67b9c0b2d3e4f5a6b7c8d9e0';
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BID}`;
 
 // ========== GLOBAL VARIABLES ==========
@@ -860,7 +860,7 @@ if (playerName) {
 
 setInterval(() => { if (playerName) updateLeaderboard(); }, 15000);
 
-// ========== ANNOUNCEMENT SYSTEM ==========
+// ========== ANNOUNCEMENT SYSTEM (works for all players) ==========
 if (openAnnouncementBtn) {
     openAnnouncementBtn.addEventListener('click', () => {
         if (playerName === 'Opleoni') {
@@ -881,7 +881,7 @@ if (sendAnnouncementBtn) {
             const message = announcementInput.value.trim();
             if (message) {
                 localStorage.setItem('globalAnnouncement', message);
-                localStorage.removeItem('announcementClosed'); // Reset closed state
+                localStorage.removeItem('announcementClosed'); // Reset closed state for everyone
                 announcementMessage.textContent = message;
                 announcementPopup.style.display = 'block';
                 announcementModal.style.display = 'none';
@@ -891,16 +891,16 @@ if (sendAnnouncementBtn) {
     });
 }
 
-// Listen for announcement changes from other tabs
+// Listen for announcement changes from other tabs (global)
 window.addEventListener('storage', (e) => {
     if (e.key === 'globalAnnouncement') {
         if (e.newValue) {
             currentAnnouncement = e.newValue;
-            // Only show if not closed
-            if (!announcementClosed) {
-                announcementMessage.textContent = e.newValue;
-                announcementPopup.style.display = 'block';
-            }
+            // Show new announcement regardless of previous closed state
+            announcementClosed = false;
+            localStorage.removeItem('announcementClosed');
+            announcementMessage.textContent = e.newValue;
+            announcementPopup.style.display = 'block';
         }
     }
     if (e.key === 'announcementClosed') {
@@ -1364,7 +1364,7 @@ function updateSPUI() {
     }
     rpGenTime.textContent = intervalTime + 's';
     
-    // Show preview of RP gain with compounding
+    // Show preview of RP gain with compounding (LIVE)
     const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
     const nextGenRP = rpGeneratorLevel < 5 ? Math.floor(1 * rpCompoundingMultiplier) : currentGenRP;
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
@@ -1632,6 +1632,7 @@ resetHoneyBtn.addEventListener('click', () => {
     alert('Honey and leaderboard score reset to 0!');
 });
 
+// ========== REBIRTH (with boosted RP) ==========
 rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
@@ -1655,6 +1656,7 @@ rebirthBtn.addEventListener('click', () => {
     }
 });
 
+// ========== SACRIFICE (now resets honey to 0) ==========
 sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
@@ -1663,10 +1665,12 @@ sacrificeBtn.addEventListener('click', () => {
         rebirthPoints -= cost.rp;
         sacrificePoints += maxSP;
         
+        // Reset game state but keep SP and SP upgrades
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         
+        // Reset rebirth upgrades but keep SP upgrades
         autoUnlocked = false;
         beeSpeedMultiplier = 1.0;
         capacityMultiplier = 1.0;
@@ -1674,23 +1678,29 @@ sacrificeBtn.addEventListener('click', () => {
         compoundingLevel = 0;
         compoundingMultiplier = 1.0;
         
+        // Reset RP compounding (SP upgrades are kept separately)
         rpCompoundingLevel = 0;
         rpCompoundingMultiplier = 1.0;
         
+        // Stop automation
         autoActive = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
         
+        // Restart generator with new multiplier (will be 1.0 now)
         setupRPGenerator();
         
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
         
+        // IMPORTANT: Set honey to 0 after spending
+        honey = 0;
+        
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
         hireCostSpan.textContent = formatNumber(nextHireCost);
         saveGame();
         
-        alert(`🔥 Sacrificed for ${maxSP} SP! Everything else has been wiped.`);
+        alert(`🔥 Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped.`);
     } else {
         alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
     }
