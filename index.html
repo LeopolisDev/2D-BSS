@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · unlimited RP + honey reset</title>
+    <title>🐝 BEE SWARM · fixed RP calculation</title>
     <style>
         * {
             box-sizing: border-box;
@@ -291,11 +291,6 @@
             border-radius: 20px;
             border: 1px solid #ffaa00;
         }
-        .compounding-info {
-            font-size: 0.8rem;
-            color: #fff4c2;
-            margin-left: 5px;
-        }
     </style>
 </head>
 <body>
@@ -521,9 +516,82 @@ const SAVE_KEY = 'beeSwarmSave';
 
 // ========== UNLIMITED RP PRICING ==========
 // 1 RP = 10k, 2 RP = 15k, 3 RP = 22.5k, 4 RP = 33.75k, etc.
-function getRPCost(rpAmount) {
-    if (rpAmount === 0) return 10000; // First RP
-    return Math.floor(10000 * Math.pow(1.5, rpAmount - 1));
+function getRPCost(rpNumber) {
+    // rpNumber starts at 1 for first RP
+    return Math.floor(10000 * Math.pow(1.5, rpNumber - 1));
+}
+
+// Calculate how many RPs you can buy and the total cost
+function calculateRPPurchase(currentHoney) {
+    let remainingHoney = currentHoney;
+    let rpGained = 0;
+    let totalCost = 0;
+    let nextRPCost = getRPCost(1);
+    
+    // Keep buying RPs until we can't afford the next one
+    while (remainingHoney >= nextRPCost) {
+        remainingHoney -= nextRPCost;
+        totalCost += nextRPCost;
+        rpGained++;
+        nextRPCost = getRPCost(rpGained + 1); // Cost for next RP
+    }
+    
+    return { rpGained, totalCost, remainingHoney };
+}
+
+function updateRebirthUI() {
+    rpSpan.textContent = rebirthPoints;
+    rpBadge.textContent = `RP: ${rebirthPoints}`;
+    rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
+    totalEarnedSpan.textContent = totalHoneyEarned.toLocaleString();
+
+    const { rpGained, totalCost } = calculateRPPurchase(honey);
+    if (rpGained > 0) {
+        rebirthInfo.textContent = `${rpGained} RP = ${totalCost.toLocaleString()}🍯`;
+    } else {
+        rebirthInfo.textContent = `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
+    }
+
+    // Update one-time upgrade buttons with MAXED status
+    if (autoUnlocked) {
+        autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyAutoUpgrade.disabled = true;
+    } else {
+        autoStatus.textContent = '(2 RP)';
+        buyAutoUpgrade.disabled = rebirthPoints < 2;
+    }
+    
+    if (beeSpeedMultiplier > 1.0) {
+        speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyBeeSpeed.disabled = true;
+    } else {
+        speedStatus.textContent = '(1 RP)';
+        buyBeeSpeed.disabled = rebirthPoints < 1;
+    }
+    
+    if (capacityMultiplier > 1.0) {
+        capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyCapacity.disabled = true;
+    } else {
+        capacityStatus.textContent = '(3 RP)';
+        buyCapacity.disabled = rebirthPoints < 3;
+    }
+    
+    if (honeyMultUpgrade > 1.0) {
+        honeyMultStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyHoneyMult.disabled = true;
+    } else {
+        honeyMultStatus.textContent = '(2 RP)';
+        buyHoneyMult.disabled = rebirthPoints < 2;
+    }
+    
+    // Compounding upgrade (unlimited)
+    const compoundingCost = Math.pow(2, compoundingLevel); // 1, 2, 4, 8, 16...
+    compoundingLevelSpan.textContent = compoundingLevel;
+    compoundingCostSpan.textContent = compoundingCost;
+    const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
+    buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
+    buyCompounding.disabled = rebirthPoints < compoundingCost;
 }
 
 // ========== GAME STATE ==========
@@ -756,84 +824,6 @@ function findBestFlower(beeX, beeY) {
     return bestIndex;
 }
 
-// ========== UNLIMITED RP FUNCTIONS ==========
-function getMaxRPFromHoney() {
-    let rpGained = 0;
-    let remainingHoney = honey;
-    let rpCount = 1;
-    
-    while (remainingHoney >= getRPCost(rpCount)) {
-        remainingHoney -= getRPCost(rpCount);
-        rpGained++;
-        rpCount++;
-    }
-    return rpGained;
-}
-
-function getTotalRPCost(rpAmount) {
-    let total = 0;
-    for (let i = 1; i <= rpAmount; i++) {
-        total += getRPCost(i);
-    }
-    return total;
-}
-
-function updateRebirthUI() {
-    rpSpan.textContent = rebirthPoints;
-    rpBadge.textContent = `RP: ${rebirthPoints}`;
-    rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
-    totalEarnedSpan.textContent = totalHoneyEarned.toLocaleString();
-
-    const maxRP = getMaxRPFromHoney();
-    if (maxRP > 0) {
-        const cost = getTotalRPCost(maxRP);
-        rebirthInfo.textContent = `${maxRP} RP = ${cost.toLocaleString()}🍯`;
-    } else {
-        rebirthInfo.textContent = `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
-    }
-
-    // Update one-time upgrade buttons with MAXED status
-    if (autoUnlocked) {
-        autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyAutoUpgrade.disabled = true;
-    } else {
-        autoStatus.textContent = '(2 RP)';
-        buyAutoUpgrade.disabled = rebirthPoints < 2;
-    }
-    
-    if (beeSpeedMultiplier > 1.0) {
-        speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyBeeSpeed.disabled = true;
-    } else {
-        speedStatus.textContent = '(1 RP)';
-        buyBeeSpeed.disabled = rebirthPoints < 1;
-    }
-    
-    if (capacityMultiplier > 1.0) {
-        capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyCapacity.disabled = true;
-    } else {
-        capacityStatus.textContent = '(3 RP)';
-        buyCapacity.disabled = rebirthPoints < 3;
-    }
-    
-    if (honeyMultUpgrade > 1.0) {
-        honeyMultStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyHoneyMult.disabled = true;
-    } else {
-        honeyMultStatus.textContent = '(2 RP)';
-        buyHoneyMult.disabled = rebirthPoints < 2;
-    }
-    
-    // Compounding upgrade (unlimited)
-    const compoundingCost = Math.pow(2, compoundingLevel); // 1, 2, 4, 8, 16...
-    compoundingLevelSpan.textContent = compoundingLevel;
-    compoundingCostSpan.textContent = compoundingCost;
-    const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
-    buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
-    buyCompounding.disabled = rebirthPoints < compoundingCost;
-}
-
 // ========== GAME MECHANICS ==========
 function update() {
     for (let i = flowers.length - 1; i >= 0; i--) {
@@ -1041,13 +1031,13 @@ resetBtn.addEventListener('click', () => {
     }
 });
 
-// ========== UNLIMITED REBIRTH ==========
+// ========== FIXED REBIRTH ==========
 rebirthBtn.addEventListener('click', () => {
-    const rpToBuy = getMaxRPFromHoney();
-    if (rpToBuy > 0) {
-        const totalCost = getTotalRPCost(rpToBuy);
-        honey -= totalCost;
-        rebirthPoints += rpToBuy;
+    const { rpGained, totalCost, remainingHoney } = calculateRPPurchase(honey);
+    
+    if (rpGained > 0) {
+        honey = remainingHoney; // Set honey to remaining amount (should be 0 if exact)
+        rebirthPoints += rpGained;
         
         // Reset game state but keep rebirth points and upgrades
         bees = []; 
@@ -1073,7 +1063,7 @@ rebirthBtn.addEventListener('click', () => {
         hireCostSpan.textContent = nextHireCost;
         saveGame();
         
-        alert(`✨ Purchased ${rpToBuy} RP for ${totalCost.toLocaleString()} honey! Honey reset to ${Math.floor(honey)}.`);
+        alert(`✨ Purchased ${rpGained} RP for ${totalCost.toLocaleString()} honey! Honey reset to ${Math.floor(honey)}.`);
     } else {
         alert(`❌ Need at least ${getRPCost(1).toLocaleString()} honey for 1 RP!`);
     }
