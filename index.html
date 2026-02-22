@@ -1732,8 +1732,6 @@ if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     fetchLeaderboard();
-    startAdminGrantWatcher();
-    claimAdminGrants();
     setupAnnouncementListener();
 } else {
     nameModal.style.display = 'flex';
@@ -2501,6 +2499,10 @@ function init() {
     if (!loadGame()) {
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
+    }
+    if (playerName) {
+        startAdminGrantWatcher();
+        claimAdminGrants();
     }
     updatePerformanceButton();
     recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
