@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · name reservation + secret adder</title>
+    <title>🐝 BEE SWARM · compounding upgrade + MAXED</title>
     <style>
         * {
             box-sizing: border-box;
@@ -23,7 +23,7 @@
             border-radius: 2.5rem 2.5rem 2rem 2rem;
             box-shadow: 0 20px 30px rgba(0,0,0,0.6), inset 0 0 0 2px #e9d68b;
             padding: 1.5rem;
-            max-width: 1400px;
+            max-width: 1500px;
             width: fit-content;
         }
         .canvas-panel {
@@ -136,7 +136,7 @@
             color: #1f431f;
             cursor: pointer;
             box-shadow: 0 3px 0 #655126;
-            min-width: 90px;
+            min-width: 100px;
         }
         .tool-btn:active {
             transform: translateY(4px);
@@ -282,8 +282,19 @@
             font-weight: bold;
             color: #ffd966;
         }
-        .hidden-adder {
-            opacity: 0.7;
+        .maxed-badge {
+            background: #4a2e1a;
+            color: #ffaa00;
+            font-size: 0.7rem;
+            margin-left: 5px;
+            padding: 2px 6px;
+            border-radius: 20px;
+            border: 1px solid #ffaa00;
+        }
+        .compounding-info {
+            font-size: 0.8rem;
+            color: #fff4c2;
+            margin-left: 5px;
         }
     </style>
 </head>
@@ -337,10 +348,11 @@
         <!-- Rebirth shop (permanent upgrades) -->
         <div class="rebirth-shop-row">
             <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
-            <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO (2 RP)</button>
-            <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED x1.5 (1 RP)</button>
-            <button class="tool-btn" id="buyCapacity">📦 CAPACITY x2 (3 RP)</button>
-            <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 (2 RP)</button>
+            <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO <span id="autoStatus">(2 RP)</span></button>
+            <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED <span id="speedStatus">(1 RP)</span></button>
+            <button class="tool-btn" id="buyCapacity">📦 CAPACITY <span id="capacityStatus">(3 RP)</span></button>
+            <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 <span id="honeyMultStatus">(2 RP)</span></button>
+            <button class="tool-btn" id="buyCompounding">📈 COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
@@ -523,11 +535,15 @@ let toolMultiplier = 1.0;
 // Rebirth
 let rebirthPoints = 0;
 
-// Rebirth upgrades
+// Rebirth upgrades (one-time)
 let autoUnlocked = false;
 let beeSpeedMultiplier = 1.0;
 let capacityMultiplier = 1.0;
 let honeyMultUpgrade = 1.0;
+
+// NEW: Compounding upgrade (unlimited levels)
+let compoundingLevel = 0;
+let compoundingMultiplier = 1.0; // 1.25^level
 
 // Automation
 let autoActive = false;
@@ -549,14 +565,20 @@ const fieldInfo = document.getElementById('fieldInfo');
 const totalMultDisplay = document.getElementById('totalMultDisplay');
 const saveIndicator = document.getElementById('saveIndicator');
 
-const hireBtn = document.getElementById('hireBtn');
-const resetBtn = document.getElementById('resetBtn');
-const rebirthBtn = document.getElementById('rebirthBtn');
+// Rebirth shop buttons and status spans
 const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
 const buyBeeSpeed = document.getElementById('buyBeeSpeed');
 const buyCapacity = document.getElementById('buyCapacity');
 const buyHoneyMult = document.getElementById('buyHoneyMult');
+const buyCompounding = document.getElementById('buyCompounding');
+const autoStatus = document.getElementById('autoStatus');
+const speedStatus = document.getElementById('speedStatus');
+const capacityStatus = document.getElementById('capacityStatus');
+const honeyMultStatus = document.getElementById('honeyMultStatus');
+const compoundingLevelSpan = document.getElementById('compoundingLevel');
+const compoundingCostSpan = document.getElementById('compoundingCost');
 
+// Tool buttons
 const buyClippers = document.getElementById('buyClippers');
 const buyShears = document.getElementById('buyShears');
 const buyScythe = document.getElementById('buyScythe');
@@ -590,6 +612,7 @@ function saveGame() {
         hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
         rebirthPoints,
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
+        compoundingLevel, compoundingMultiplier,
         autoActive
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
@@ -622,6 +645,8 @@ function loadGame() {
         beeSpeedMultiplier = data.beeSpeedMultiplier || 1.0;
         capacityMultiplier = data.capacityMultiplier || 1.0;
         honeyMultUpgrade = data.honeyMultUpgrade || 1.0;
+        compoundingLevel = data.compoundingLevel || 0;
+        compoundingMultiplier = data.compoundingMultiplier || 1.0;
         autoActive = data.autoActive || false;
 
         if (autoActive && autoUnlocked) {
@@ -662,7 +687,8 @@ function recalcMultiplier() {
     if (hasStarTreat) toolMult *= 5.0;
     toolMultiplier = toolMult;
     
-    const totalMult = toolMult * honeyMultUpgrade;
+    // Total multiplier = tools * honeyMultUpgrade * compoundingMultiplier
+    const totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
     totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
 }
 
@@ -748,10 +774,46 @@ function updateRebirthUI() {
         rebirthInfo.textContent = `1 RP = ${RP_PRICES[0].toLocaleString()}🍯`;
     }
 
-    buyAutoUpgrade.disabled = autoUnlocked || rebirthPoints < 2;
-    buyBeeSpeed.disabled = beeSpeedMultiplier > 1.0 || rebirthPoints < 1;
-    buyCapacity.disabled = capacityMultiplier > 1.0 || rebirthPoints < 3;
-    buyHoneyMult.disabled = honeyMultUpgrade > 1.0 || rebirthPoints < 2;
+    // Update one-time upgrade buttons with MAXED status
+    if (autoUnlocked) {
+        autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyAutoUpgrade.disabled = true;
+    } else {
+        autoStatus.textContent = '(2 RP)';
+        buyAutoUpgrade.disabled = rebirthPoints < 2;
+    }
+    
+    if (beeSpeedMultiplier > 1.0) {
+        speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyBeeSpeed.disabled = true;
+    } else {
+        speedStatus.textContent = '(1 RP)';
+        buyBeeSpeed.disabled = rebirthPoints < 1;
+    }
+    
+    if (capacityMultiplier > 1.0) {
+        capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyCapacity.disabled = true;
+    } else {
+        capacityStatus.textContent = '(3 RP)';
+        buyCapacity.disabled = rebirthPoints < 3;
+    }
+    
+    if (honeyMultUpgrade > 1.0) {
+        honeyMultStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyHoneyMult.disabled = true;
+    } else {
+        honeyMultStatus.textContent = '(2 RP)';
+        buyHoneyMult.disabled = rebirthPoints < 2;
+    }
+    
+    // Compounding upgrade (unlimited)
+    const compoundingCost = Math.pow(2, compoundingLevel); // 1, 2, 4, 8, 16...
+    compoundingLevelSpan.textContent = compoundingLevel;
+    compoundingCostSpan.textContent = compoundingCost;
+    const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
+    buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
+    buyCompounding.disabled = rebirthPoints < compoundingCost;
 }
 
 // ========== GAME MECHANICS ==========
@@ -782,7 +844,8 @@ function update() {
             const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
             const dist = Math.hypot(dx, dy);
             if (dist < 20) {
-                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade);
+                // Apply ALL multipliers: tools * honeyMultUpgrade * compoundingMultiplier
+                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier);
                 honey += deposited;
                 totalHoneyEarned += deposited;
                 b.carrying = 0;
@@ -949,6 +1012,7 @@ resetBtn.addEventListener('click', () => {
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         rebirthPoints = 0; autoUnlocked = false; beeSpeedMultiplier = 1.0; capacityMultiplier = 1.0; honeyMultUpgrade = 1.0;
+        compoundingLevel = 0; compoundingMultiplier = 1.0;
         autoActive = false; if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
         addBee();
@@ -959,27 +1023,94 @@ resetBtn.addEventListener('click', () => {
     }
 });
 
+// ========== REBIRTH ==========
 rebirthBtn.addEventListener('click', () => {
     const rpToBuy = getMaxRPFromHoney();
     if (rpToBuy > 0) {
         const cost = RP_PRICES[rpToBuy - 1];
         honey -= cost;
         rebirthPoints += rpToBuy;
-        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
+        
+        // Reset game state but keep rebirth points and upgrades
+        bees = []; 
+        flowers = []; 
+        nextHireCost = HIRE_COST_BASE;
+        
+        // Reset tools (but keep rebirth upgrades)
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+        
+        // Add starting bee
         addBee();
-        for (let i = 0; i < 14; i++) spawnFlower();
-        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); hireCostSpan.textContent = nextHireCost;
+        
+        // Spawn initial flowers
+        for (let i = 0; i < 14; i++) {
+            spawnFlower();
+        }
+        
+        // Update UI
+        recalcMultiplier(); 
+        updateRebirthUI(); 
+        updateToolButtons(); 
+        hireCostSpan.textContent = nextHireCost;
         saveGame();
-        alert(`✨ Purchased ${rpToBuy} RP for ${cost.toLocaleString()} honey!`);
-    } else alert(`❌ Need ${RP_PRICES[0].toLocaleString()} honey for 1 RP!`);
+        
+        alert(`✨ Purchased ${rpToBuy} RP for ${cost.toLocaleString()} honey! Honey reset to ${Math.floor(honey)}.`);
+    } else {
+        alert(`❌ Need ${RP_PRICES[0].toLocaleString()} honey for 1 RP!`);
+    }
 });
 
-buyAutoUpgrade.addEventListener('click', () => { if (rebirthPoints>=2 && !autoUnlocked) { rebirthPoints-=2; autoUnlocked=true; updateRebirthUI(); saveGame(); } });
-buyBeeSpeed.addEventListener('click', () => { if (rebirthPoints>=1 && beeSpeedMultiplier===1.0) { rebirthPoints-=1; beeSpeedMultiplier=1.5; updateRebirthUI(); saveGame(); } });
-buyCapacity.addEventListener('click', () => { if (rebirthPoints>=3 && capacityMultiplier===1.0) { rebirthPoints-=3; capacityMultiplier=2.0; updateRebirthUI(); saveGame(); } });
-buyHoneyMult.addEventListener('click', () => { if (rebirthPoints>=2 && honeyMultUpgrade===1.0) { rebirthPoints-=2; honeyMultUpgrade=5.0; recalcMultiplier(); updateRebirthUI(); saveGame(); } });
+// ========== REBIRTH SHOP PURCHASES ==========
+buyAutoUpgrade.addEventListener('click', () => { 
+    if (rebirthPoints >= 2 && !autoUnlocked) { 
+        rebirthPoints -= 2; 
+        autoUnlocked = true; 
+        updateRebirthUI(); 
+        saveGame(); 
+    } 
+});
+
+buyBeeSpeed.addEventListener('click', () => { 
+    if (rebirthPoints >= 1 && beeSpeedMultiplier === 1.0) { 
+        rebirthPoints -= 1; 
+        beeSpeedMultiplier = 1.5; 
+        updateRebirthUI(); 
+        saveGame(); 
+    } 
+});
+
+buyCapacity.addEventListener('click', () => { 
+    if (rebirthPoints >= 3 && capacityMultiplier === 1.0) { 
+        rebirthPoints -= 3; 
+        capacityMultiplier = 2.0; 
+        updateRebirthUI(); 
+        saveGame(); 
+    } 
+});
+
+buyHoneyMult.addEventListener('click', () => { 
+    if (rebirthPoints >= 2 && honeyMultUpgrade === 1.0) { 
+        rebirthPoints -= 2; 
+        honeyMultUpgrade = 5.0; 
+        recalcMultiplier(); 
+        updateRebirthUI(); 
+        saveGame(); 
+    } 
+});
+
+// ========== COMPOUNDING UPGRADE (unlimited) ==========
+buyCompounding.addEventListener('click', () => {
+    const cost = Math.pow(2, compoundingLevel);
+    if (rebirthPoints >= cost) {
+        rebirthPoints -= cost;
+        compoundingLevel++;
+        compoundingMultiplier = Math.pow(1.25, compoundingLevel);
+        recalcMultiplier();
+        updateRebirthUI();
+        saveGame();
+    }
+});
 
 // Tool purchases
 buyClippers.addEventListener('click', () => { if (!hasClippers && honey>=50) { honey-=50; hasClippers=true; recalcMultiplier(); buyClippers.disabled=true; saveGame(); } });
