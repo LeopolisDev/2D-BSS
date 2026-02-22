@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · RP compounding everywhere + global announcements</title>
+    <title>🐝 BEE SWARM · fixed leaderboard + working announcements</title>
     <style>
         * {
             box-sizing: border-box;
@@ -672,26 +672,48 @@ async function fetchLeaderboard(showLoading = true) {
     }
     
     try {
+        console.log('Fetching from:', JSONBIN_URL);
         const response = await fetch(JSONBIN_URL, {
             headers: { 'X-Master-Key': JSONBIN_API_KEY }
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        debugInfo.textContent = `Data loaded: ${JSON.stringify(data).substring(0, 100)}...`;
+        console.log('Raw data:', data);
         
+        // Handle the actual JSONBin structure
         let players = [];
         if (data && data.record) {
-            if (Array.isArray(data.record)) players = data.record;
-            else if (data.record.players && Array.isArray(data.record.players)) players = data.record.players;
-            else if (typeof data.record === 'object') {
+            // If it's an object with a record property
+            if (Array.isArray(data.record)) {
+                players = data.record;
+            } else if (data.record.players && Array.isArray(data.record.players)) {
+                players = data.record.players;
+            } else if (typeof data.record === 'object') {
+                // Try to find any array in the object
                 for (let key in data.record) {
-                    if (Array.isArray(data.record[key])) { players = data.record[key]; break; }
+                    if (Array.isArray(data.record[key])) {
+                        players = data.record[key];
+                        break;
+                    }
                 }
             }
-        } else if (Array.isArray(data)) players = data;
+        } else if (Array.isArray(data)) {
+            players = data;
+        }
         
-        leaderboard = players.filter(entry => entry && typeof entry === 'object' && entry.name && typeof entry.name === 'string' && typeof entry.total === 'number');
+        // Filter out invalid entries and ensure correct format
+        leaderboard = players.filter(entry => 
+            entry && 
+            typeof entry === 'object' && 
+            entry.name && 
+            typeof entry.name === 'string' &&
+            typeof entry.total === 'number'
+        );
+        
+        console.log('Processed leaderboard:', leaderboard);
+        debugInfo.textContent = `Loaded ${leaderboard.length} players`;
         renderLeaderboard();
+        
         if (playerName === 'Opleoni') {
             updateAdminPlayerSelect();
         }
@@ -712,6 +734,8 @@ async function fetchLeaderboard(showLoading = true) {
 async function saveLeaderboard() {
     try {
         if (!Array.isArray(leaderboard)) leaderboard = [];
+        
+        // Remove duplicates (keep highest score for each name)
         const uniquePlayers = {};
         leaderboard.forEach(entry => {
             if (entry && entry.name) {
@@ -720,14 +744,26 @@ async function saveLeaderboard() {
                 }
             }
         });
+        
         leaderboard = Object.values(uniquePlayers);
+        
+        // Prepare data in the format JSONBin expects
         const dataToSave = { players: leaderboard };
+        
+        console.log('Saving to JSONBin:', dataToSave);
+        
         const response = await fetch(JSONBIN_URL, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
+            headers: { 
+                'Content-Type': 'application/json', 
+                'X-Master-Key': JSONBIN_API_KEY 
+            },
             body: JSON.stringify(dataToSave)
         });
+        
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        console.log('Save successful');
     } catch (error) {
         console.error('Failed to save leaderboard:', error);
         debugInfo.textContent = `Save error: ${error.message}`;
@@ -781,28 +817,41 @@ function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
     if (!leaderboard || leaderboard.length === 0) {
         listDiv.innerHTML = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
-        debugInfo.textContent = 'No players in leaderboard';
         return;
     }
+    
+    // Sort by total descending (highest first)
     const sorted = [...leaderboard].sort((a, b) => b.total - a.total);
     const top10 = sorted.slice(0, 10);
+    
     let html = '';
     top10.forEach((entry, index) => {
         const isYou = entry.name === playerName ? 'you-row' : '';
         const rank = index + 1;
         let rankSymbol = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
-        html += `<div class="leaderboard-entry ${isYou}"><span class="leaderboard-rank">${rankSymbol}</span><span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span><span class="leaderboard-score">🍯 ${formatNumber(entry.total)}</span></div>`;
+        
+        html += `<div class="leaderboard-entry ${isYou}">
+            <span class="leaderboard-rank">${rankSymbol}</span>
+            <span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+            <span class="leaderboard-score">🍯 ${formatNumber(entry.total)}</span>
+        </div>`;
     });
+    
+    // Add player's rank if they're not in top 10
     const playerInTop10 = top10.some(entry => entry.name === playerName);
     if (!playerInTop10 && playerName) {
         const playerRank = sorted.findIndex(entry => entry.name === playerName) + 1;
         if (playerRank > 0) {
             const playerEntry = sorted.find(entry => entry.name === playerName);
-            html += `<div class="leaderboard-entry you-row"><span class="leaderboard-rank">${playerRank}.</span><span class="leaderboard-name">${escapeHtml(playerName)}</span><span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span></div>`;
+            html += `<div class="leaderboard-entry you-row">
+                <span class="leaderboard-rank">${playerRank}.</span>
+                <span class="leaderboard-name">${escapeHtml(playerName)}</span>
+                <span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span>
+            </div>`;
         }
     }
+    
     listDiv.innerHTML = html;
-    debugInfo.textContent = `Loaded ${leaderboard.length} players, showing top ${top10.length}`;
 }
 
 function escapeHtml(unsafe) {
@@ -843,8 +892,12 @@ saveNameBtn.addEventListener('click', async () => {
     }
 });
 
-refreshBtn.addEventListener('click', () => { updateRetryCount = 0; fetchLeaderboard(); });
+refreshBtn.addEventListener('click', () => { 
+    updateRetryCount = 0; 
+    fetchLeaderboard(); 
+});
 
+// Initial load
 if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
@@ -860,7 +913,7 @@ if (playerName) {
 
 setInterval(() => { if (playerName) updateLeaderboard(); }, 15000);
 
-// ========== ANNOUNCEMENT SYSTEM (works for all players) ==========
+// ========== ANNOUNCEMENT SYSTEM ==========
 if (openAnnouncementBtn) {
     openAnnouncementBtn.addEventListener('click', () => {
         if (playerName === 'Opleoni') {
@@ -881,7 +934,7 @@ if (sendAnnouncementBtn) {
             const message = announcementInput.value.trim();
             if (message) {
                 localStorage.setItem('globalAnnouncement', message);
-                localStorage.removeItem('announcementClosed'); // Reset closed state for everyone
+                localStorage.removeItem('announcementClosed');
                 announcementMessage.textContent = message;
                 announcementPopup.style.display = 'block';
                 announcementModal.style.display = 'none';
@@ -891,12 +944,11 @@ if (sendAnnouncementBtn) {
     });
 }
 
-// Listen for announcement changes from other tabs (global)
+// Listen for announcement changes
 window.addEventListener('storage', (e) => {
     if (e.key === 'globalAnnouncement') {
         if (e.newValue) {
             currentAnnouncement = e.newValue;
-            // Show new announcement regardless of previous closed state
             announcementClosed = false;
             localStorage.removeItem('announcementClosed');
             announcementMessage.textContent = e.newValue;
@@ -1364,16 +1416,15 @@ function updateSPUI() {
     }
     rpGenTime.textContent = intervalTime + 's';
     
-    // Show preview of RP gain with compounding (LIVE)
+    // Show preview of RP gain with compounding
     const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
-    const nextGenRP = rpGeneratorLevel < 5 ? Math.floor(1 * rpCompoundingMultiplier) : currentGenRP;
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
     
     if (rpGeneratorLevel >= 5) {
         buyRPGen.innerHTML = `⏱️ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
         buyRPGen.disabled = true;
     } else {
-        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${nextGenRP} RP/s next)</span>`;
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s next)</span>`;
         buyRPGen.disabled = sacrificePoints < genCost;
     }
 
@@ -1632,7 +1683,7 @@ resetHoneyBtn.addEventListener('click', () => {
     alert('Honey and leaderboard score reset to 0!');
 });
 
-// ========== REBIRTH (with boosted RP) ==========
+// ========== REBIRTH ==========
 rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
@@ -1656,7 +1707,7 @@ rebirthBtn.addEventListener('click', () => {
     }
 });
 
-// ========== SACRIFICE (now resets honey to 0) ==========
+// ========== SACRIFICE ==========
 sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
@@ -1665,12 +1716,10 @@ sacrificeBtn.addEventListener('click', () => {
         rebirthPoints -= cost.rp;
         sacrificePoints += maxSP;
         
-        // Reset game state but keep SP and SP upgrades
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         
-        // Reset rebirth upgrades but keep SP upgrades
         autoUnlocked = false;
         beeSpeedMultiplier = 1.0;
         capacityMultiplier = 1.0;
@@ -1678,22 +1727,18 @@ sacrificeBtn.addEventListener('click', () => {
         compoundingLevel = 0;
         compoundingMultiplier = 1.0;
         
-        // Reset RP compounding (SP upgrades are kept separately)
         rpCompoundingLevel = 0;
         rpCompoundingMultiplier = 1.0;
         
-        // Stop automation
         autoActive = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
         
-        // Restart generator with new multiplier (will be 1.0 now)
         setupRPGenerator();
         
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
         
-        // IMPORTANT: Set honey to 0 after spending
         honey = 0;
         
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
@@ -1903,4 +1948,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
