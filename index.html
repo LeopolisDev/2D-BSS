@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · fixed leaderboard + working announcements</title>
+    <title>🐝 BEE SWARM · SimpleBoards Leaderboard</title>
     <style>
         * {
             box-sizing: border-box;
@@ -419,7 +419,6 @@
             background: #4caf50;
             border-bottom-color: #2e7d32;
         }
-        /* Announcement Popup */
         .announcement-popup {
             position: fixed;
             top: 50%; left: 50%;
@@ -470,7 +469,7 @@
         </div>
     </div>
 
-    <!-- Announcement Popup (shown to all players) -->
+    <!-- Announcement Popup -->
     <div id="announcementPopup" class="announcement-popup" style="display: none;">
         <h2 style="color:#2a4820;">📢 ANNOUNCEMENT</h2>
         <p id="announcementMessage"></p>
@@ -496,10 +495,10 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Leaderboard Panel -->
+        <!-- Leaderboard Panel (SIMPLEBOARDS - GLOBAL) -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">
-                🌍 GLOBAL TOP 10
+                🌍 GLOBAL TOP 10 (SimpleBoards)
                 <span class="refresh-btn" id="refreshLeaderboard">↻</span>
             </div>
             <div id="leaderboardList">
@@ -508,7 +507,7 @@
             <div id="debugInfo" class="debug-info"></div>
         </div>
 
-        <!-- Rebirth Row (shows boosted RP) -->
+        <!-- Rebirth Row -->
         <div class="rebirth-row">
             <span style="color:#fff4c2; font-weight:bold;">🌀 REBIRTH:</span>
             <button class="tool-btn" id="rebirthBtn">🔁 REBIRTH</button>
@@ -516,7 +515,7 @@
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
-        <!-- SACRIFICE Row (now resets honey to 0) -->
+        <!-- SACRIFICE Row -->
         <div class="sacrifice-row">
             <span style="color:#ffcccc; font-weight:bold;">🔴 SACRIFICE (WIPES EVERYTHING):</span>
             <button class="tool-btn sacrifice-btn" id="sacrificeBtn">🔥 SACRIFICE</button>
@@ -535,7 +534,7 @@
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
-        <!-- SP SHOP with live RP previews -->
+        <!-- SP SHOP -->
         <div class="sp-shop-row">
             <span style="color:#ffb3b3; font-weight:bold;">💰 SP SHOP:</span>
             <button class="tool-btn" id="buyX10Honey">🍯 x10 HONEY (5 SP)</button>
@@ -545,7 +544,7 @@
             <span class="multiplier-badge" id="spShopDisplay">SP: 0</span>
         </div>
 
-        <!-- Tool shop with 8 tools -->
+        <!-- Tool shop -->
         <div class="shop-row">
             <span style="color:#fff4c2; font-weight:bold;">🛒 TOOLS:</span>
             <button class="tool-btn" id="buyClippers">✂️ 1.2x (50)</button>
@@ -566,7 +565,7 @@
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
         </div>
 
-        <!-- Compact Admin Panel for Opleoni -->
+        <!-- Admin Panel for Opleoni -->
         <div id="adminPanel" class="admin-panel-compact" style="display: none;">
             <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN:</span>
             <select id="adminPlayerSelect" class="admin-select">
@@ -591,7 +590,7 @@
             <button id="cancelAnnouncementBtn">CANCEL</button>
         </div>
 
-        <!-- Footer with RESET buttons -->
+        <!-- Footer -->
         <footer>
             <div class="footer-row">
                 <span>🌸 Click flowers to boost them</span>
@@ -606,21 +605,18 @@
 </div>
 
 <script>
-// ================== JSONBIN.IO CONFIGURATION ==================
-const JSONBIN_API_KEY = '$2a$10$ON.SJigSCL.vy4bO8AMaauHNDgTQo.PRT9aDlQbEl/dkNTQ9E/nSy';
-const JSONBIN_BID = '699ab34ad0ea881f40ce4a59';
-const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BID}`;
+// ================== SIMPLEBOARDS CONFIGURATION ==================
+// REPLACE THESE WITH YOUR ACTUAL VALUES FROM SIMPLEBOARDS.DEV
+const SIMPLEBOARDS_API_KEY = '1e499b45-0ceb-4f77-89c0-f4d69cef9586';
+const SIMPLEBOARDS_LEADERBOARD_ID = '00000000-0000-0000-0000-000000000000';
+const SIMPLEBOARDS_API_URL = 'https://api.simpleboards.dev/v1';
 
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
 let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
 let totalHoneyEarned = 0;
-let lastUpdate = 0;
-let updateRetryCount = 0;
 let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
 let announcementClosed = localStorage.getItem('announcementClosed') === 'true';
-const UPDATE_COOLDOWN = 3000;
-const MAX_RETRIES = 5;
 
 // ========== UI ELEMENTS ==========
 const nameModal = document.getElementById('nameModal');
@@ -644,7 +640,7 @@ const announcementPopup = document.getElementById('announcementPopup');
 const announcementMessage = document.getElementById('announcementMessage');
 const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
 
-// Show announcement popup if exists and not closed
+// Show announcement if exists
 if (currentAnnouncement && !announcementClosed) {
     announcementMessage.textContent = currentAnnouncement;
     announcementPopup.style.display = 'block';
@@ -665,111 +661,72 @@ function formatNumber(num) {
     return Math.floor(num).toString();
 }
 
-// ========== LEADERBOARD FUNCTIONS ==========
-async function fetchLeaderboard(showLoading = true) {
-    if (showLoading) {
-        document.getElementById('leaderboardList').innerHTML = '<div class="loading">Loading leaderboard...</div>';
-    }
+// ========== SIMPLEBOARDS LEADERBOARD FUNCTIONS ==========
+async function fetchLeaderboard() {
+    document.getElementById('leaderboardList').innerHTML = '<div class="loading">Loading leaderboard...</div>';
     
     try {
-        console.log('Fetching from:', JSONBIN_URL);
-        const response = await fetch(JSONBIN_URL, {
-            headers: { 'X-Master-Key': JSONBIN_API_KEY }
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        console.log('Raw data:', data);
-        
-        // Handle the actual JSONBin structure
-        let players = [];
-        if (data && data.record) {
-            // If it's an object with a record property
-            if (Array.isArray(data.record)) {
-                players = data.record;
-            } else if (data.record.players && Array.isArray(data.record.players)) {
-                players = data.record.players;
-            } else if (typeof data.record === 'object') {
-                // Try to find any array in the object
-                for (let key in data.record) {
-                    if (Array.isArray(data.record[key])) {
-                        players = data.record[key];
-                        break;
-                    }
-                }
+        const response = await fetch(`${SIMPLEBOARDS_API_URL}/leaderboards/${SIMPLEBOARDS_LEADERBOARD_ID}/entries`, {
+            headers: {
+                'Authorization': `Bearer ${SIMPLEBOARDS_API_KEY}`,
+                'Content-Type': 'application/json'
             }
-        } else if (Array.isArray(data)) {
-            players = data;
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        // Filter out invalid entries and ensure correct format
-        leaderboard = players.filter(entry => 
-            entry && 
-            typeof entry === 'object' && 
-            entry.name && 
-            typeof entry.name === 'string' &&
-            typeof entry.total === 'number'
-        );
+        const data = await response.json();
         
-        console.log('Processed leaderboard:', leaderboard);
-        debugInfo.textContent = `Loaded ${leaderboard.length} players`;
+        // SimpleBoards returns an array of entries
+        leaderboard = data.map(entry => ({
+            name: entry.playerDisplayName,
+            total: parseInt(entry.score) || 0
+        })).filter(entry => entry.name && entry.total > 0);
+        
         renderLeaderboard();
         
         if (playerName === 'Opleoni') {
             updateAdminPlayerSelect();
         }
-        updateRetryCount = 0;
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
         debugInfo.textContent = `Error: ${error.message}`;
-        updateRetryCount++;
-        if (updateRetryCount < MAX_RETRIES) {
-            document.getElementById('leaderboardList').innerHTML = `<div class="loading">Retrying... (${updateRetryCount}/${MAX_RETRIES})</div>`;
-            setTimeout(() => fetchLeaderboard(showLoading), 2000);
-        } else {
-            document.getElementById('leaderboardList').innerHTML = '<div class="leaderboard-entry">⚠️ Failed to load leaderboard. Click ↻ to retry.</div>';
-        }
+        document.getElementById('leaderboardList').innerHTML = 
+            '<div class="leaderboard-entry">⚠️ Failed to load leaderboard. Check API key.</div>';
     }
 }
 
-async function saveLeaderboard() {
+async function submitScore(score) {
+    if (!playerName || score <= 0) return;
+    
     try {
-        if (!Array.isArray(leaderboard)) leaderboard = [];
-        
-        // Remove duplicates (keep highest score for each name)
-        const uniquePlayers = {};
-        leaderboard.forEach(entry => {
-            if (entry && entry.name) {
-                if (!uniquePlayers[entry.name] || uniquePlayers[entry.name].total < entry.total) {
-                    uniquePlayers[entry.name] = entry;
-                }
-            }
-        });
-        
-        leaderboard = Object.values(uniquePlayers);
-        
-        // Prepare data in the format JSONBin expects
-        const dataToSave = { players: leaderboard };
-        
-        console.log('Saving to JSONBin:', dataToSave);
-        
-        const response = await fetch(JSONBIN_URL, {
-            method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'X-Master-Key': JSONBIN_API_KEY 
+        const response = await fetch(`${SIMPLEBOARDS_API_URL}/leaderboards/${SIMPLEBOARDS_LEADERBOARD_ID}/entries`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${SIMPLEBOARDS_API_KEY}`,
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(dataToSave)
+            body: JSON.stringify({
+                playerDisplayName: playerName,
+                score: score.toString(),
+                metadata: JSON.stringify({})
+            })
         });
         
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         
-        console.log('Save successful');
+        // Refresh leaderboard after submitting
+        await fetchLeaderboard();
     } catch (error) {
-        console.error('Failed to save leaderboard:', error);
-        debugInfo.textContent = `Save error: ${error.message}`;
+        console.error('Failed to submit score:', error);
     }
 }
 
+// ========== ADMIN FUNCTIONS ==========
 function updateAdminPlayerSelect() {
     if (playerName !== 'Opleoni') return;
     const select = adminPlayerSelect;
@@ -790,37 +747,20 @@ function updateAdminPlayerSelect() {
     select.appendChild(newOption);
 }
 
-async function updateLeaderboard() {
-    if (!playerName) return;
-    const now = Date.now();
-    if (now - lastUpdate < UPDATE_COOLDOWN) return;
-    lastUpdate = now;
-    try {
-        await fetchLeaderboard(false);
-        let playerEntry = leaderboard.find(entry => entry && entry.name === playerName);
-        if (playerEntry) {
-            if (totalHoneyEarned > playerEntry.total) {
-                playerEntry.total = totalHoneyEarned;
-                await saveLeaderboard();
-            }
-        } else {
-            leaderboard.push({ name: playerName, total: totalHoneyEarned });
-            await saveLeaderboard();
-        }
-        await fetchLeaderboard(false);
-    } catch (error) {
-        console.error('Error updating leaderboard:', error);
-    }
+async function isNameAvailable(name) {
+    await fetchLeaderboard();
+    const lowerName = name.toLowerCase();
+    return !leaderboard.some(entry => entry && entry.name && entry.name.toLowerCase() === lowerName);
 }
 
 function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
     if (!leaderboard || leaderboard.length === 0) {
         listDiv.innerHTML = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
+        debugInfo.textContent = 'No players';
         return;
     }
     
-    // Sort by total descending (highest first)
     const sorted = [...leaderboard].sort((a, b) => b.total - a.total);
     const top10 = sorted.slice(0, 10);
     
@@ -837,7 +777,6 @@ function renderLeaderboard() {
         </div>`;
     });
     
-    // Add player's rank if they're not in top 10
     const playerInTop10 = top10.some(entry => entry.name === playerName);
     if (!playerInTop10 && playerName) {
         const playerRank = sorted.findIndex(entry => entry.name === playerName) + 1;
@@ -852,6 +791,7 @@ function renderLeaderboard() {
     }
     
     listDiv.innerHTML = html;
+    debugInfo.textContent = `Loaded ${leaderboard.length} players`;
 }
 
 function escapeHtml(unsafe) {
@@ -862,56 +802,36 @@ function escapeHtml(unsafe) {
     });
 }
 
-async function isNameAvailable(name) {
-    await fetchLeaderboard(false);
-    const lowerName = name.toLowerCase();
-    return !leaderboard.some(entry => entry && entry.name && entry.name.toLowerCase() === lowerName);
-}
-
 saveNameBtn.addEventListener('click', async () => {
     let name = playerNameInput.value.trim();
     if (name === '') name = 'BeeKeeper';
+    
     const available = await isNameAvailable(name);
     if (!available) {
         nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
         return;
     }
+    
     playerName = name;
     localStorage.setItem('beeSwarmPlayerName', playerName);
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
-    leaderboard.push({ name: playerName, total: 0 });
-    await saveLeaderboard();
-    await fetchLeaderboard();
+    
+    // Submit initial score of 0
+    await submitScore(0);
+    
     if (playerName === 'Opleoni') {
-        console.log('🔮 Admin panel activated for Opleoni');
+        console.log('🔮 Admin panel activated');
         adminPanel.style.display = 'flex';
-        updateAdminPlayerSelect();
+        setTimeout(updateAdminPlayerSelect, 1000);
     } else {
         adminPanel.style.display = 'none';
     }
 });
 
 refreshBtn.addEventListener('click', () => { 
-    updateRetryCount = 0; 
-    fetchLeaderboard(); 
+    fetchLeaderboard();
 });
-
-// Initial load
-if (playerName) {
-    nameModal.style.display = 'none';
-    playerNameDisplay.textContent = `Name: ${playerName}`;
-    fetchLeaderboard();
-    if (playerName === 'Opleoni') {
-        adminPanel.style.display = 'flex';
-        setTimeout(updateAdminPlayerSelect, 1000);
-    }
-} else {
-    nameModal.style.display = 'flex';
-    fetchLeaderboard();
-}
-
-setInterval(() => { if (playerName) updateLeaderboard(); }, 15000);
 
 // ========== ANNOUNCEMENT SYSTEM ==========
 if (openAnnouncementBtn) {
@@ -962,6 +882,25 @@ window.addEventListener('storage', (e) => {
         }
     }
 });
+
+// Initial load
+if (playerName) {
+    nameModal.style.display = 'none';
+    playerNameDisplay.textContent = `Name: ${playerName}`;
+    fetchLeaderboard();
+    if (playerName === 'Opleoni') {
+        adminPanel.style.display = 'flex';
+        setTimeout(updateAdminPlayerSelect, 1000);
+    }
+} else {
+    nameModal.style.display = 'flex';
+    fetchLeaderboard();
+}
+
+// Periodically refresh leaderboard (every 30 seconds)
+setInterval(() => {
+    fetchLeaderboard();
+}, 30000);
 
 // ========== GAME CONSTANTS ==========
 const HIVE_X = 100, HIVE_Y = 200;
@@ -1015,8 +954,6 @@ let toolMultiplier = 1.0;
 
 // Rebirth
 let rebirthPoints = 0;
-
-// Sacrifice Points
 let sacrificePoints = 0;
 
 // Rebirth upgrades
@@ -1033,8 +970,6 @@ let rpAutoBuyActive = false;
 let rpGeneratorLevel = 0;
 let rpGeneratorInterval = null;
 let rpAutoBuyInterval = null;
-
-// RP Compounding upgrade
 let rpCompoundingLevel = 0;
 let rpCompoundingMultiplier = 1.0;
 
@@ -1135,7 +1070,9 @@ function saveGame() {
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
     setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
-    updateLeaderboard();
+    
+    // Submit score to SimpleBoards
+    submitScore(totalHoneyEarned);
 }
 
 function loadGame() {
@@ -1343,7 +1280,6 @@ function updateRebirthUI() {
         sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
     }
 
-    // Rebirth shop maxed buttons
     if (autoUnlocked) {
         autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
         buyAutoUpgrade.disabled = true;
@@ -1389,7 +1325,6 @@ function updateRebirthUI() {
 }
 
 function updateSPUI() {
-    // SP shop maxed buttons
     if (x10HoneyPurchased) {
         buyX10Honey.innerHTML = '🍯 x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
         buyX10Honey.disabled = true;
@@ -1416,7 +1351,6 @@ function updateSPUI() {
     }
     rpGenTime.textContent = intervalTime + 's';
     
-    // Show preview of RP gain with compounding
     const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
     
@@ -1673,17 +1607,13 @@ resetHoneyBtn.addEventListener('click', () => {
     honey = 0;
     totalHoneyEarned = 0;
     
-    let playerEntry = leaderboard.find(entry => entry.name === playerName);
-    if (playerEntry) {
-        playerEntry.total = 0;
-        saveLeaderboard();
-    }
+    // Submit zero score to leaderboard
+    submitScore(0);
     
     saveGame();
     alert('Honey and leaderboard score reset to 0!');
 });
 
-// ========== REBIRTH ==========
 rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
@@ -1707,7 +1637,6 @@ rebirthBtn.addEventListener('click', () => {
     }
 });
 
-// ========== SACRIFICE ==========
 sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
@@ -1878,7 +1807,6 @@ adminAddBtn.addEventListener('click', async () => {
         return;
     }
     
-    // If no player selected, target Opleoni (self)
     if (!targetPlayer || targetPlayer === '') {
         targetPlayer = 'Opleoni';
     }
@@ -1894,14 +1822,11 @@ adminAddBtn.addEventListener('click', async () => {
         }
         
         targetPlayer = newName;
-        leaderboard.push({ name: targetPlayer, total: 0 });
+        // Submit initial score
+        await submitScore(0);
     }
     
     let playerEntry = leaderboard.find(entry => entry.name === targetPlayer);
-    if (!playerEntry) {
-        playerEntry = { name: targetPlayer, total: 0 };
-        leaderboard.push(playerEntry);
-    }
     
     switch(stat) {
         case 'honey':
@@ -1909,7 +1834,11 @@ adminAddBtn.addEventListener('click', async () => {
                 honey += amount;
                 totalHoneyEarned += amount;
             }
-            playerEntry.total += amount;
+            if (playerEntry) {
+                playerEntry.total += amount;
+            }
+            // Submit updated score
+            await submitScore(totalHoneyEarned);
             break;
         case 'rp':
             if (targetPlayer === playerName) {
@@ -1923,7 +1852,7 @@ adminAddBtn.addEventListener('click', async () => {
             break;
     }
     
-    await saveLeaderboard();
+    await fetchLeaderboard();
     updateRebirthUI();
     updateSPUI();
     saveGame();
