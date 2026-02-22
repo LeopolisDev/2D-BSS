@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · compounding upgrade + MAXED</title>
+    <title>🐝 BEE SWARM · unlimited RP + honey reset</title>
     <style>
         * {
             box-sizing: border-box;
@@ -519,7 +519,12 @@ const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
 const SAVE_KEY = 'beeSwarmSave';
 
-const RP_PRICES = [10000, 15000, 22500, 33750, 50625, 75937, 113906, 170859, 256289, 384434, 576651, 864977, 1297466, 1946199, 2919299];
+// ========== UNLIMITED RP PRICING ==========
+// 1 RP = 10k, 2 RP = 15k, 3 RP = 22.5k, 4 RP = 33.75k, etc.
+function getRPCost(rpAmount) {
+    if (rpAmount === 0) return 10000; // First RP
+    return Math.floor(10000 * Math.pow(1.5, rpAmount - 1));
+}
 
 // ========== GAME STATE ==========
 let honey = 0;
@@ -541,7 +546,7 @@ let beeSpeedMultiplier = 1.0;
 let capacityMultiplier = 1.0;
 let honeyMultUpgrade = 1.0;
 
-// NEW: Compounding upgrade (unlimited levels)
+// Compounding upgrade (unlimited levels)
 let compoundingLevel = 0;
 let compoundingMultiplier = 1.0; // 1.25^level
 
@@ -751,14 +756,26 @@ function findBestFlower(beeX, beeY) {
     return bestIndex;
 }
 
+// ========== UNLIMITED RP FUNCTIONS ==========
 function getMaxRPFromHoney() {
     let rpGained = 0;
-    for (let i = 0; i < RP_PRICES.length; i++) {
-        if (honey >= RP_PRICES[i]) {
-            rpGained = i + 1;
-        } else break;
+    let remainingHoney = honey;
+    let rpCount = 1;
+    
+    while (remainingHoney >= getRPCost(rpCount)) {
+        remainingHoney -= getRPCost(rpCount);
+        rpGained++;
+        rpCount++;
     }
     return rpGained;
+}
+
+function getTotalRPCost(rpAmount) {
+    let total = 0;
+    for (let i = 1; i <= rpAmount; i++) {
+        total += getRPCost(i);
+    }
+    return total;
 }
 
 function updateRebirthUI() {
@@ -769,9 +786,10 @@ function updateRebirthUI() {
 
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
-        rebirthInfo.textContent = `${maxRP} RP = ${RP_PRICES[maxRP-1].toLocaleString()}🍯`;
+        const cost = getTotalRPCost(maxRP);
+        rebirthInfo.textContent = `${maxRP} RP = ${cost.toLocaleString()}🍯`;
     } else {
-        rebirthInfo.textContent = `1 RP = ${RP_PRICES[0].toLocaleString()}🍯`;
+        rebirthInfo.textContent = `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
     }
 
     // Update one-time upgrade buttons with MAXED status
@@ -1023,12 +1041,12 @@ resetBtn.addEventListener('click', () => {
     }
 });
 
-// ========== REBIRTH ==========
+// ========== UNLIMITED REBIRTH ==========
 rebirthBtn.addEventListener('click', () => {
     const rpToBuy = getMaxRPFromHoney();
     if (rpToBuy > 0) {
-        const cost = RP_PRICES[rpToBuy - 1];
-        honey -= cost;
+        const totalCost = getTotalRPCost(rpToBuy);
+        honey -= totalCost;
         rebirthPoints += rpToBuy;
         
         // Reset game state but keep rebirth points and upgrades
@@ -1055,9 +1073,9 @@ rebirthBtn.addEventListener('click', () => {
         hireCostSpan.textContent = nextHireCost;
         saveGame();
         
-        alert(`✨ Purchased ${rpToBuy} RP for ${cost.toLocaleString()} honey! Honey reset to ${Math.floor(honey)}.`);
+        alert(`✨ Purchased ${rpToBuy} RP for ${totalCost.toLocaleString()} honey! Honey reset to ${Math.floor(honey)}.`);
     } else {
-        alert(`❌ Need ${RP_PRICES[0].toLocaleString()} honey for 1 RP!`);
+        alert(`❌ Need at least ${getRPCost(1).toLocaleString()} honey for 1 RP!`);
     }
 });
 
