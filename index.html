@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · fixed admin panel + announcements</title>
+    <title>🐝 BEE SWARM · RP compounding preview + closable announcements</title>
     <style>
         * {
             box-sizing: border-box;
@@ -352,6 +352,7 @@
             padding: 2px 6px;
             border-radius: 20px;
             border: 1px solid #ffaa00;
+            white-space: nowrap;
         }
         .loading {
             text-align: center;
@@ -418,55 +419,42 @@
             background: #4caf50;
             border-bottom-color: #2e7d32;
         }
-        .announcement-modal {
+        /* Announcement Popup */
+        .announcement-popup {
             position: fixed;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: #dba959;
+            background: #ffd966;
             padding: 30px;
             border-radius: 60px;
-            border: 5px solid #ffaa00;
+            border: 5px solid #b57c2a;
             text-align: center;
             box-shadow: 0 10px 0 #7e6237;
             z-index: 2000;
             max-width: 500px;
             width: 90%;
+            color: #1f431f;
         }
-        .announcement-modal input {
-            font-size: 1.2rem;
-            padding: 10px;
-            border-radius: 40px;
-            border: none;
+        .announcement-popup p {
+            font-size: 1.3rem;
             margin: 20px 0;
-            text-align: center;
-            background: #fff9d7;
-            width: 100%;
+            word-wrap: break-word;
         }
-        .announcement-modal button {
+        .announcement-popup button {
             background: #fecd4f;
             border: none;
             font-size: 1.1rem;
-            padding: 8px 20px;
+            padding: 8px 30px;
             border-radius: 40px;
             border-bottom: 5px solid #b57c2a;
             cursor: pointer;
             font-weight: bold;
-            margin: 5px;
+            margin-top: 10px;
         }
-        .announcement-banner {
-            background: #ffaa00;
-            color: #1a1a1a;
-            text-align: center;
-            padding: 10px;
-            border-radius: 40px;
-            margin-bottom: 10px;
-            font-weight: bold;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.8; }
-            100% { opacity: 1; }
+        .preview-text {
+            font-size: 0.9rem;
+            color: #ffaa00;
+            margin-left: 5px;
         }
     </style>
 </head>
@@ -482,16 +470,11 @@
         </div>
     </div>
 
-    <!-- Announcement Banner (shown to all players) -->
-    <div id="announcementBanner" class="announcement-banner" style="display: none;"></div>
-
-    <!-- Announcement Modal (for Opleoni) -->
-    <div id="announcementModal" class="announcement-modal" style="display: none;">
-        <h2 style="color:#2a4820;">📢 SEND ANNOUNCEMENT</h2>
-        <input type="text" id="announcementInput" placeholder="Enter your message..." maxlength="100">
-        <br>
-        <button id="sendAnnouncementBtn">SEND</button>
-        <button id="closeAnnouncementBtn">CANCEL</button>
+    <!-- Announcement Popup (shown to all players) -->
+    <div id="announcementPopup" class="announcement-popup" style="display: none;">
+        <h2 style="color:#2a4820;">📢 ANNOUNCEMENT</h2>
+        <p id="announcementMessage"></p>
+        <button id="closeAnnouncementBtn">CLOSE</button>
     </div>
 
 <div class="game-wrapper">
@@ -557,7 +540,7 @@
             <span style="color:#ffb3b3; font-weight:bold;">💰 SP SHOP:</span>
             <button class="tool-btn" id="buyX10Honey">🍯 x10 HONEY (5 SP)</button>
             <button class="tool-btn" id="buyRPAuto">🤖 RP AUTOBUY (10 SP)</button>
-            <button class="tool-btn" id="buyRPGen">⏱️ RP GENERATOR lv<span id="rpGenLevel">0</span> (<span id="rpGenCost">1</span> SP) <span id="rpGenTime">5s</span></button>
+            <button class="tool-btn" id="buyRPGen">⏱️ RP GENERATOR lv<span id="rpGenLevel">0</span> (<span id="rpGenCost">1</span> SP) <span id="rpGenTime">5s</span> <span id="rpGenPreview" class="preview-text"></span></button>
             <button class="tool-btn" id="buyRPCompounding">📈 RP COMPOUNDING lv<span id="rpCompLevel">0</span> (<span id="rpCompCost">1</span> SP) x<span id="rpCompMult">1.00</span></button>
             <span class="multiplier-badge" id="spShopDisplay">SP: 0</span>
         </div>
@@ -583,7 +566,7 @@
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
         </div>
 
-        <!-- Compact Admin Panel for Opleoni (with announcement button) -->
+        <!-- Compact Admin Panel for Opleoni -->
         <div id="adminPanel" class="admin-panel-compact" style="display: none;">
             <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN:</span>
             <select id="adminPlayerSelect" class="admin-select">
@@ -597,6 +580,15 @@
             <input type="number" id="adminAmount" class="adder-input" value="1000" min="0">
             <button class="tool-btn" id="adminAddBtn">➕ ADD</button>
             <button class="tool-btn" id="openAnnouncementBtn">📢 ANNOUNCE</button>
+        </div>
+
+        <!-- Announcement Modal for Opleoni -->
+        <div id="announcementModal" class="announcement-popup" style="display: none;">
+            <h2 style="color:#2a4820;">📢 SEND ANNOUNCEMENT</h2>
+            <input type="text" id="announcementInput" placeholder="Enter your message..." maxlength="100" style="width: 90%; padding: 10px; border-radius: 40px; border: none; margin: 20px 0;">
+            <br>
+            <button id="sendAnnouncementBtn">SEND</button>
+            <button id="cancelAnnouncementBtn">CANCEL</button>
         </div>
 
         <!-- Footer with RESET buttons -->
@@ -625,7 +617,7 @@ let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
 let totalHoneyEarned = 0;
 let lastUpdate = 0;
 let updateRetryCount = 0;
-let announcement = localStorage.getItem('globalAnnouncement') || '';
+let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
 const UPDATE_COOLDOWN = 3000;
 const MAX_RETRIES = 5;
 
@@ -646,14 +638,20 @@ const openAnnouncementBtn = document.getElementById('openAnnouncementBtn');
 const announcementModal = document.getElementById('announcementModal');
 const announcementInput = document.getElementById('announcementInput');
 const sendAnnouncementBtn = document.getElementById('sendAnnouncementBtn');
+const cancelAnnouncementBtn = document.getElementById('cancelAnnouncementBtn');
+const announcementPopup = document.getElementById('announcementPopup');
+const announcementMessage = document.getElementById('announcementMessage');
 const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
-const announcementBanner = document.getElementById('announcementBanner');
 
-// Show announcement if exists
-if (announcement) {
-    announcementBanner.textContent = announcement;
-    announcementBanner.style.display = 'block';
+// Show announcement popup if exists
+if (currentAnnouncement) {
+    announcementMessage.textContent = currentAnnouncement;
+    announcementPopup.style.display = 'block';
 }
+
+closeAnnouncementBtn.addEventListener('click', () => {
+    announcementPopup.style.display = 'none';
+});
 
 // ========== NUMBER FORMATTING ==========
 function formatNumber(num) {
@@ -739,7 +737,6 @@ function updateAdminPlayerSelect() {
     const select = adminPlayerSelect;
     select.innerHTML = '<option value="">Select Player</option>';
     
-    // Add current players
     leaderboard.forEach(entry => {
         if (entry && entry.name) {
             const option = document.createElement('option');
@@ -749,7 +746,6 @@ function updateAdminPlayerSelect() {
         }
     });
     
-    // Add option to create new player
     const newOption = document.createElement('option');
     newOption.value = '__NEW__';
     newOption.textContent = '➕ Create New Player...';
@@ -871,8 +867,8 @@ if (openAnnouncementBtn) {
     });
 }
 
-if (closeAnnouncementBtn) {
-    closeAnnouncementBtn.addEventListener('click', () => {
+if (cancelAnnouncementBtn) {
+    cancelAnnouncementBtn.addEventListener('click', () => {
         announcementModal.style.display = 'none';
     });
 }
@@ -883,8 +879,8 @@ if (sendAnnouncementBtn) {
             const message = announcementInput.value.trim();
             if (message) {
                 localStorage.setItem('globalAnnouncement', message);
-                announcementBanner.textContent = message;
-                announcementBanner.style.display = 'block';
+                announcementMessage.textContent = message;
+                announcementPopup.style.display = 'block';
                 announcementModal.style.display = 'none';
                 announcementInput.value = '';
             }
@@ -896,10 +892,10 @@ if (sendAnnouncementBtn) {
 window.addEventListener('storage', (e) => {
     if (e.key === 'globalAnnouncement') {
         if (e.newValue) {
-            announcementBanner.textContent = e.newValue;
-            announcementBanner.style.display = 'block';
+            announcementMessage.textContent = e.newValue;
+            announcementPopup.style.display = 'block';
         } else {
-            announcementBanner.style.display = 'none';
+            announcementPopup.style.display = 'none';
         }
     }
 });
@@ -1027,6 +1023,7 @@ const buyRPCompounding = document.getElementById('buyRPCompounding');
 const rpGenLevel = document.getElementById('rpGenLevel');
 const rpGenCost = document.getElementById('rpGenCost');
 const rpGenTime = document.getElementById('rpGenTime');
+const rpGenPreview = document.getElementById('rpGenPreview');
 const rpCompLevel = document.getElementById('rpCompLevel');
 const rpCompCost = document.getElementById('rpCompCost');
 const rpCompMult = document.getElementById('rpCompMult');
@@ -1283,6 +1280,7 @@ function updateRebirthUI() {
         sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
     }
 
+    // Rebirth shop maxed buttons
     if (autoUnlocked) {
         autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
         buyAutoUpgrade.disabled = true;
@@ -1328,8 +1326,22 @@ function updateRebirthUI() {
 }
 
 function updateSPUI() {
-    buyX10Honey.disabled = x10HoneyPurchased || sacrificePoints < 5;
-    buyRPAuto.disabled = rpAutoBuyActive || sacrificePoints < 10;
+    // SP shop maxed buttons
+    if (x10HoneyPurchased) {
+        buyX10Honey.innerHTML = '🍯 x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
+        buyX10Honey.disabled = true;
+    } else {
+        buyX10Honey.innerHTML = '🍯 x10 HONEY (5 SP)';
+        buyX10Honey.disabled = sacrificePoints < 5;
+    }
+    
+    if (rpAutoBuyActive) {
+        buyRPAuto.innerHTML = '🤖 RP AUTOBUY MAXED <span class="maxed-badge">MAX</span>';
+        buyRPAuto.disabled = true;
+    } else {
+        buyRPAuto.innerHTML = '🤖 RP AUTOBUY (10 SP)';
+        buyRPAuto.disabled = sacrificePoints < 10;
+    }
     
     const nextLevel = rpGeneratorLevel + 1;
     const genCost = nextLevel;
@@ -1340,7 +1352,19 @@ function updateSPUI() {
         intervalTime = Math.max(1, 5 - (rpGeneratorLevel - 1));
     }
     rpGenTime.textContent = intervalTime + 's';
-    buyRPGen.disabled = rpGeneratorLevel >= 5 || sacrificePoints < genCost;
+    
+    // Show preview of RP gain with compounding
+    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
+    const nextGenRP = rpGeneratorLevel < 5 ? Math.floor(1 * rpCompoundingMultiplier) : currentGenRP;
+    rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
+    
+    if (rpGeneratorLevel >= 5) {
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
+        buyRPGen.disabled = true;
+    } else {
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${nextGenRP} RP/s next)</span>`;
+        buyRPGen.disabled = sacrificePoints < genCost;
+    }
 
     const compCost = Math.pow(2, rpCompoundingLevel);
     rpCompLevel.textContent = rpCompoundingLevel;
@@ -1694,7 +1718,7 @@ buyRPGen.addEventListener('click', () => {
         setupRPGenerator();
         updateSPUI();
         saveGame();
-        alert(`⏱️ RP Generator upgraded to level ${rpGeneratorLevel}!`);
+        alert(`⏱️ RP Generator upgraded to level ${rpGeneratorLevel}! Now generating ${Math.floor(1 * rpCompoundingMultiplier)} RP every ${Math.max(1, 5 - (rpGeneratorLevel - 1))}s.`);
     }
 });
 
@@ -1788,12 +1812,10 @@ adminAddBtn.addEventListener('click', async () => {
         return;
     }
     
-    // Handle "Create New Player" option
     if (targetPlayer === '__NEW__') {
         const newName = prompt('Enter new player name:');
         if (!newName) return;
         
-        // Check if name exists
         const exists = leaderboard.some(entry => entry.name.toLowerCase() === newName.toLowerCase());
         if (exists) {
             alert('❌ That name already exists!');
@@ -1834,7 +1856,7 @@ adminAddBtn.addEventListener('click', async () => {
     updateRebirthUI();
     updateSPUI();
     saveGame();
-    updateAdminPlayerSelect(); // Refresh the player list
+    updateAdminPlayerSelect();
     alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
 });
 
