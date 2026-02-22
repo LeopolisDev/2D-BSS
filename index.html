@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · save/load codes + Firebase</title>
+    <title>🐝 BEE SWARM · save/load with copy button</title>
     <style>
         * {
             box-sizing: border-box;
@@ -499,6 +499,25 @@
             max-width: 400px;
             word-break: break-all;
             font-family: monospace;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .copy-btn {
+            background: #fecd4f;
+            border: none;
+            border-radius: 30px;
+            padding: 5px 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #2a4820;
+            border-bottom: 3px solid #b57c2a;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .copy-btn:active {
+            transform: translateY(2px);
+            border-bottom-width: 1px;
         }
     </style>
     <!-- Firebase SDK -->
@@ -546,7 +565,7 @@
         <!-- Leaderboard Panel (FIREBASE - 64-bit) -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">
-                🌍 GLOBAL TOP 10
+                🌍 GLOBAL TOP 10 (Firebase)
                 <span class="refresh-btn" id="refreshLeaderboard">↻</span>
             </div>
             <div id="leaderboardList">
@@ -649,10 +668,13 @@
                 <button class="bee-btn reset-btn-bottom" id="resetHoneyBtn">🍯 RESET HONEY (leaderboard too)</button>
             </div>
             
-            <!-- SAVE/LOAD Section -->
+            <!-- SAVE/LOAD Section with Copy Button -->
             <div class="save-load-row">
                 <button class="tool-btn" id="generateSaveBtn">📋 GENERATE SAVE CODE</button>
-                <div class="save-code-display" id="saveCodeDisplay">Click generate to create code</div>
+                <div class="save-code-display" id="saveCodeDisplay">
+                    <span style="flex:1; text-align:center;">Click generate to create code</span>
+                    <button class="copy-btn" id="copySaveBtn" style="display:none;">📋 COPY</button>
+                </div>
                 <input type="text" id="loadCodeInput" class="save-code-input" placeholder="Paste save code here">
                 <button class="tool-btn" id="loadSaveBtn">📂 LOAD SAVE</button>
             </div>
@@ -710,6 +732,7 @@ const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
 // Save/Load elements
 const generateSaveBtn = document.getElementById('generateSaveBtn');
 const saveCodeDisplay = document.getElementById('saveCodeDisplay');
+const copySaveBtn = document.getElementById('copySaveBtn');
 const loadCodeInput = document.getElementById('loadCodeInput');
 const loadSaveBtn = document.getElementById('loadSaveBtn');
 
@@ -760,7 +783,19 @@ function generateSaveCode() {
     // Convert to JSON and then to base64 for a compact code
     const jsonStr = JSON.stringify(saveData);
     const base64 = btoa(encodeURIComponent(jsonStr));
-    saveCodeDisplay.textContent = base64;
+    
+    // Update display and show copy button
+    saveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${base64}</span><button class="copy-btn" id="copySaveBtn">📋 COPY</button>`;
+    
+    // Re-attach event listener to the new copy button
+    document.getElementById('copySaveBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(base64).then(() => {
+            alert('✅ Save code copied to clipboard!');
+        }).catch(() => {
+            alert('❌ Failed to copy');
+        });
+    });
+    
     return base64;
 }
 
@@ -846,6 +881,7 @@ loadSaveBtn.addEventListener('click', () => {
     const code = loadCodeInput.value.trim();
     if (code) {
         loadSaveCode(code);
+        loadCodeInput.value = ''; // Clear after loading
     } else {
         alert('❌ Please enter a save code');
     }
@@ -2035,4 +2071,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
