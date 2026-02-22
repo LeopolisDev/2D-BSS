@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · fixed leaderboard data</title>
+    <title>🐝 BEE SWARM · sacrifice layer + SP upgrades</title>
     <style>
         * {
             box-sizing: border-box;
@@ -23,7 +23,7 @@
             border-radius: 2.5rem 2.5rem 2rem 2rem;
             box-shadow: 0 20px 30px rgba(0,0,0,0.6), inset 0 0 0 2px #e9d68b;
             padding: 1.5rem;
-            max-width: 1500px;
+            max-width: 1600px;
             width: fit-content;
         }
         .canvas-panel {
@@ -171,6 +171,25 @@
             border: 3px solid #fcd87a;
             width: 100%;
         }
+        .sacrifice-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            background: #8b3a3a;
+            padding: 10px 20px;
+            border-radius: 60px;
+            margin-top: 12px;
+            border: 3px solid #ffaaaa;
+            width: 100%;
+        }
+        .sacrifice-btn {
+            background: #c44b4b;
+            border-bottom-color: #6b2a2a;
+            color: white;
+            box-shadow: 0 4px 0 #4a1e1e;
+        }
         .rebirth-shop-row {
             display: flex;
             flex-wrap: wrap;
@@ -182,6 +201,19 @@
             padding: 12px 20px;
             border-radius: 60px;
             border: 3px solid #cfb3ff;
+            width: 100%;
+        }
+        .sp-shop-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 12px;
+            background: #794b4b;
+            padding: 12px 20px;
+            border-radius: 60px;
+            border: 3px solid #ffb3b3;
             width: 100%;
         }
         .adder-input {
@@ -345,6 +377,14 @@
             text-align: center;
             margin-top: 5px;
         }
+        .admin-row {
+            background: #2a2a2a;
+            border-color: #ffaa00;
+        }
+        .reset-honey-btn {
+            background: #ffaa00;
+            color: #1a1a1a;
+        }
     </style>
 </head>
 <body>
@@ -370,6 +410,7 @@
                 <div class="stat-item">🐝 <span id="beeCountDisplay">1</span></div>
                 <div class="stat-item">🏆 <span id="totalEarnedDisplay">0</span></div>
                 <div class="stat-item">🔁 <span id="rpDisplay">0</span> RP</div>
+                <div class="stat-item">🔴 <span id="spDisplay">0</span> SP</div>
             </div>
             <div class="button-group">
                 <button class="bee-btn" id="hireBtn">🐝 HIRE <span id="hireCostSpan">20</span>🍯</button>
@@ -378,7 +419,7 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Leaderboard Panel (GLOBAL TOP 10) -->
+        <!-- Leaderboard Panel -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">
                 🌍 GLOBAL TOP 10
@@ -390,7 +431,7 @@
             <div id="debugInfo" class="debug-info"></div>
         </div>
 
-        <!-- Rebirth Button -->
+        <!-- Rebirth Row -->
         <div class="rebirth-row">
             <span style="color:#fff4c2; font-weight:bold;">🌀 REBIRTH:</span>
             <button class="tool-btn" id="rebirthBtn">🔁 REBIRTH</button>
@@ -398,7 +439,15 @@
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
-        <!-- Rebirth shop (permanent upgrades) -->
+        <!-- SACRIFICE Row (new red layer) -->
+        <div class="sacrifice-row">
+            <span style="color:#ffcccc; font-weight:bold;">🔴 SACRIFICE:</span>
+            <button class="tool-btn sacrifice-btn" id="sacrificeBtn">🔥 SACRIFICE</button>
+            <span class="multiplier-badge" id="sacrificeInfo">1 SP = 100M + 10 RP</span>
+            <span class="multiplier-badge" id="spBadge">SP: 0</span>
+        </div>
+
+        <!-- Rebirth Shop -->
         <div class="rebirth-shop-row">
             <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
             <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO <span id="autoStatus">(2 RP)</span></button>
@@ -407,6 +456,15 @@
             <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 <span id="honeyMultStatus">(2 RP)</span></button>
             <button class="tool-btn" id="buyCompounding">📈 COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
+        </div>
+
+        <!-- SP SHOP (new) -->
+        <div class="sp-shop-row">
+            <span style="color:#ffb3b3; font-weight:bold;">💰 SP SHOP:</span>
+            <button class="tool-btn" id="buyX10Honey">🍯 x10 HONEY (5 SP)</button>
+            <button class="tool-btn" id="buyRPAuto">🤖 RP AUTOBUY (10 SP)</button>
+            <button class="tool-btn" id="buyRPGen">⏱️ RP GENERATOR lv<span id="rpGenLevel">0</span> (<span id="rpGenCost">1</span> SP) <span id="rpGenTime">5s</span></button>
+            <span class="multiplier-badge" id="spShopDisplay">SP: 0</span>
         </div>
 
         <!-- Tool shop with 8 tools -->
@@ -423,12 +481,22 @@
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
-        <!-- Controls row (adder only works for Opleoni) -->
-        <div class="shop-row" style="background:#8f6d3c;">
+        <!-- Controls row with ADMIN buttons for Opleoni -->
+        <div class="shop-row admin-row" style="background:#2a2a2a;">
             <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
             <input type="number" id="honeyInput" class="adder-input" value="1000" min="0">
             <button class="tool-btn" id="addHoneyBtn">➕ ADD HONEY</button>
+            <button class="tool-btn reset-honey-btn" id="resetHoneyBtn">🔄 RESET HONEY</button>
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
+        </div>
+        
+        <!-- Admin panel for Opleoni (hidden for others) -->
+        <div id="adminPanel" style="display: none; margin-top: 10px; background: #333; padding: 10px; border-radius: 30px;">
+            <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN PANEL (OPLEONI ONLY):</span>
+            <input type="number" id="adminHoney" class="adder-input" placeholder="Honey" value="0">
+            <input type="number" id="adminRP" class="adder-input" placeholder="RP" value="0">
+            <input type="number" id="adminSP" class="adder-input" placeholder="SP" value="0">
+            <button class="tool-btn" id="adminSetBtn">⚡ SET VALUES</button>
         </div>
     </div>
     <footer>
@@ -439,9 +507,8 @@
 
 <script>
 // ================== JSONBIN.IO CONFIGURATION ==================
-// REPLACE THESE WITH YOUR ACTUAL VALUES FROM JSONBIN.IO
-const JSONBIN_API_KEY = '$2a$10$ON.SJigSCL.vy4bO8AMaauHNDgTQo.PRT9aDlQbEl/dkNTQ9E/nSy'; // ← YOUR MASTER KEY
-const JSONBIN_BIN_ID = '699ab34ad0ea881f40ce4a59'; // ← YOUR BIN ID
+const JSONBIN_API_KEY = '$2a$10$kGhybE1lB8q1lB8q1lB8qu1lB8q1lB8q1lB8q1l'; // ← YOUR MASTER KEY
+const JSONBIN_BIN_ID = '67b9c0b2d3e4f5a6b7c8d9e0'; // ← YOUR BIN ID
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
 // ========== GLOBAL VARIABLES ==========
@@ -450,7 +517,7 @@ let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
 let totalHoneyEarned = 0;
 let lastUpdate = 0;
 let updateRetryCount = 0;
-const UPDATE_COOLDOWN = 3000; // 3 seconds
+const UPDATE_COOLDOWN = 3000;
 const MAX_RETRIES = 5;
 
 // ========== UI ELEMENTS ==========
@@ -461,6 +528,10 @@ const playerNameDisplay = document.getElementById('playerNameDisplay');
 const nameError = document.getElementById('nameError');
 const refreshBtn = document.getElementById('refreshLeaderboard');
 const debugInfo = document.getElementById('debugInfo');
+const adminPanel = document.getElementById('adminPanel');
+const spDisplay = document.getElementById('spDisplay');
+const spBadge = document.getElementById('spBadge');
+const spShopDisplay = document.getElementById('spShopDisplay');
 
 // ========== LEADERBOARD FUNCTIONS ==========
 async function fetchLeaderboard(showLoading = true) {
@@ -469,83 +540,43 @@ async function fetchLeaderboard(showLoading = true) {
     }
     
     try {
-        console.log('Fetching leaderboard from:', JSONBIN_URL);
         const response = await fetch(JSONBIN_URL, {
-            headers: {
-                'X-Master-Key': JSONBIN_API_KEY
-            }
+            headers: { 'X-Master-Key': JSONBIN_API_KEY }
         });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        console.log('Raw data from JSONBin:', data);
-        
-        // Debug info
         debugInfo.textContent = `Data loaded: ${JSON.stringify(data).substring(0, 100)}...`;
         
-        // Handle different data structures
         let players = [];
-        
         if (data && data.record) {
-            if (Array.isArray(data.record)) {
-                // Direct array
-                players = data.record;
-            } else if (data.record.players && Array.isArray(data.record.players)) {
-                // { players: [...] }
-                players = data.record.players;
-            } else if (typeof data.record === 'object') {
-                // Try to find any array in the object
+            if (Array.isArray(data.record)) players = data.record;
+            else if (data.record.players && Array.isArray(data.record.players)) players = data.record.players;
+            else if (typeof data.record === 'object') {
                 for (let key in data.record) {
-                    if (Array.isArray(data.record[key])) {
-                        players = data.record[key];
-                        break;
-                    }
+                    if (Array.isArray(data.record[key])) { players = data.record[key]; break; }
                 }
             }
-        } else if (Array.isArray(data)) {
-            players = data;
-        }
+        } else if (Array.isArray(data)) players = data;
         
-        // Filter out invalid entries
-        leaderboard = players.filter(entry => 
-            entry && 
-            typeof entry === 'object' && 
-            entry.name && 
-            typeof entry.name === 'string' &&
-            typeof entry.total === 'number'
-        );
-        
-        console.log('Processed leaderboard:', leaderboard);
+        leaderboard = players.filter(entry => entry && typeof entry === 'object' && entry.name && typeof entry.name === 'string' && typeof entry.total === 'number');
         renderLeaderboard();
-        updateRetryCount = 0; // Reset retry count on success
+        updateRetryCount = 0;
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
         debugInfo.textContent = `Error: ${error.message}`;
         updateRetryCount++;
-        
         if (updateRetryCount < MAX_RETRIES) {
-            // Retry after 2 seconds
-            document.getElementById('leaderboardList').innerHTML = 
-                `<div class="loading">Retrying... (${updateRetryCount}/${MAX_RETRIES})</div>`;
+            document.getElementById('leaderboardList').innerHTML = `<div class="loading">Retrying... (${updateRetryCount}/${MAX_RETRIES})</div>`;
             setTimeout(() => fetchLeaderboard(showLoading), 2000);
         } else {
-            document.getElementById('leaderboardList').innerHTML = 
-                '<div class="leaderboard-entry">⚠️ Failed to load leaderboard. Click ↻ to retry.</div>';
+            document.getElementById('leaderboardList').innerHTML = '<div class="leaderboard-entry">⚠️ Failed to load leaderboard. Click ↻ to retry.</div>';
         }
     }
 }
 
 async function saveLeaderboard() {
     try {
-        // Ensure leaderboard is an array
-        if (!Array.isArray(leaderboard)) {
-            leaderboard = [];
-        }
-        
-        // Remove duplicates (keep highest score for each name)
+        if (!Array.isArray(leaderboard)) leaderboard = [];
         const uniquePlayers = {};
         leaderboard.forEach(entry => {
             if (entry && entry.name) {
@@ -554,28 +585,14 @@ async function saveLeaderboard() {
                 }
             }
         });
-        
         leaderboard = Object.values(uniquePlayers);
-        
-        // Prepare data in the format JSONBin expects
         const dataToSave = { players: leaderboard };
-        
-        console.log('Saving to JSONBin:', dataToSave);
-        
         const response = await fetch(JSONBIN_URL, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': JSONBIN_API_KEY
-            },
+            headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
             body: JSON.stringify(dataToSave)
         });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        console.log('Save successful');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     } catch (error) {
         console.error('Failed to save leaderboard:', error);
         debugInfo.textContent = `Save error: ${error.message}`;
@@ -584,17 +601,11 @@ async function saveLeaderboard() {
 
 async function updateLeaderboard() {
     if (!playerName) return;
-    
-    // Rate limiting
     const now = Date.now();
     if (now - lastUpdate < UPDATE_COOLDOWN) return;
     lastUpdate = now;
-    
     try {
-        // First fetch latest leaderboard
         await fetchLeaderboard(false);
-        
-        // Find or create player entry
         let playerEntry = leaderboard.find(entry => entry && entry.name === playerName);
         if (playerEntry) {
             if (totalHoneyEarned > playerEntry.total) {
@@ -605,8 +616,6 @@ async function updateLeaderboard() {
             leaderboard.push({ name: playerName, total: totalHoneyEarned });
             await saveLeaderboard();
         }
-        
-        // Fetch again to confirm save
         await fetchLeaderboard(false);
     } catch (error) {
         console.error('Error updating leaderboard:', error);
@@ -615,120 +624,82 @@ async function updateLeaderboard() {
 
 function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
-    
     if (!leaderboard || leaderboard.length === 0) {
         listDiv.innerHTML = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
         debugInfo.textContent = 'No players in leaderboard';
         return;
     }
-    
-    // Sort by total descending (highest first)
     const sorted = [...leaderboard].sort((a, b) => b.total - a.total);
-    
-    // Take only top 10
     const top10 = sorted.slice(0, 10);
-    
     let html = '';
     top10.forEach((entry, index) => {
         const isYou = entry.name === playerName ? 'you-row' : '';
         const rank = index + 1;
-        let rankSymbol = '';
-        if (rank === 1) rankSymbol = '🥇';
-        else if (rank === 2) rankSymbol = '🥈';
-        else if (rank === 3) rankSymbol = '🥉';
-        else rankSymbol = `${rank}.`;
-        
-        html += `<div class="leaderboard-entry ${isYou}">
-            <span class="leaderboard-rank">${rankSymbol}</span>
-            <span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
-            <span class="leaderboard-score">🍯 ${entry.total.toLocaleString()}</span>
-        </div>`;
+        let rankSymbol = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+        html += `<div class="leaderboard-entry ${isYou}"><span class="leaderboard-rank">${rankSymbol}</span><span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span><span class="leaderboard-score">🍯 ${entry.total.toLocaleString()}</span></div>`;
     });
-    
-    // Add player's rank if they're not in top 10
     const playerInTop10 = top10.some(entry => entry.name === playerName);
     if (!playerInTop10 && playerName) {
         const playerRank = sorted.findIndex(entry => entry.name === playerName) + 1;
         if (playerRank > 0) {
             const playerEntry = sorted.find(entry => entry.name === playerName);
-            html += `<div class="leaderboard-entry you-row">
-                <span class="leaderboard-rank">${playerRank}.</span>
-                <span class="leaderboard-name">${escapeHtml(playerName)}</span>
-                <span class="leaderboard-score">🍯 ${playerEntry.total.toLocaleString()}</span>
-            </div>`;
+            html += `<div class="leaderboard-entry you-row"><span class="leaderboard-rank">${playerRank}.</span><span class="leaderboard-name">${escapeHtml(playerName)}</span><span class="leaderboard-score">🍯 ${playerEntry.total.toLocaleString()}</span></div>`;
         }
     }
-    
     listDiv.innerHTML = html;
     debugInfo.textContent = `Loaded ${leaderboard.length} players, showing top ${top10.length}`;
 }
 
 function escapeHtml(unsafe) {
     if (!unsafe) return '';
-    return unsafe.replace(/[&<>"']/g, function(m) {
+    return unsafe.replace(/[&<>"']/g, m => {
         if(m === '&') return '&amp;'; if(m === '<') return '&lt;'; if(m === '>') return '&gt;';
-        if(m === '"') return '&quot;'; if(m === "'") return '&#039;';
-        return m;
+        if(m === '"') return '&quot;'; if(m === "'") return '&#039;'; return m;
     });
 }
 
-// Check if name is available (case-insensitive)
 async function isNameAvailable(name) {
     await fetchLeaderboard(false);
     const lowerName = name.toLowerCase();
     return !leaderboard.some(entry => entry && entry.name && entry.name.toLowerCase() === lowerName);
 }
 
-// Save name with validation
 saveNameBtn.addEventListener('click', async () => {
     let name = playerNameInput.value.trim();
     if (name === '') name = 'BeeKeeper';
-    
-    // Check if name is already taken
     const available = await isNameAvailable(name);
     if (!available) {
         nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
         return;
     }
-    
     playerName = name;
     localStorage.setItem('beeSwarmPlayerName', playerName);
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
-    
-    // Add to leaderboard
     leaderboard.push({ name: playerName, total: 0 });
     await saveLeaderboard();
     await fetchLeaderboard();
-    
-    // If this is Opleoni, show a secret message
     if (playerName === 'Opleoni') {
-        console.log('🔮 Secret adder activated for Opleoni');
+        console.log('🔮 Admin panel activated for Opleoni');
+        adminPanel.style.display = 'block';
+    } else {
+        adminPanel.style.display = 'none';
     }
 });
 
-// Refresh button
-refreshBtn.addEventListener('click', () => {
-    updateRetryCount = 0; // Reset retry count
-    fetchLeaderboard();
-});
+refreshBtn.addEventListener('click', () => { updateRetryCount = 0; fetchLeaderboard(); });
 
-// Initial load
 if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     fetchLeaderboard();
+    if (playerName === 'Opleoni') adminPanel.style.display = 'block';
 } else {
     nameModal.style.display = 'flex';
     fetchLeaderboard();
 }
 
-// Update leaderboard periodically (every 15 seconds)
-setInterval(() => {
-    if (playerName) {
-        updateLeaderboard();
-    }
-}, 15000);
+setInterval(() => { if (playerName) updateLeaderboard(); }, 15000);
 
 // ========== GAME CONSTANTS ==========
 const HIVE_X = 100, HIVE_Y = 200;
@@ -746,10 +717,27 @@ function getRPCost(rpNumber) {
 
 function getMaxRPFromHoney() {
     let rpCount = 1;
-    while (honey >= getRPCost(rpCount)) {
-        rpCount++;
-    }
+    while (honey >= getRPCost(rpCount)) rpCount++;
     return rpCount - 1;
+}
+
+// ========== SP PRICING (Sacrifice) ==========
+function getSPCost(spNumber) {
+    return {
+        honey: Math.floor(100000000 * Math.pow(1.5, spNumber - 1)), // 100M, 150M, 225M...
+        rp: Math.floor(10 * Math.pow(1.5, spNumber - 1)) // 10, 15, 22.5...
+    };
+}
+
+function getMaxSPFromResources() {
+    let spCount = 1;
+    while (true) {
+        const cost = getSPCost(spCount);
+        if (honey >= cost.honey && rebirthPoints >= cost.rp) {
+            spCount++;
+        } else break;
+    }
+    return spCount - 1;
 }
 
 // ========== GAME STATE ==========
@@ -766,6 +754,9 @@ let toolMultiplier = 1.0;
 // Rebirth
 let rebirthPoints = 0;
 
+// Sacrifice Points
+let sacrificePoints = 0;
+
 // Rebirth upgrades
 let autoUnlocked = false;
 let beeSpeedMultiplier = 1.0;
@@ -773,6 +764,13 @@ let capacityMultiplier = 1.0;
 let honeyMultUpgrade = 1.0;
 let compoundingLevel = 0;
 let compoundingMultiplier = 1.0;
+
+// SP Upgrades
+let x10HoneyPurchased = false;
+let rpAutoBuyActive = false;
+let rpGeneratorLevel = 0; // 0-4
+let rpGeneratorInterval = null;
+let rpAutoBuyInterval = null;
 
 // Automation
 let autoActive = false;
@@ -789,6 +787,7 @@ const rpSpan = document.getElementById('rpDisplay');
 const rpBadge = document.getElementById('rpBadge');
 const rpShopDisplay = document.getElementById('rpShopDisplay');
 const rebirthInfo = document.getElementById('rebirthInfo');
+const sacrificeInfo = document.getElementById('sacrificeInfo');
 const hireCostSpan = document.getElementById('hireCostSpan');
 const fieldInfo = document.getElementById('fieldInfo');
 const totalMultDisplay = document.getElementById('totalMultDisplay');
@@ -809,6 +808,14 @@ const compoundingCostSpan = document.getElementById('compoundingCost');
 const speedBoost = document.getElementById('speedBoost');
 const capacityBoost = document.getElementById('capacityBoost');
 
+// SP Shop buttons
+const buyX10Honey = document.getElementById('buyX10Honey');
+const buyRPAuto = document.getElementById('buyRPAuto');
+const buyRPGen = document.getElementById('buyRPGen');
+const rpGenLevel = document.getElementById('rpGenLevel');
+const rpGenCost = document.getElementById('rpGenCost');
+const rpGenTime = document.getElementById('rpGenTime');
+
 // Tool buttons
 const buyClippers = document.getElementById('buyClippers');
 const buyShears = document.getElementById('buyShears');
@@ -822,6 +829,14 @@ const buyStarTreat = document.getElementById('buyStarTreat');
 const toggleAutoBtn = document.getElementById('toggleAutoBtn');
 const addHoneyBtn = document.getElementById('addHoneyBtn');
 const honeyInput = document.getElementById('honeyInput');
+const resetHoneyBtn = document.getElementById('resetHoneyBtn');
+const sacrificeBtn = document.getElementById('sacrificeBtn');
+
+// Admin elements
+const adminHoney = document.getElementById('adminHoney');
+const adminRP = document.getElementById('adminRP');
+const adminSP = document.getElementById('adminSP');
+const adminSetBtn = document.getElementById('adminSetBtn');
 
 // ========== SAVE / LOAD ==========
 function saveGame() {
@@ -841,23 +856,20 @@ function saveGame() {
         nextHireCost,
         hasClippers, hasShears, hasScythe, hasOil,
         hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
-        rebirthPoints,
+        rebirthPoints, sacrificePoints,
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
-        autoActive
+        autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
     setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
-    
-    // Update global leaderboard
     updateLeaderboard();
 }
 
 function loadGame() {
     const saved = localStorage.getItem(SAVE_KEY);
     if (!saved) return false;
-
     try {
         const data = JSON.parse(saved);
         honey = data.honey || 0;
@@ -874,6 +886,7 @@ function loadGame() {
         hasRoyalJelly = data.hasRoyalJelly || false;
         hasStarTreat = data.hasStarTreat || false;
         rebirthPoints = data.rebirthPoints || 0;
+        sacrificePoints = data.sacrificePoints || 0;
         autoUnlocked = data.autoUnlocked || false;
         beeSpeedMultiplier = data.beeSpeedMultiplier || 1.0;
         capacityMultiplier = data.capacityMultiplier || 1.0;
@@ -881,26 +894,66 @@ function loadGame() {
         compoundingLevel = data.compoundingLevel || 0;
         compoundingMultiplier = data.compoundingMultiplier || 1.0;
         autoActive = data.autoActive || false;
+        x10HoneyPurchased = data.x10HoneyPurchased || false;
+        rpAutoBuyActive = data.rpAutoBuyActive || false;
+        rpGeneratorLevel = data.rpGeneratorLevel || 0;
 
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
             toggleAutoBtn.classList.add('auto-active');
-            if (!autoInterval) {
-                autoInterval = setInterval(autoBuy, 1000);
-            }
+            if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
         } else {
             autoActive = false;
             toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
             toggleAutoBtn.classList.remove('auto-active');
         }
 
+        // Setup RP generator if level > 0
+        setupRPGenerator();
+        
+        // Setup RP AutoBuy if active
+        setupRPAutoBuy();
+
         recalcMultiplier();
         updateRebirthUI();
         updateToolButtons();
+        updateSPUI();
         return true;
     } catch (e) {
         console.error('Failed to load save', e);
         return false;
+    }
+}
+
+function setupRPGenerator() {
+    if (rpGeneratorInterval) clearInterval(rpGeneratorInterval);
+    if (rpGeneratorLevel > 0) {
+        const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000); // 5s,4s,3s,2s,1s
+        rpGeneratorInterval = setInterval(() => {
+            rebirthPoints++;
+            updateRebirthUI();
+            saveGame();
+        }, intervalTime);
+    }
+}
+
+function setupRPAutoBuy() {
+    if (rpAutoBuyInterval) clearInterval(rpAutoBuyInterval);
+    if (rpAutoBuyActive) {
+        rpAutoBuyInterval = setInterval(() => {
+            // Auto-buy RP upgrades (compounding first, then others if enough RP)
+            if (rebirthPoints >= Math.pow(2, compoundingLevel)) {
+                buyCompounding.click();
+            } else if (!autoUnlocked && rebirthPoints >= 2) {
+                buyAutoUpgrade.click();
+            } else if (beeSpeedMultiplier === 1.0 && rebirthPoints >= 1) {
+                buyBeeSpeed.click();
+            } else if (capacityMultiplier === 1.0 && rebirthPoints >= 3) {
+                buyCapacity.click();
+            } else if (honeyMultUpgrade === 1.0 && rebirthPoints >= 2) {
+                buyHoneyMult.click();
+            }
+        }, 1000);
     }
 }
 
@@ -920,7 +973,8 @@ function recalcMultiplier() {
     if (hasStarTreat) toolMult *= 5.0;
     toolMultiplier = toolMult;
     
-    const totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
+    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
+    if (x10HoneyPurchased) totalMult *= 10;
     totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
 }
 
@@ -987,16 +1041,22 @@ function updateRebirthUI() {
     rpSpan.textContent = rebirthPoints;
     rpBadge.textContent = `RP: ${rebirthPoints}`;
     rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
+    spDisplay.textContent = sacrificePoints;
+    spBadge.textContent = `SP: ${sacrificePoints}`;
+    spShopDisplay.textContent = `SP: ${sacrificePoints}`;
     totalEarnedSpan.textContent = totalHoneyEarned.toLocaleString();
 
     const maxRP = getMaxRPFromHoney();
-    if (maxRP > 0) {
-        rebirthInfo.textContent = `${maxRP} RP = ${getRPCost(maxRP).toLocaleString()}🍯`;
+    rebirthInfo.textContent = maxRP > 0 ? `${maxRP} RP = ${getRPCost(maxRP).toLocaleString()}🍯` : `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
+
+    const maxSP = getMaxSPFromResources();
+    if (maxSP > 0) {
+        const cost = getSPCost(maxSP);
+        sacrificeInfo.textContent = `${maxSP} SP = ${cost.honey.toLocaleString()}🍯 + ${cost.rp} RP`;
     } else {
-        rebirthInfo.textContent = `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
+        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
     }
 
-    // Update one-time upgrade buttons with MAXED status
     if (autoUnlocked) {
         autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
         buyAutoUpgrade.disabled = true;
@@ -1005,7 +1065,6 @@ function updateRebirthUI() {
         buyAutoUpgrade.disabled = rebirthPoints < 2;
     }
     
-    // Speed boost display
     if (beeSpeedMultiplier > 1.0) {
         speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
         speedBoost.textContent = `(x${beeSpeedMultiplier.toFixed(1)})`;
@@ -1016,7 +1075,6 @@ function updateRebirthUI() {
         buyBeeSpeed.disabled = rebirthPoints < 1;
     }
     
-    // Capacity boost display
     if (capacityMultiplier > 1.0) {
         capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
         capacityBoost.textContent = `(x${capacityMultiplier.toFixed(1)})`;
@@ -1041,6 +1099,19 @@ function updateRebirthUI() {
     const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
     buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
     buyCompounding.disabled = rebirthPoints < compoundingCost;
+}
+
+function updateSPUI() {
+    buyX10Honey.disabled = x10HoneyPurchased || sacrificePoints < 5;
+    buyRPAuto.disabled = rpAutoBuyActive || sacrificePoints < 10;
+    
+    const nextLevel = rpGeneratorLevel + 1;
+    const cost = nextLevel; // 1,2,3,4
+    rpGenLevel.textContent = rpGeneratorLevel;
+    rpGenCost.textContent = cost;
+    const intervalTime = rpGeneratorLevel === 0 ? 5 : Math.max(1, 5 - (rpGeneratorLevel - 1));
+    rpGenTime.textContent = intervalTime + 's';
+    buyRPGen.disabled = rpGeneratorLevel >= 4 || sacrificePoints < cost;
 }
 
 // ========== GAME MECHANICS ==========
@@ -1071,7 +1142,7 @@ function update() {
             const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
             const dist = Math.hypot(dx, dy);
             if (dist < 20) {
-                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier);
+                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * (x10HoneyPurchased ? 10 : 1));
                 honey += deposited;
                 totalHoneyEarned += deposited;
                 b.carrying = 0;
@@ -1131,6 +1202,7 @@ function update() {
     fieldInfo.textContent = `🌸 ${activeFlowers} flowers`;
     hireCostSpan.textContent = nextHireCost;
     updateRebirthUI();
+    updateSPUI();
 }
 
 // ========== DRAWING ==========
@@ -1237,49 +1309,109 @@ resetBtn.addEventListener('click', () => {
         honey = 0; totalHoneyEarned = 0; bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
-        rebirthPoints = 0; autoUnlocked = false; beeSpeedMultiplier = 1.0; capacityMultiplier = 1.0; honeyMultUpgrade = 1.0;
+        rebirthPoints = 0; sacrificePoints = 0;
+        autoUnlocked = false; beeSpeedMultiplier = 1.0; capacityMultiplier = 1.0; honeyMultUpgrade = 1.0;
         compoundingLevel = 0; compoundingMultiplier = 1.0;
-        autoActive = false; if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+        x10HoneyPurchased = false; rpAutoBuyActive = false; rpGeneratorLevel = 0;
+        autoActive = false; 
+        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+        if (rpGeneratorInterval) { clearInterval(rpGeneratorInterval); rpGeneratorInterval = null; }
+        if (rpAutoBuyInterval) { clearInterval(rpAutoBuyInterval); rpAutoBuyInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
-        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); hireCostSpan.textContent = nextHireCost;
+        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
+        hireCostSpan.textContent = nextHireCost;
         localStorage.removeItem(SAVE_KEY);
         saveGame();
     }
 });
 
+resetHoneyBtn.addEventListener('click', () => {
+    honey = 0;
+    saveGame();
+    alert('Honey reset to 0!');
+});
+
 // ========== REBIRTH ==========
 rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
-    
     if (maxRP > 0) {
         const cost = getRPCost(maxRP);
         rebirthPoints += maxRP;
+        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
+        hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
+        hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+        addBee();
+        for (let i = 0; i < 14; i++) spawnFlower();
+        honey = 0;
+        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); hireCostSpan.textContent = nextHireCost;
+        saveGame();
+        alert(`✨ Purchased ${maxRP} RP for ${cost.toLocaleString()} honey! Honey reset to 0.`);
+    } else {
+        alert(`❌ Need at least ${getRPCost(1).toLocaleString()} honey for 1 RP!`);
+    }
+});
+
+// ========== SACRIFICE ==========
+sacrificeBtn.addEventListener('click', () => {
+    const maxSP = getMaxSPFromResources();
+    if (maxSP > 0) {
+        const cost = getSPCost(maxSP);
+        honey -= cost.honey;
+        rebirthPoints -= cost.rp;
+        sacrificePoints += maxSP;
         
-        bees = []; 
-        flowers = []; 
-        nextHireCost = HIRE_COST_BASE;
-        
+        // Reset game state but keep SP and SP upgrades
+        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         
         addBee();
-        for (let i = 0; i < 14; i++) {
-            spawnFlower();
-        }
+        for (let i = 0; i < 14; i++) spawnFlower();
         
-        honey = 0;
-        
-        recalcMultiplier(); 
-        updateRebirthUI(); 
-        updateToolButtons(); 
+        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
         hireCostSpan.textContent = nextHireCost;
         saveGame();
         
-        alert(`✨ Purchased ${maxRP} RP for ${cost.toLocaleString()} honey! Honey reset to 0.`);
+        alert(`🔥 Sacrificed for ${maxSP} SP! Cost: ${cost.honey.toLocaleString()} honey + ${cost.rp} RP.`);
     } else {
-        alert(`❌ Need at least ${getRPCost(1).toLocaleString()} honey for 1 RP!`);
+        alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
+    }
+});
+
+// ========== SP SHOP ==========
+buyX10Honey.addEventListener('click', () => {
+    if (sacrificePoints >= 5 && !x10HoneyPurchased) {
+        sacrificePoints -= 5;
+        x10HoneyPurchased = true;
+        recalcMultiplier();
+        updateSPUI();
+        saveGame();
+        alert('🍯 x10 Honey multiplier purchased!');
+    }
+});
+
+buyRPAuto.addEventListener('click', () => {
+    if (sacrificePoints >= 10 && !rpAutoBuyActive) {
+        sacrificePoints -= 10;
+        rpAutoBuyActive = true;
+        setupRPAutoBuy();
+        updateSPUI();
+        saveGame();
+        alert('🤖 RP Autobuy activated!');
+    }
+});
+
+buyRPGen.addEventListener('click', () => {
+    const cost = rpGeneratorLevel + 1;
+    if (rpGeneratorLevel < 4 && sacrificePoints >= cost) {
+        sacrificePoints -= cost;
+        rpGeneratorLevel++;
+        setupRPGenerator();
+        updateSPUI();
+        saveGame();
+        alert(`⏱️ RP Generator upgraded to level ${rpGeneratorLevel}!`);
     }
 });
 
@@ -1345,17 +1477,39 @@ buyStarTreat.addEventListener('click', () => { if (!hasStarTreat && honey>=25000
 
 toggleAutoBtn.addEventListener('click', toggleAuto);
 
-// ========== SECRET ADDER ==========
+// ========== SECRET ADDER (Opleoni only) ==========
 addHoneyBtn.addEventListener('click', () => {
     if (playerName === 'Opleoni') {
         let val = parseInt(honeyInput.value);
         if (!isNaN(val) && val > 0) {
             honey += val;
+            totalHoneyEarned += val; // Also add to leaderboard total
             saveGame();
             console.log('🔮 Added', val, 'honey for Opleoni');
         }
     } else {
         alert('❌ Honey adder is only available for player Opleoni!');
+    }
+});
+
+// Admin panel for Opleoni
+adminSetBtn.addEventListener('click', () => {
+    if (playerName === 'Opleoni') {
+        let newHoney = parseInt(adminHoney.value);
+        let newRP = parseInt(adminRP.value);
+        let newSP = parseInt(adminSP.value);
+        
+        if (!isNaN(newHoney)) {
+            honey = newHoney;
+            totalHoneyEarned = Math.max(totalHoneyEarned, newHoney);
+        }
+        if (!isNaN(newRP)) rebirthPoints = newRP;
+        if (!isNaN(newSP)) sacrificePoints = newSP;
+        
+        updateRebirthUI();
+        updateSPUI();
+        saveGame();
+        alert('⚡ Values updated!');
     }
 });
 
@@ -1365,7 +1519,8 @@ function init() {
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
     }
-    recalcMultiplier(); updateRebirthUI(); updateToolButtons(); hireCostSpan.textContent = nextHireCost;
+    recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
+    hireCostSpan.textContent = nextHireCost;
     saveGame();
 }
 init();
@@ -1375,4 +1530,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
