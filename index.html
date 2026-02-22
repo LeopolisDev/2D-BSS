@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · COMPLETE WORKING VERSION</title>
+    <title>🐝 BEE SWARM · fixed admin panel + announcements</title>
     <style>
         * {
             box-sizing: border-box;
@@ -392,7 +392,7 @@
             flex-wrap: wrap;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 15px;
         }
         .admin-select {
             background: #efeac5;
@@ -402,7 +402,7 @@
             font-size: 1rem;
             border-bottom: 4px solid #bd9f4b;
             outline: none;
-            min-width: 120px;
+            min-width: 140px;
         }
         .reset-btn-bottom {
             background: #cab577;
@@ -418,6 +418,56 @@
             background: #4caf50;
             border-bottom-color: #2e7d32;
         }
+        .announcement-modal {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #dba959;
+            padding: 30px;
+            border-radius: 60px;
+            border: 5px solid #ffaa00;
+            text-align: center;
+            box-shadow: 0 10px 0 #7e6237;
+            z-index: 2000;
+            max-width: 500px;
+            width: 90%;
+        }
+        .announcement-modal input {
+            font-size: 1.2rem;
+            padding: 10px;
+            border-radius: 40px;
+            border: none;
+            margin: 20px 0;
+            text-align: center;
+            background: #fff9d7;
+            width: 100%;
+        }
+        .announcement-modal button {
+            background: #fecd4f;
+            border: none;
+            font-size: 1.1rem;
+            padding: 8px 20px;
+            border-radius: 40px;
+            border-bottom: 5px solid #b57c2a;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        .announcement-banner {
+            background: #ffaa00;
+            color: #1a1a1a;
+            text-align: center;
+            padding: 10px;
+            border-radius: 40px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -430,6 +480,18 @@
             <button id="saveNameBtn">START HIVE</button>
             <div id="nameError" class="error-message"></div>
         </div>
+    </div>
+
+    <!-- Announcement Banner (shown to all players) -->
+    <div id="announcementBanner" class="announcement-banner" style="display: none;"></div>
+
+    <!-- Announcement Modal (for Opleoni) -->
+    <div id="announcementModal" class="announcement-modal" style="display: none;">
+        <h2 style="color:#2a4820;">📢 SEND ANNOUNCEMENT</h2>
+        <input type="text" id="announcementInput" placeholder="Enter your message..." maxlength="100">
+        <br>
+        <button id="sendAnnouncementBtn">SEND</button>
+        <button id="closeAnnouncementBtn">CANCEL</button>
     </div>
 
 <div class="game-wrapper">
@@ -471,7 +533,7 @@
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
-        <!-- SACRIFICE Row (wipes everything) -->
+        <!-- SACRIFICE Row -->
         <div class="sacrifice-row">
             <span style="color:#ffcccc; font-weight:bold;">🔴 SACRIFICE (WIPES EVERYTHING):</span>
             <button class="tool-btn sacrifice-btn" id="sacrificeBtn">🔥 SACRIFICE</button>
@@ -514,14 +576,14 @@
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
-        <!-- Controls row - Only AUTO toggles and name display -->
+        <!-- Controls row -->
         <div class="shop-row" style="background:#8f6d3c;">
             <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
             <button class="tool-btn rp-autobuy-toggle" id="toggleRPAutoBtn">🤖 RP AUTO (OFF)</button>
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
         </div>
 
-        <!-- Compact Admin Panel for Opleoni (with player selector) -->
+        <!-- Compact Admin Panel for Opleoni (with announcement button) -->
         <div id="adminPanel" class="admin-panel-compact" style="display: none;">
             <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN:</span>
             <select id="adminPlayerSelect" class="admin-select">
@@ -534,6 +596,7 @@
             </select>
             <input type="number" id="adminAmount" class="adder-input" value="1000" min="0">
             <button class="tool-btn" id="adminAddBtn">➕ ADD</button>
+            <button class="tool-btn" id="openAnnouncementBtn">📢 ANNOUNCE</button>
         </div>
 
         <!-- Footer with RESET buttons -->
@@ -552,10 +615,9 @@
 
 <script>
 // ================== JSONBIN.IO CONFIGURATION ==================
-// REPLACE THESE WITH YOUR ACTUAL VALUES
 const JSONBIN_API_KEY = '$2a$10$ON.SJigSCL.vy4bO8AMaauHNDgTQo.PRT9aDlQbEl/dkNTQ9E/nSy';
-const JSONBIN_BIN_ID = '699ab34ad0ea881f40ce4a59';
-const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+const JSONBIN_BID = '699ab34ad0ea881f40ce4a59';
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BID}`;
 
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
@@ -563,6 +625,7 @@ let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
 let totalHoneyEarned = 0;
 let lastUpdate = 0;
 let updateRetryCount = 0;
+let announcement = localStorage.getItem('globalAnnouncement') || '';
 const UPDATE_COOLDOWN = 3000;
 const MAX_RETRIES = 5;
 
@@ -579,8 +642,20 @@ const adminPlayerSelect = document.getElementById('adminPlayerSelect');
 const adminStatSelect = document.getElementById('adminStatSelect');
 const adminAmount = document.getElementById('adminAmount');
 const adminAddBtn = document.getElementById('adminAddBtn');
+const openAnnouncementBtn = document.getElementById('openAnnouncementBtn');
+const announcementModal = document.getElementById('announcementModal');
+const announcementInput = document.getElementById('announcementInput');
+const sendAnnouncementBtn = document.getElementById('sendAnnouncementBtn');
+const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
+const announcementBanner = document.getElementById('announcementBanner');
 
-// ========== NUMBER FORMATTING FUNCTION ==========
+// Show announcement if exists
+if (announcement) {
+    announcementBanner.textContent = announcement;
+    announcementBanner.style.display = 'block';
+}
+
+// ========== NUMBER FORMATTING ==========
 function formatNumber(num) {
     if (num === undefined || num === null) return '0';
     if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
@@ -617,7 +692,9 @@ async function fetchLeaderboard(showLoading = true) {
         
         leaderboard = players.filter(entry => entry && typeof entry === 'object' && entry.name && typeof entry.name === 'string' && typeof entry.total === 'number');
         renderLeaderboard();
-        updateAdminPlayerSelect();
+        if (playerName === 'Opleoni') {
+            updateAdminPlayerSelect();
+        }
         updateRetryCount = 0;
     } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
@@ -661,6 +738,8 @@ function updateAdminPlayerSelect() {
     if (playerName !== 'Opleoni') return;
     const select = adminPlayerSelect;
     select.innerHTML = '<option value="">Select Player</option>';
+    
+    // Add current players
     leaderboard.forEach(entry => {
         if (entry && entry.name) {
             const option = document.createElement('option');
@@ -669,6 +748,12 @@ function updateAdminPlayerSelect() {
             select.appendChild(option);
         }
     });
+    
+    // Add option to create new player
+    const newOption = document.createElement('option');
+    newOption.value = '__NEW__';
+    newOption.textContent = '➕ Create New Player...';
+    select.appendChild(newOption);
 }
 
 async function updateLeaderboard() {
@@ -776,6 +861,48 @@ if (playerName) {
 }
 
 setInterval(() => { if (playerName) updateLeaderboard(); }, 15000);
+
+// ========== ANNOUNCEMENT SYSTEM ==========
+if (openAnnouncementBtn) {
+    openAnnouncementBtn.addEventListener('click', () => {
+        if (playerName === 'Opleoni') {
+            announcementModal.style.display = 'block';
+        }
+    });
+}
+
+if (closeAnnouncementBtn) {
+    closeAnnouncementBtn.addEventListener('click', () => {
+        announcementModal.style.display = 'none';
+    });
+}
+
+if (sendAnnouncementBtn) {
+    sendAnnouncementBtn.addEventListener('click', () => {
+        if (playerName === 'Opleoni') {
+            const message = announcementInput.value.trim();
+            if (message) {
+                localStorage.setItem('globalAnnouncement', message);
+                announcementBanner.textContent = message;
+                announcementBanner.style.display = 'block';
+                announcementModal.style.display = 'none';
+                announcementInput.value = '';
+            }
+        }
+    });
+}
+
+// Listen for announcement changes from other tabs
+window.addEventListener('storage', (e) => {
+    if (e.key === 'globalAnnouncement') {
+        if (e.newValue) {
+            announcementBanner.textContent = e.newValue;
+            announcementBanner.style.display = 'block';
+        } else {
+            announcementBanner.style.display = 'none';
+        }
+    }
+});
 
 // ========== GAME CONSTANTS ==========
 const HIVE_X = 100, HIVE_Y = 200;
@@ -1649,16 +1776,32 @@ toggleAutoBtn.addEventListener('click', toggleAuto);
 toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
 
 // ========== ADMIN PANEL ==========
-adminAddBtn.addEventListener('click', () => {
+adminAddBtn.addEventListener('click', async () => {
     if (playerName !== 'Opleoni') return;
     
-    const targetPlayer = adminPlayerSelect.value;
+    let targetPlayer = adminPlayerSelect.value;
     const stat = adminStatSelect.value;
     const amount = parseInt(adminAmount.value);
     
     if (!targetPlayer || isNaN(amount) || amount < 0) {
         alert('Please select a player and enter a valid amount');
         return;
+    }
+    
+    // Handle "Create New Player" option
+    if (targetPlayer === '__NEW__') {
+        const newName = prompt('Enter new player name:');
+        if (!newName) return;
+        
+        // Check if name exists
+        const exists = leaderboard.some(entry => entry.name.toLowerCase() === newName.toLowerCase());
+        if (exists) {
+            alert('❌ That name already exists!');
+            return;
+        }
+        
+        targetPlayer = newName;
+        leaderboard.push({ name: targetPlayer, total: 0 });
     }
     
     let playerEntry = leaderboard.find(entry => entry.name === targetPlayer);
@@ -1687,10 +1830,11 @@ adminAddBtn.addEventListener('click', () => {
             break;
     }
     
-    saveLeaderboard();
+    await saveLeaderboard();
     updateRebirthUI();
     updateSPUI();
     saveGame();
+    updateAdminPlayerSelect(); // Refresh the player list
     alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
 });
 
