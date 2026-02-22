@@ -113,6 +113,12 @@
             border-bottom-color: #6b2a2a;
             box-shadow: 0 3px 0 #4a1e1e;
         }
+        .menu-btn.performance-active {
+            background: #9ad35f;
+            border-bottom-color: #4d7f2b;
+            box-shadow: 0 3px 0 #2f5518;
+            color: #17350f;
+        }
         .menu-input {
             background: #efeac5;
             border: none;
@@ -662,6 +668,15 @@
             </div>
         </div>
 
+        <!-- Performance Section -->
+        <div class="menu-section">
+            <div class="menu-section-title">⚡ PERFORMANCE</div>
+            <div class="menu-row">
+                <button class="menu-btn" id="menuPerformanceBtn">⚡ PERFORMANCE (OFF)</button>
+            </div>
+            <div style="font-size:0.8rem; color:#ffd966; text-align:center;">Hides bees and heavy effects for smoother gameplay.</div>
+        </div>
+
         <!-- Reset Buttons -->
         <div class="menu-section">
             <div class="menu-section-title">🔄 RESET</div>
@@ -842,6 +857,7 @@ const menuSaveCodeDisplay = document.getElementById('menuSaveCodeDisplay');
 const menuCopySaveBtn = document.getElementById('menuCopySaveBtn');
 const menuLoadCodeInput = document.getElementById('menuLoadCodeInput');
 const menuLoadSaveBtn = document.getElementById('menuLoadSaveBtn');
+const menuPerformanceBtn = document.getElementById('menuPerformanceBtn');
 const menuResetAllBtn = document.getElementById('menuResetAllBtn');
 const menuResetHoneyBtn = document.getElementById('menuResetHoneyBtn');
 const menuRemoveNameInput = document.getElementById('menuRemoveNameInput');
@@ -926,6 +942,21 @@ function formatNumber(num) {
     return Math.floor(num).toString();
 }
 
+function parseBoolean(value, fallback = false) {
+    return typeof value === 'boolean' ? value : fallback;
+}
+
+function updatePerformanceButton() {
+    menuPerformanceBtn.textContent = performanceMode ? '⚡ PERFORMANCE (ON)' : '⚡ PERFORMANCE (OFF)';
+    menuPerformanceBtn.classList.toggle('performance-active', performanceMode);
+}
+
+function togglePerformanceMode() {
+    performanceMode = !performanceMode;
+    updatePerformanceButton();
+    saveGame();
+}
+
 // ========== REDEEM CODE SYSTEM ==========
 const validCodes = {
     'release': { honey: 100000, rp: 5, sp: 0, message: 'Release code redeemed! +100k Honey, +5 RP' },
@@ -1003,7 +1034,8 @@ function generateSaveCode() {
         rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier,
         rpAutobuyEnabled,
-        autoActive
+        autoActive,
+        performanceMode
     };
     
     const jsonStr = JSON.stringify(saveData);
@@ -1055,6 +1087,8 @@ function loadSaveCode(code) {
         rpCompoundingMultiplier = saveData.rpCompoundingMultiplier || 1.0;
         rpAutobuyEnabled = saveData.rpAutobuyEnabled || false;
         autoActive = saveData.autoActive || false;
+        performanceMode = parseBoolean(saveData.performanceMode, false);
+        updatePerformanceButton();
         
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
@@ -1089,6 +1123,7 @@ function loadSaveCode(code) {
 }
 
 menuGenerateSaveBtn.addEventListener('click', generateSaveCode);
+menuPerformanceBtn.addEventListener('click', togglePerformanceMode);
 
 menuLoadSaveBtn.addEventListener('click', () => {
     const code = menuLoadCodeInput.value.trim();
@@ -1116,11 +1151,13 @@ menuResetAllBtn.addEventListener('click', () => {
         x10HoneyPurchased = false; rpAutoBuyActive = false; rpGeneratorLevel = 0;
         rpCompoundingLevel = 0; rpCompoundingMultiplier = 1.0;
         autoActive = false; rpAutobuyEnabled = false;
+        performanceMode = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         if (rpGeneratorInterval) { clearInterval(rpGeneratorInterval); rpGeneratorInterval = null; }
         if (rpAutoBuyInterval) { clearInterval(rpAutoBuyInterval); rpAutoBuyInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
         toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)'; toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+        updatePerformanceButton();
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
@@ -1620,6 +1657,7 @@ let rpCompoundingMultiplier = 1.0;
 let autoActive = false;
 let autoInterval = null;
 let rpAutobuyEnabled = false;
+let performanceMode = false;
 
 // ========== GAME MECHANICS ==========
 function update() {
@@ -2221,7 +2259,8 @@ function saveGame() {
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
-        rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled
+        rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
+        performanceMode
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
@@ -2263,6 +2302,8 @@ function loadGame() {
         rpCompoundingLevel = data.rpCompoundingLevel || 0;
         rpCompoundingMultiplier = data.rpCompoundingMultiplier || 1.0;
         rpAutobuyEnabled = data.rpAutobuyEnabled || false;
+        performanceMode = parseBoolean(data.performanceMode, false);
+        updatePerformanceButton();
 
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
@@ -2302,6 +2343,7 @@ function init() {
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
     }
+    updatePerformanceButton();
     recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
     hireCostSpan.textContent = formatNumber(nextHireCost);
     saveGame();
@@ -2315,15 +2357,34 @@ function draw() {
     grad.addColorStop(0, '#9ccc7c'); grad.addColorStop(1, '#5f8b4b');
     ctx.fillStyle = grad; ctx.fillRect(0, 0, 800, 400);
 
-    ctx.shadowColor = '#402d16'; ctx.shadowBlur = 12;
+    ctx.shadowColor = '#402d16'; ctx.shadowBlur = performanceMode ? 0 : 12;
     ctx.fillStyle = '#c99a3b';
     ctx.beginPath(); ctx.ellipse(HIVE_X-5, HIVE_Y-10, 40, 30, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#b57c2a'; ctx.beginPath(); ctx.ellipse(HIVE_X, HIVE_Y, 44, 34, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#e3b15a'; ctx.beginPath(); ctx.ellipse(HIVE_X-5, HIVE_Y-5, 30, 22, 0, 0, Math.PI*2); ctx.fill();
-    ctx.shadowBlur = 0; ctx.font = '30px "Segoe UI"'; ctx.fillStyle = '#f5d742'; ctx.fillText('🏠', HIVE_X-30, HIVE_Y+10);
+    ctx.shadowBlur = 0;
+    if (!performanceMode) {
+        ctx.font = '30px "Segoe UI"'; ctx.fillStyle = '#f5d742'; ctx.fillText('🏠', HIVE_X-30, HIVE_Y+10);
+    }
 
     for (let f of flowers) {
-        if (!f.active) { ctx.globalAlpha = 0.3; ctx.fillStyle = '#755d3b'; ctx.beginPath(); ctx.arc(f.x, f.y, FLOWER_RADIUS-4,0,2*Math.PI); ctx.fill(); ctx.globalAlpha=1; continue; }
+        if (!f.active) {
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = '#755d3b';
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, FLOWER_RADIUS - 4, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            continue;
+        }
+        if (performanceMode) {
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#f5a3c7';
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, 8, 0, 2 * Math.PI);
+            ctx.fill();
+            continue;
+        }
         ctx.shadowBlur = 8; ctx.shadowColor = '#4f2f0a';
         ctx.fillStyle = '#f5a3c7'; ctx.beginPath(); ctx.arc(f.x-4, f.y-4, 7,0,2*Math.PI); ctx.fill();
         ctx.fillStyle = '#ffea9f'; ctx.beginPath(); ctx.arc(f.x+4, f.y+2, 7,0,2*Math.PI); ctx.fill();
@@ -2331,17 +2392,19 @@ function draw() {
         ctx.shadowBlur = 4; ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#422b0e'; ctx.fillText(f.pollen, f.x-12, f.y-15);
     }
 
-    for (let b of bees) {
-        ctx.shadowBlur = 6; ctx.shadowColor = '#141c0e';
-        ctx.fillStyle = '#f2b137'; ctx.beginPath(); ctx.ellipse(b.x, b.y, 12, 8, 0, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#3f2e1c'; ctx.fillRect(b.x-8, b.y-3, 4, 6); ctx.fillRect(b.x+4, b.y-3, 4, 6);
-        ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(b.x-6, b.y-4, 2,0,2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(b.x+2, b.y-4, 2,0,2*Math.PI); ctx.fill();
-        ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(b.x-7, b.y-5, 1,0,2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(b.x+1, b.y-5, 1,0,2*Math.PI); ctx.fill();
-        ctx.fillStyle = '#c9e9fa'; ctx.globalAlpha = 0.6;
-        ctx.beginPath(); ctx.ellipse(b.x-8, b.y-12, 6, 3, 0.2, 0, 2*Math.PI); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(b.x+4, b.y-12, 6, 3, -0.2, 0, 2*Math.PI); ctx.fill();
-        ctx.globalAlpha = 1;
-        if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('✨', b.x-12, b.y-25); }
+    if (!performanceMode) {
+        for (let b of bees) {
+            ctx.shadowBlur = 6; ctx.shadowColor = '#141c0e';
+            ctx.fillStyle = '#f2b137'; ctx.beginPath(); ctx.ellipse(b.x, b.y, 12, 8, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#3f2e1c'; ctx.fillRect(b.x-8, b.y-3, 4, 6); ctx.fillRect(b.x+4, b.y-3, 4, 6);
+            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(b.x-6, b.y-4, 2,0,2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(b.x+2, b.y-4, 2,0,2*Math.PI); ctx.fill();
+            ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(b.x-7, b.y-5, 1,0,2*Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(b.x+1, b.y-5, 1,0,2*Math.PI); ctx.fill();
+            ctx.fillStyle = '#c9e9fa'; ctx.globalAlpha = 0.6;
+            ctx.beginPath(); ctx.ellipse(b.x-8, b.y-12, 6, 3, 0.2, 0, 2*Math.PI); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(b.x+4, b.y-12, 6, 3, -0.2, 0, 2*Math.PI); ctx.fill();
+            ctx.globalAlpha = 1;
+            if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('✨', b.x-12, b.y-25); }
+        }
     }
     ctx.shadowBlur = 0;
 }
