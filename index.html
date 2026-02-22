@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · fixed individual RP pricing</title>
+    <title>🐝 BEE SWARM · fixed RP with resetting prices</title>
     <style>
         * {
             box-sizing: border-box;
@@ -232,11 +232,11 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Single Rebirth Button (individual RP pricing) -->
+        <!-- Rebirth Button -->
         <div class="rebirth-row">
             <span style="color:#fff4c2; font-weight:bold;">🌀 REBIRTH:</span>
-            <button class="tool-btn" id="rebirthBtn">🔁 BUY NEXT RP</button>
-            <span class="multiplier-badge" id="rebirthInfo">Next RP: 10k</span>
+            <button class="tool-btn" id="rebirthBtn">🔁 REBIRTH</button>
+            <span class="multiplier-badge" id="rebirthInfo">1 RP = 10k</span>
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
@@ -283,7 +283,9 @@
     const BEE_CAPACITY_BASE = 8;
     const HIRE_COST_BASE = 20;
     const SAVE_KEY = 'beeSwarmSave';
-    const BASE_RP_COST = 10000; // First RP costs 10k
+    
+    // RP pricing: 1 RP = 10k, 2 RP = 15k, 3 RP = 22.5k, 4 RP = 33.75k, etc.
+    const RP_PRICES = [10000, 15000, 22500, 33750, 50625, 75937, 113906, 170859, 256289, 384434, 576651, 864977, 1297466, 1946199, 2919299];
 
     // ========== GAME STATE ==========
     let honey = 0;
@@ -297,7 +299,6 @@
 
     // Rebirth
     let rebirthPoints = 0;
-    let nextRPCost = BASE_RP_COST; // Track the cost of the next RP
 
     // Rebirth upgrades
     let autoUnlocked = false;
@@ -357,7 +358,7 @@
             })),
             nextHireCost,
             hasClippers, hasShears, hasScythe, hasOil,
-            rebirthPoints, nextRPCost,
+            rebirthPoints,
             autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
             autoActive
         };
@@ -381,7 +382,6 @@
             hasScythe = data.hasScythe || false;
             hasOil = data.hasOil || false;
             rebirthPoints = data.rebirthPoints || 0;
-            nextRPCost = data.nextRPCost || BASE_RP_COST;
             autoUnlocked = data.autoUnlocked || false;
             beeSpeedMultiplier = data.beeSpeedMultiplier || 1.0;
             capacityMultiplier = data.capacityMultiplier || 1.0;
@@ -495,16 +495,35 @@
         return bestIndex;
     }
 
-    // ========== INDIVIDUAL RP PRICING ==========
-    // Each RP has its own price that scales by 1.5x
-    // 1st RP: 10k, 2nd RP: 15k, 3rd RP: 22.5k, 4th RP: 33.75k, etc.
+    // Calculate how many RP you can buy with current honey
+    function getMaxRPFromHoney() {
+        let rpGained = 0;
+        let totalCost = 0;
+        
+        // Keep adding RP costs until we can't afford the next one
+        for (let i = 0; i < RP_PRICES.length; i++) {
+            if (honey >= RP_PRICES[i]) {
+                rpGained = i + 1;
+            } else {
+                break;
+            }
+        }
+        
+        return rpGained;
+    }
+
     function updateRebirthUI() {
         rpSpan.textContent = rebirthPoints;
         rpBadge.textContent = `RP: ${rebirthPoints}`;
         rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
 
-        // Show next RP cost
-        rebirthInfo.textContent = `Next RP: ${Math.floor(nextRPCost).toLocaleString()}🍯`;
+        // Show current RP pricing info
+        const maxRP = getMaxRPFromHoney();
+        if (maxRP > 0) {
+            rebirthInfo.textContent = `${maxRP} RP = ${RP_PRICES[maxRP-1].toLocaleString()}🍯`;
+        } else {
+            rebirthInfo.textContent = `1 RP = ${RP_PRICES[0].toLocaleString()}🍯`;
+        }
 
         // Update rebirth shop buttons
         buyAutoUpgrade.disabled = autoUnlocked || rebirthPoints < 2;
@@ -529,7 +548,6 @@
         
         // Reset rebirth points and upgrades
         rebirthPoints = 0;
-        nextRPCost = BASE_RP_COST;
         autoUnlocked = false;
         beeSpeedMultiplier = 1.0;
         capacityMultiplier = 1.0;
@@ -913,14 +931,14 @@
         }
     });
 
-    // FIXED: Buy one RP at a time with individual pricing
+    // FIXED: Buy as many RP as you can afford with current honey
     rebirthBtn.addEventListener('click', () => {
-        if (honey >= nextRPCost) {
-            honey -= nextRPCost;
-            rebirthPoints++;
-            
-            // Update next RP cost (multiply by 1.5)
-            nextRPCost = Math.floor(nextRPCost * 1.5);
+        const rpToBuy = getMaxRPFromHoney();
+        
+        if (rpToBuy > 0) {
+            const cost = RP_PRICES[rpToBuy - 1];
+            honey -= cost;
+            rebirthPoints += rpToBuy;
             
             // Reset game state but keep rebirth points and upgrades
             bees = [];
@@ -948,9 +966,9 @@
             hireCostSpan.textContent = nextHireCost;
             saveGame();
             
-            alert(`✨ Purchased 1 RP for ${Math.floor(nextRPCost/1.5).toLocaleString()} honey! Next RP costs ${nextRPCost.toLocaleString()} honey.`);
+            alert(`✨ Purchased ${rpToBuy} RP for ${cost.toLocaleString()} honey!`);
         } else {
-            alert(`❌ Need ${nextRPCost.toLocaleString()} honey for next RP! (You have ${Math.floor(honey).toLocaleString()} honey)`);
+            alert(`❌ Need at least ${RP_PRICES[0].toLocaleString()} honey for 1 RP! (You have ${Math.floor(honey).toLocaleString()} honey)`);
         }
     });
 
