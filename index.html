@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · SimpleBoards Fixed</title>
+    <title>🐝 BEE SWARM · Firebase 64-bit Leaderboard</title>
     <style>
         * {
             box-sizing: border-box;
@@ -462,6 +462,9 @@
             word-break: break-all;
         }
     </style>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <!-- Name modal (shown once) -->
@@ -501,10 +504,10 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Leaderboard Panel (SIMPLEBOARDS - GLOBAL) -->
+        <!-- Leaderboard Panel (FIREBASE - 64-bit) -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">
-                🌍 GLOBAL TOP 10
+                🌍 GLOBAL TOP 10 (64-bit Firebase)
                 <span class="refresh-btn" id="refreshLeaderboard">↻</span>
             </div>
             <div id="leaderboardList">
@@ -611,10 +614,23 @@
 </div>
 
 <script>
-// ================== SIMPLEBOARDS CONFIGURATION ==================
-const SIMPLEBOARDS_API_KEY = '1e499b45-0ceb-4f77-89c0-f4d69cef9586';
-const SIMPLEBOARDS_LEADERBOARD_ID = 'f96a2bd0-2571-4637-0379-08de7214c7ed';
-const SIMPLEBOARDS_API_URL = 'https://api.simpleboards.dev/api';
+// ================== FIREBASE CONFIGURATION ==================
+// REPLACE THESE WITH YOUR FIREBASE PROJECT DETAILS
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    databaseURL: "YOUR_DATABASE_URL",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+const leaderboardRef = database.ref('leaderboard');
+const announcementRef = database.ref('announcement');
 
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
@@ -656,168 +672,82 @@ closeAnnouncementBtn.addEventListener('click', () => {
     localStorage.setItem('announcementClosed', 'true');
 });
 
-// ========== NUMBER FORMATTING ==========
+// ========== NUMBER FORMATTING (supports up to 64-bit) ==========
 function formatNumber(num) {
     if (num === undefined || num === null) return '0';
-    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
-    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
+    if (num >= 1e15) return (num / 1e15).toFixed(2) + 'Qd';  // Quadrillion
+    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';  // Trillion
+    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';    // Billion
+    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';    // Million
+    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';    // Thousand
     return Math.floor(num).toString();
 }
 
-// ========== SIMPLEBOARDS LEADERBOARD FUNCTIONS ==========
-async function fetchLeaderboard() {
+// ========== FIREBASE LEADERBOARD FUNCTIONS ==========
+function fetchLeaderboard() {
     document.getElementById('leaderboardList').innerHTML = '<div class="loading">Loading leaderboard...</div>';
     
-    try {
-        // According to your screenshot, the GET endpoint might be different
-        // Let's try a different approach - maybe we need to get entries from the leaderboard
-        console.log('Fetching leaderboard entries...');
+    leaderboardRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        leaderboard = [];
         
-        // Try the entries endpoint with leaderboardId as query parameter
-        const response = await fetch(`${SIMPLEBOARDS_API_URL}/entries?leaderboardId=${SIMPLEBOARDS_LEADERBOARD_ID}`, {
-            headers: {
-                'x-api-key': SIMPLEBOARDS_API_KEY,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        console.log('Response status:', response.status);
-        
-        if (!response.ok) {
-            // If that fails, try getting leaderboard info
-            console.log('Trying alternative endpoint...');
-            const altResponse = await fetch(`${SIMPLEBOARDS_API_URL}/leaderboards/${SIMPLEBOARDS_LEADERBOARD_ID}`, {
-                headers: {
-                    'x-api-key': SIMPLEBOARDS_API_KEY,
-                    'Content-Type': 'application/json'
+        if (data) {
+            // Convert object to array
+            Object.keys(data).forEach(key => {
+                if (data[key] && data[key].name && typeof data[key].total === 'number') {
+                    leaderboard.push({
+                        name: data[key].name,
+                        total: data[key].total
+                    });
                 }
             });
-            
-            if (!altResponse.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const altData = await altResponse.json();
-            console.log('Alt data:', altData);
-            
-            // If we get here, use whatever format we got
-            if (altData.entries && Array.isArray(altData.entries)) {
-                leaderboard = altData.entries.map(entry => ({
-                    name: entry.playerDisplayName || entry.name,
-                    total: parseInt(entry.score) || 0
-                })).filter(entry => entry.name && entry.total > 0);
-            }
-        } else {
-            const data = await response.json();
-            console.log('Received data:', data);
-            
-            // Handle the data format
-            if (Array.isArray(data)) {
-                leaderboard = data.map(entry => ({
-                    name: entry.playerDisplayName || entry.name,
-                    total: parseInt(entry.score) || 0
-                })).filter(entry => entry.name && entry.total > 0);
-            } else if (data.entries && Array.isArray(data.entries)) {
-                leaderboard = data.entries.map(entry => ({
-                    name: entry.playerDisplayName || entry.name,
-                    total: parseInt(entry.score) || 0
-                })).filter(entry => entry.name && entry.total > 0);
-            } else {
-                console.error('Unexpected data format:', data);
-                leaderboard = [];
-            }
         }
         
         renderLeaderboard();
+        debugInfo.textContent = `✅ Loaded ${leaderboard.length} players`;
         
         if (playerName === 'Opleoni') {
             updateAdminPlayerSelect();
         }
-        
-        debugInfo.textContent = `✅ Loaded ${leaderboard.length} players`;
-    } catch (error) {
-        console.error('Failed to fetch leaderboard:', error);
-        debugInfo.innerHTML = `❌ Error: ${error.message}<br><span class="error-details">Using local storage fallback</span>`;
-        
-        // Fallback to localStorage
-        const saved = localStorage.getItem('localLeaderboard');
-        if (saved) {
-            try {
-                leaderboard = JSON.parse(saved);
-            } catch (e) {
-                leaderboard = [];
-            }
-        } else {
-            leaderboard = [];
-        }
-        
-        renderLeaderboard();
-        
-        // Try again in 10 seconds
-        setTimeout(fetchLeaderboard, 10000);
-    }
+    }, (error) => {
+        console.error('Firebase error:', error);
+        debugInfo.innerHTML = `❌ Error: ${error.message}`;
+    });
 }
 
 async function submitScore(score) {
     if (!playerName || score < 0) return;
     
     try {
-        console.log('Submitting score:', { playerName, score });
+        console.log('Submitting score to Firebase:', { playerName, score });
         
-        const response = await fetch(`${SIMPLEBOARDS_API_URL}/entries`, {
-            method: 'POST',
-            headers: {
-                'x-api-key': SIMPLEBOARDS_API_KEY,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                leaderboardId: SIMPLEBOARDS_LEADERBOARD_ID,
-                playerDisplayName: playerName,
-                score: score.toString()
-            })
+        // Firebase uses 64-bit integers, so no scaling needed!
+        await leaderboardRef.child(playerName.replace(/[.#$\[\]]/g, '_')).set({
+            name: playerName,
+            total: score
         });
         
-        console.log('Submit response status:', response.status);
+        console.log('Submit success');
         
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Submit error:', errorText);
-            
-            // Fallback to localStorage
-            const localLeaderboard = JSON.parse(localStorage.getItem('localLeaderboard') || '[]');
-            const existingIndex = localLeaderboard.findIndex(e => e.name === playerName);
-            if (existingIndex >= 0) {
-                localLeaderboard[existingIndex].total = Math.max(localLeaderboard[existingIndex].total, score);
-            } else {
-                localLeaderboard.push({ name: playerName, total: score });
-            }
-            localStorage.setItem('localLeaderboard', JSON.stringify(localLeaderboard));
-            leaderboard = localLeaderboard;
-            renderLeaderboard();
-            return;
-        }
-        
-        const data = await response.json();
-        console.log('Submit success:', data);
-        
-        // Refresh leaderboard after submitting
-        await fetchLeaderboard();
+        // Leaderboard will auto-update due to the on() listener
     } catch (error) {
         console.error('Failed to submit score:', error);
-        // Fallback to localStorage
-        const localLeaderboard = JSON.parse(localStorage.getItem('localLeaderboard') || '[]');
-        const existingIndex = localLeaderboard.findIndex(e => e.name === playerName);
-        if (existingIndex >= 0) {
-            localLeaderboard[existingIndex].total = Math.max(localLeaderboard[existingIndex].total, score);
-        } else {
-            localLeaderboard.push({ name: playerName, total: score });
-        }
-        localStorage.setItem('localLeaderboard', JSON.stringify(localLeaderboard));
-        leaderboard = localLeaderboard;
-        renderLeaderboard();
+        debugInfo.innerHTML = `❌ Submit error: ${error.message}`;
     }
+}
+
+// ========== ANNOUNCEMENT FUNCTIONS ==========
+function setupAnnouncementListener() {
+    announcementRef.on('value', (snapshot) => {
+        const message = snapshot.val();
+        if (message && message.text) {
+            currentAnnouncement = message.text;
+            if (!announcementClosed) {
+                announcementMessage.textContent = message.text;
+                announcementPopup.style.display = 'block';
+            }
+        }
+    });
 }
 
 // ========== ADMIN FUNCTIONS ==========
@@ -842,16 +772,14 @@ function updateAdminPlayerSelect() {
 }
 
 async function isNameAvailable(name) {
-    await fetchLeaderboard();
-    const lowerName = name.toLowerCase();
-    return !leaderboard.some(entry => entry && entry.name && entry.name.toLowerCase() === lowerName);
+    const snapshot = await leaderboardRef.child(name.replace(/[.#$\[\]]/g, '_')).once('value');
+    return !snapshot.exists();
 }
 
 function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
     if (!leaderboard || leaderboard.length === 0) {
         listDiv.innerHTML = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
-        debugInfo.textContent = 'No players';
         return;
     }
     
@@ -942,14 +870,12 @@ if (cancelAnnouncementBtn) {
 }
 
 if (sendAnnouncementBtn) {
-    sendAnnouncementBtn.addEventListener('click', () => {
+    sendAnnouncementBtn.addEventListener('click', async () => {
         if (playerName === 'Opleoni') {
             const message = announcementInput.value.trim();
             if (message) {
-                localStorage.setItem('globalAnnouncement', message);
+                await announcementRef.set({ text: message });
                 localStorage.removeItem('announcementClosed');
-                announcementMessage.textContent = message;
-                announcementPopup.style.display = 'block';
                 announcementModal.style.display = 'none';
                 announcementInput.value = '';
             }
@@ -959,15 +885,6 @@ if (sendAnnouncementBtn) {
 
 // Listen for announcement changes
 window.addEventListener('storage', (e) => {
-    if (e.key === 'globalAnnouncement') {
-        if (e.newValue) {
-            currentAnnouncement = e.newValue;
-            announcementClosed = false;
-            localStorage.removeItem('announcementClosed');
-            announcementMessage.textContent = e.newValue;
-            announcementPopup.style.display = 'block';
-        }
-    }
     if (e.key === 'announcementClosed') {
         announcementClosed = e.newValue === 'true';
         if (announcementClosed) {
@@ -981,6 +898,7 @@ if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     fetchLeaderboard();
+    setupAnnouncementListener();
     if (playerName === 'Opleoni') {
         adminPanel.style.display = 'flex';
         setTimeout(updateAdminPlayerSelect, 1000);
@@ -988,12 +906,8 @@ if (playerName) {
 } else {
     nameModal.style.display = 'flex';
     fetchLeaderboard();
+    setupAnnouncementListener();
 }
-
-// Periodically refresh leaderboard (every 30 seconds)
-setInterval(() => {
-    fetchLeaderboard();
-}, 30000);
 
 // ========== GAME CONSTANTS ==========
 const HIVE_X = 100, HIVE_Y = 200;
@@ -1164,7 +1078,7 @@ function saveGame() {
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
     setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
     
-    // Submit score to SimpleBoards
+    // Submit score to Firebase
     submitScore(totalHoneyEarned);
 }
 
@@ -1269,94 +1183,81 @@ function setupRPAutoBuy() {
 setInterval(saveGame, 30000);
 window.addEventListener('beforeunload', saveGame);
 
-// ========== GAME MECHANICS ==========
-function update() {
-    for (let i = flowers.length - 1; i >= 0; i--) {
+// ========== HELPER FUNCTIONS ==========
+function recalcMultiplier() {
+    let toolMult = 1.0;
+    if (hasClippers) toolMult *= 1.2;
+    if (hasShears) toolMult *= 1.5;
+    if (hasScythe) toolMult *= 2.0;
+    if (hasOil) toolMult *= 3.0;
+    if (hasHoneycomb) toolMult *= 1.5;
+    if (hasBeeGun) toolMult *= 2.0;
+    if (hasRoyalJelly) toolMult *= 3.0;
+    if (hasStarTreat) toolMult *= 5.0;
+    toolMultiplier = toolMult;
+    
+    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
+    if (x10HoneyPurchased) totalMult *= 10;
+    totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
+}
+
+function updateToolButtons() {
+    buyClippers.disabled = hasClippers;
+    buyShears.disabled = hasShears;
+    buyScythe.disabled = hasScythe;
+    buyOil.disabled = hasOil;
+    buyHoneycomb.disabled = hasHoneycomb;
+    buyBeeGun.disabled = hasBeeGun;
+    buyRoyalJelly.disabled = hasRoyalJelly;
+    buyStarTreat.disabled = hasStarTreat;
+}
+
+function spawnFlower() {
+    if (flowers.filter(f => f.active).length >= MAX_FLOWERS) return false;
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const x = 200 + Math.random() * 550;
+        const y = 50 + Math.random() * 300;
+        if (x < 180) continue;
+        let overlap = false;
+        for (let f of flowers) {
+            if (!f.active) continue;
+            const dx = f.x - x, dy = f.y - y;
+            if (Math.hypot(dx, dy) < FLOWER_RADIUS * 2.2) {
+                overlap = true;
+                break;
+            }
+        }
+        if (!overlap) {
+            let basePollen = 8 + Math.floor(Math.random() * 12);
+            flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
+            return true;
+        }
+    }
+    return false;
+}
+
+function addBee() {
+    let capacity = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
+    bees.push({
+        x: HIVE_X + (Math.random() * 30 - 15),
+        y: HIVE_Y + (Math.random() * 30 - 15),
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+        carrying: 0,
+        targetFlower: null,
+        returning: false
+    });
+}
+
+function findBestFlower(beeX, beeY) {
+    let bestDist = Infinity, bestIndex = -1;
+    for (let i = 0; i < flowers.length; i++) {
         const f = flowers[i];
-        if (!f.active) {
-            f.timer--;
-            if (f.timer <= 0) {
-                if (flowers.filter(fl => fl.active).length < MAX_FLOWERS) {
-                    f.active = true;
-                    f.pollen = 8 + Math.floor(Math.random() * 12);
-                    f.timer = 0;
-                }
-            }
-        }
+        if (!f.active || f.pollen <= 0) continue;
+        const dist = Math.hypot(f.x - beeX, f.y - beeY);
+        if (dist < bestDist) { bestDist = dist; bestIndex = i; }
     }
-    if (flowers.filter(f => f.active).length < 5) spawnFlower();
-
-    for (let b of bees) {
-        let maxCap = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
-        if (b.carrying >= maxCap) {
-            b.returning = true;
-            b.targetFlower = null;
-        }
-
-        if (b.returning) {
-            const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 20) {
-                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * (x10HoneyPurchased ? 10 : 1));
-                honey += deposited;
-                totalHoneyEarned += deposited;
-                b.carrying = 0;
-                b.returning = false;
-            } else {
-                b.vx += (dx / dist) * 0.1 * beeSpeedMultiplier;
-                b.vy += (dy / dist) * 0.1 * beeSpeedMultiplier;
-            }
-        } else {
-            if (b.targetFlower === null || b.targetFlower >= flowers.length || 
-                !flowers[b.targetFlower]?.active || flowers[b.targetFlower].pollen <= 0) {
-                b.targetFlower = findBestFlower(b.x, b.y);
-            }
-
-            if (b.targetFlower !== null && b.targetFlower < flowers.length) {
-                const target = flowers[b.targetFlower];
-                if (target.active && target.pollen > 0) {
-                    const dx = target.x - b.x, dy = target.y - b.y;
-                    const dist = Math.hypot(dx, dy);
-                    if (dist < FLOWER_RADIUS + 5) {
-                        const collect = Math.min(maxCap - b.carrying, target.pollen);
-                        b.carrying += collect;
-                        target.pollen -= collect;
-                        if (target.pollen <= 0) {
-                            target.active = false;
-                            target.timer = 200;
-                            b.targetFlower = null;
-                        }
-                    } else {
-                        b.vx += (dx / dist) * 0.1 * beeSpeedMultiplier;
-                        b.vy += (dy / dist) * 0.1 * beeSpeedMultiplier;
-                    }
-                } else b.targetFlower = null;
-            } else {
-                b.vx += (Math.random() - 0.5) * 0.1 * beeSpeedMultiplier;
-                b.vy += (Math.random() - 0.5) * 0.1 * beeSpeedMultiplier;
-            }
-        }
-
-        const speed = Math.hypot(b.vx, b.vy);
-        const maxSpeed = BEE_SPEED_BASE * beeSpeedMultiplier;
-        if (speed > maxSpeed) {
-            b.vx = (b.vx / speed) * maxSpeed;
-            b.vy = (b.vy / speed) * maxSpeed;
-        }
-
-        b.x += b.vx; b.y += b.vy;
-        if (b.x < 10) { b.x = 10; b.vx *= -0.5; }
-        if (b.x > 790) { b.x = 790; b.vx *= -0.5; }
-        if (b.y < 10) { b.y = 10; b.vy *= -0.5; }
-        if (b.y > 390) { b.y = 390; b.vy *= -0.5; }
-    }
-
-    beeCountSpan.textContent = bees.length;
-    const activeFlowers = flowers.filter(f => f.active).length;
-    fieldInfo.textContent = `🌸 ${activeFlowers} flowers`;
-    hireCostSpan.textContent = formatNumber(nextHireCost);
-    updateRebirthUI();
-    updateSPUI();
+    return bestIndex;
 }
 
 function updateRebirthUI() {
@@ -1475,87 +1376,6 @@ function updateSPUI() {
     buyRPCompounding.disabled = sacrificePoints < compCost;
 }
 
-// ========== SPAWN FLOWER ==========
-function spawnFlower() {
-    if (flowers.filter(f => f.active).length >= MAX_FLOWERS) return false;
-    for (let attempt = 0; attempt < 200; attempt++) {
-        const x = 200 + Math.random() * 550;
-        const y = 50 + Math.random() * 300;
-        if (x < 180) continue;
-        let overlap = false;
-        for (let f of flowers) {
-            if (!f.active) continue;
-            const dx = f.x - x, dy = f.y - y;
-            if (Math.hypot(dx, dy) < FLOWER_RADIUS * 2.2) {
-                overlap = true;
-                break;
-            }
-        }
-        if (!overlap) {
-            let basePollen = 8 + Math.floor(Math.random() * 12);
-            flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
-            return true;
-        }
-    }
-    return false;
-}
-
-// ========== ADD BEE ==========
-function addBee() {
-    let capacity = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
-    bees.push({
-        x: HIVE_X + (Math.random() * 30 - 15),
-        y: HIVE_Y + (Math.random() * 30 - 15),
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 0.5) * 2,
-        carrying: 0,
-        targetFlower: null,
-        returning: false
-    });
-}
-
-// ========== FIND BEST FLOWER ==========
-function findBestFlower(beeX, beeY) {
-    let bestDist = Infinity, bestIndex = -1;
-    for (let i = 0; i < flowers.length; i++) {
-        const f = flowers[i];
-        if (!f.active || f.pollen <= 0) continue;
-        const dist = Math.hypot(f.x - beeX, f.y - beeY);
-        if (dist < bestDist) { bestDist = dist; bestIndex = i; }
-    }
-    return bestIndex;
-}
-
-// ========== RECALC MULTIPLIER ==========
-function recalcMultiplier() {
-    let toolMult = 1.0;
-    if (hasClippers) toolMult *= 1.2;
-    if (hasShears) toolMult *= 1.5;
-    if (hasScythe) toolMult *= 2.0;
-    if (hasOil) toolMult *= 3.0;
-    if (hasHoneycomb) toolMult *= 1.5;
-    if (hasBeeGun) toolMult *= 2.0;
-    if (hasRoyalJelly) toolMult *= 3.0;
-    if (hasStarTreat) toolMult *= 5.0;
-    toolMultiplier = toolMult;
-    
-    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
-    if (x10HoneyPurchased) totalMult *= 10;
-    totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
-}
-
-// ========== UPDATE TOOL BUTTONS ==========
-function updateToolButtons() {
-    buyClippers.disabled = hasClippers;
-    buyShears.disabled = hasShears;
-    buyScythe.disabled = hasScythe;
-    buyOil.disabled = hasOil;
-    buyHoneycomb.disabled = hasHoneycomb;
-    buyBeeGun.disabled = hasBeeGun;
-    buyRoyalJelly.disabled = hasRoyalJelly;
-    buyStarTreat.disabled = hasStarTreat;
-}
-
 // ========== AUTOMATION ==========
 function autoBuy() {
     if (!autoActive || !autoUnlocked) return;
@@ -1658,6 +1478,9 @@ resetBtn.addEventListener('click', () => {
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
         hireCostSpan.textContent = formatNumber(nextHireCost);
         localStorage.removeItem(SAVE_KEY);
+        
+        // Submit zero score to Firebase
+        submitScore(0);
         saveGame();
     }
 });
@@ -1666,7 +1489,7 @@ resetHoneyBtn.addEventListener('click', () => {
     honey = 0;
     totalHoneyEarned = 0;
     
-    // Submit zero score to leaderboard
+    // Submit zero score to Firebase
     submitScore(0);
     
     saveGame();
@@ -1874,8 +1697,8 @@ adminAddBtn.addEventListener('click', async () => {
         const newName = prompt('Enter new player name:');
         if (!newName) return;
         
-        const exists = leaderboard.some(entry => entry.name.toLowerCase() === newName.toLowerCase());
-        if (exists) {
+        const exists = await isNameAvailable(newName);
+        if (!exists) {
             alert('❌ That name already exists!');
             return;
         }
@@ -1885,16 +1708,11 @@ adminAddBtn.addEventListener('click', async () => {
         await submitScore(0);
     }
     
-    let playerEntry = leaderboard.find(entry => entry.name === targetPlayer);
-    
     switch(stat) {
         case 'honey':
             if (targetPlayer === playerName) {
                 honey += amount;
                 totalHoneyEarned += amount;
-            }
-            if (playerEntry) {
-                playerEntry.total += amount;
             }
             // Submit updated score
             await submitScore(totalHoneyEarned);
@@ -1911,11 +1729,9 @@ adminAddBtn.addEventListener('click', async () => {
             break;
     }
     
-    await fetchLeaderboard();
     updateRebirthUI();
     updateSPUI();
     saveGame();
-    updateAdminPlayerSelect();
     alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
 });
 
