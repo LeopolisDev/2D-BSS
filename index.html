@@ -791,6 +791,10 @@
             <button class="tool-btn" id="buyBeeGun">🔫 2.0x (50k)</button>
             <button class="tool-btn" id="buyRoyalJelly">👑 3.0x (100k)</button>
             <button class="tool-btn" id="buyStarTreat">⭐ 5.0x (250k)</button>
+            <button class="tool-btn" id="buyMoonCharm">&#127769; MOON CHARM 1.5x (10B)</button>
+            <button class="tool-btn" id="buySunRelic">&#9728;&#65039; SUN RELIC 2.0x (50B)</button>
+            <button class="tool-btn" id="buyStormTotem">&#9889; STORM TOTEM 3.0x (250B)</button>
+            <button class="tool-btn" id="buyGalaxyCrown">&#127756; GALAXY CROWN 5.0x (1T)</button>
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
@@ -919,6 +923,10 @@ const buyHoneycomb = document.getElementById('buyHoneycomb');
 const buyBeeGun = document.getElementById('buyBeeGun');
 const buyRoyalJelly = document.getElementById('buyRoyalJelly');
 const buyStarTreat = document.getElementById('buyStarTreat');
+const buyMoonCharm = document.getElementById('buyMoonCharm');
+const buySunRelic = document.getElementById('buySunRelic');
+const buyStormTotem = document.getElementById('buyStormTotem');
+const buyGalaxyCrown = document.getElementById('buyGalaxyCrown');
 
 // Display elements
 const honeySpan = document.getElementById('honeyDisplay');
@@ -1057,6 +1065,7 @@ function generateSaveCode() {
         sacrificePoints,
         hasClippers, hasShears, hasScythe, hasOil,
         hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
+        hasMoonCharm, hasSunRelic, hasStormTotem, hasGalaxyCrown,
         autoUnlocked,
         beeSpeedMultiplier,
         capacityMultiplier,
@@ -1105,6 +1114,10 @@ function loadSaveCode(code) {
         hasBeeGun = saveData.hasBeeGun || false;
         hasRoyalJelly = saveData.hasRoyalJelly || false;
         hasStarTreat = saveData.hasStarTreat || false;
+        hasMoonCharm = saveData.hasMoonCharm || false;
+        hasSunRelic = saveData.hasSunRelic || false;
+        hasStormTotem = saveData.hasStormTotem || false;
+        hasGalaxyCrown = saveData.hasGalaxyCrown || false;
         
         autoUnlocked = saveData.autoUnlocked || false;
         beeSpeedMultiplier = saveData.beeSpeedMultiplier || 1.0;
@@ -1989,6 +2002,7 @@ let nextHireCost = HIRE_COST_BASE;
 // Tools
 let hasClippers = false, hasShears = false, hasScythe = false, hasOil = false;
 let hasHoneycomb = false, hasBeeGun = false, hasRoyalJelly = false, hasStarTreat = false;
+let hasMoonCharm = false, hasSunRelic = false, hasStormTotem = false, hasGalaxyCrown = false;
 let toolMultiplier = 1.0;
 
 // Rebirth
@@ -2234,6 +2248,10 @@ function recalcMultiplier() {
     if (hasBeeGun) toolMult *= 2.0;
     if (hasRoyalJelly) toolMult *= 3.0;
     if (hasStarTreat) toolMult *= 5.0;
+    if (hasMoonCharm) toolMult *= 1.5;
+    if (hasSunRelic) toolMult *= 2.0;
+    if (hasStormTotem) toolMult *= 3.0;
+    if (hasGalaxyCrown) toolMult *= 5.0;
     toolMultiplier = toolMult;
     
     let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
@@ -2250,6 +2268,10 @@ function updateToolButtons() {
     buyBeeGun.disabled = hasBeeGun;
     buyRoyalJelly.disabled = hasRoyalJelly;
     buyStarTreat.disabled = hasStarTreat;
+    buyMoonCharm.disabled = hasMoonCharm;
+    buySunRelic.disabled = hasSunRelic;
+    buyStormTotem.disabled = hasStormTotem;
+    buyGalaxyCrown.disabled = hasGalaxyCrown;
 }
 
 function setupRPGenerator() {
@@ -2359,6 +2381,10 @@ function autoBuy() {
     else if (!hasBeeGun && honey >= 50000) { honey -= 50000; hasBeeGun = true; recalcMultiplier(); buyBeeGun.disabled = true; saveGame(); }
     else if (!hasRoyalJelly && honey >= 100000) { honey -= 100000; hasRoyalJelly = true; recalcMultiplier(); buyRoyalJelly.disabled = true; saveGame(); }
     else if (!hasStarTreat && honey >= 250000) { honey -= 250000; hasStarTreat = true; recalcMultiplier(); buyStarTreat.disabled = true; saveGame(); }
+    else if (!hasMoonCharm && honey >= 10000000000) { honey -= 10000000000; hasMoonCharm = true; recalcMultiplier(); buyMoonCharm.disabled = true; saveGame(); }
+    else if (!hasSunRelic && honey >= 50000000000) { honey -= 50000000000; hasSunRelic = true; recalcMultiplier(); buySunRelic.disabled = true; saveGame(); }
+    else if (!hasStormTotem && honey >= 250000000000) { honey -= 250000000000; hasStormTotem = true; recalcMultiplier(); buyStormTotem.disabled = true; saveGame(); }
+    else if (!hasGalaxyCrown && honey >= 1000000000000) { honey -= 1000000000000; hasGalaxyCrown = true; recalcMultiplier(); buyGalaxyCrown.disabled = true; saveGame(); }
 
     while (honey >= nextHireCost) {
         honey -= nextHireCost;
@@ -2438,6 +2464,7 @@ rebirthBtn.addEventListener('click', () => {
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+        hasMoonCharm = false; hasSunRelic = false; hasStormTotem = false; hasGalaxyCrown = false;
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
         honey = 0;
@@ -2463,6 +2490,7 @@ sacrificeBtn.addEventListener('click', () => {
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+        hasMoonCharm = false; hasSunRelic = false; hasStormTotem = false; hasGalaxyCrown = false;
         
         // Reset rebirth upgrades but KEEP SP upgrades
         autoUnlocked = false;
@@ -2607,6 +2635,10 @@ buyHoneycomb.addEventListener('click', () => { if (!hasHoneycomb && honey>=25000
 buyBeeGun.addEventListener('click', () => { if (!hasBeeGun && honey>=50000) { honey-=50000; hasBeeGun=true; recalcMultiplier(); buyBeeGun.disabled=true; saveGame(); } });
 buyRoyalJelly.addEventListener('click', () => { if (!hasRoyalJelly && honey>=100000) { honey-=100000; hasRoyalJelly=true; recalcMultiplier(); buyRoyalJelly.disabled=true; saveGame(); } });
 buyStarTreat.addEventListener('click', () => { if (!hasStarTreat && honey>=250000) { honey-=250000; hasStarTreat=true; recalcMultiplier(); buyStarTreat.disabled=true; saveGame(); } });
+buyMoonCharm.addEventListener('click', () => { if (!hasMoonCharm && honey>=10000000000) { honey-=10000000000; hasMoonCharm=true; recalcMultiplier(); buyMoonCharm.disabled=true; saveGame(); } });
+buySunRelic.addEventListener('click', () => { if (!hasSunRelic && honey>=50000000000) { honey-=50000000000; hasSunRelic=true; recalcMultiplier(); buySunRelic.disabled=true; saveGame(); } });
+buyStormTotem.addEventListener('click', () => { if (!hasStormTotem && honey>=250000000000) { honey-=250000000000; hasStormTotem=true; recalcMultiplier(); buyStormTotem.disabled=true; saveGame(); } });
+buyGalaxyCrown.addEventListener('click', () => { if (!hasGalaxyCrown && honey>=1000000000000) { honey-=1000000000000; hasGalaxyCrown=true; recalcMultiplier(); buyGalaxyCrown.disabled=true; saveGame(); } });
 
 toggleAutoBtn.addEventListener('click', toggleAuto);
 toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
@@ -2624,6 +2656,7 @@ function buildSaveData(includeWorldData = true) {
         nextHireCost,
         hasClippers, hasShears, hasScythe, hasOil,
         hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
+        hasMoonCharm, hasSunRelic, hasStormTotem, hasGalaxyCrown,
         rebirthPoints, sacrificePoints,
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
@@ -2690,6 +2723,10 @@ function loadGame() {
         hasBeeGun = data.hasBeeGun || false;
         hasRoyalJelly = data.hasRoyalJelly || false;
         hasStarTreat = data.hasStarTreat || false;
+        hasMoonCharm = data.hasMoonCharm || false;
+        hasSunRelic = data.hasSunRelic || false;
+        hasStormTotem = data.hasStormTotem || false;
+        hasGalaxyCrown = data.hasGalaxyCrown || false;
         rebirthPoints = finiteOr(data.rebirthPoints, 0);
         sacrificePoints = finiteOr(data.sacrificePoints, 0);
         autoUnlocked = data.autoUnlocked || false;
