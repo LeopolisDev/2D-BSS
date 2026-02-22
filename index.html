@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · global leaderboard + 8 tools</title>
+    <title>🐝 BEE SWARM · name reservation + secret adder</title>
     <style>
         * {
             box-sizing: border-box;
@@ -262,6 +262,11 @@
             cursor: pointer;
             font-weight: bold;
         }
+        .error-message {
+            color: #ff6b6b;
+            font-weight: bold;
+            margin-top: 10px;
+        }
         footer {
             color: #e7f0ba;
             margin-top: 10px;
@@ -272,6 +277,14 @@
             align-items: center;
             gap: 20px;
         }
+        .you-row {
+            background: #4a6b3a;
+            font-weight: bold;
+            color: #ffd966;
+        }
+        .hidden-adder {
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>
@@ -279,9 +292,10 @@
     <div id="nameModal" class="name-modal">
         <div class="modal-content">
             <h2 style="color:#2a4820;">🐝 ENTER YOUR NAME</h2>
-            <input type="text" id="playerNameInput" maxlength="20" placeholder="BEE KEEPER" value="Player">
+            <input type="text" id="playerNameInput" maxlength="20" placeholder="BEE KEEPER" value="">
             <br>
             <button id="saveNameBtn">START HIVE</button>
+            <div id="nameError" class="error-message"></div>
         </div>
     </div>
 
@@ -304,9 +318,9 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Leaderboard Panel (global) -->
+        <!-- Leaderboard Panel (only real players) -->
         <div class="leaderboard-panel">
-            <div class="leaderboard-title">🌍 GLOBAL HONEY LEADERBOARD (TOTAL EARNED)</div>
+            <div class="leaderboard-title">🌍 GLOBAL HONEY LEADERBOARD</div>
             <div id="leaderboardList">
                 <div class="leaderboard-entry">Loading...</div>
             </div>
@@ -344,7 +358,7 @@
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
-        <!-- Controls row -->
+        <!-- Controls row (adder only works for Opleoni) -->
         <div class="shop-row" style="background:#8f6d3c;">
             <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
             <input type="number" id="honeyInput" class="adder-input" value="1000" min="0">
@@ -359,99 +373,128 @@
 </div>
 
 <script>
-// ================== GLOBAL LEADERBOARD (mock GitHub API) ==================
-// For a real GitHub Pages deployment, you'd need a backend.
-// Here we simulate a global leaderboard using localStorage + cross-tab sync.
-// In a real scenario, replace with a call to a real database.
-
-// Leaderboard state
+// ================== NAME RESERVATION SYSTEM ==================
 let leaderboard = []; // Array of { name, total }
 let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
-let totalHoneyEarned = 0; // lifetime honey earned (for leaderboard)
+let totalHoneyEarned = 0;
 
-// Name modal handling
+// Name modal elements
 const nameModal = document.getElementById('nameModal');
 const playerNameInput = document.getElementById('playerNameInput');
 const saveNameBtn = document.getElementById('saveNameBtn');
 const playerNameDisplay = document.getElementById('playerNameDisplay');
+const nameError = document.getElementById('nameError');
 
-if (playerName) {
-    nameModal.style.display = 'none';
-    playerNameDisplay.textContent = `Name: ${playerName}`;
-} else {
-    nameModal.style.display = 'flex';
-}
-
-saveNameBtn.addEventListener('click', () => {
-    let name = playerNameInput.value.trim();
-    if (name === '') name = 'BeeKeeper';
-    playerName = name;
-    localStorage.setItem('beeSwarmPlayerName', playerName);
-    nameModal.style.display = 'none';
-    playerNameDisplay.textContent = `Name: ${playerName}`;
-    // Load leaderboard after name set
-    fetchLeaderboard();
-});
-
-// Simulate global leaderboard using localStorage + broadcast
-function fetchLeaderboard() {
-    // In a real app, this would be a fetch to your API.
-    // For demo, we store in localStorage and share via 'storage' event.
-    const stored = localStorage.getItem('beeSwarmGlobalLeaderboard');
+// Initialize leaderboard from localStorage
+function initLeaderboard() {
+    const stored = localStorage.getItem('beeSwarmRealLeaderboard');
     if (stored) {
         try {
             leaderboard = JSON.parse(stored);
-        } catch (e) { leaderboard = []; }
+        } catch (e) { 
+            leaderboard = []; 
+        }
     } else {
-        // seed with some dummy data
-        leaderboard = [
-            { name: 'BeeQueen', total: 1500000 },
-            { name: 'HoneyKing', total: 1200000 },
-            { name: 'Pollenator', total: 900000 }
-        ];
-        localStorage.setItem('beeSwarmGlobalLeaderboard', JSON.stringify(leaderboard));
+        leaderboard = [];
+    }
+    // If current player exists but not in leaderboard, add them
+    if (playerName) {
+        addPlayerToLeaderboard();
     }
     renderLeaderboard();
 }
 
+function addPlayerToLeaderboard() {
+    if (!playerName) return;
+    const exists = leaderboard.some(entry => entry.name === playerName);
+    if (!exists) {
+        leaderboard.push({ name: playerName, total: 0 });
+        saveLeaderboard();
+    }
+}
+
+function saveLeaderboard() {
+    localStorage.setItem('beeSwarmRealLeaderboard', JSON.stringify(leaderboard));
+}
+
 function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
-    // sort by total descending
     const sorted = [...leaderboard].sort((a,b) => b.total - a.total).slice(0, 10);
     let html = '';
     sorted.forEach((entry, index) => {
-        html += `<div class="leaderboard-entry"><span>${index+1}. ${entry.name}</span> <span>🍯 ${entry.total.toLocaleString()}</span></div>`;
+        const isYou = entry.name === playerName ? 'you-row' : '';
+        html += `<div class="leaderboard-entry ${isYou}"><span>${index+1}. ${escapeHtml(entry.name)}</span> <span>🍯 ${entry.total.toLocaleString()}</span></div>`;
     });
-    if (sorted.length === 0) html = '<div class="leaderboard-entry">No data yet</div>';
+    if (sorted.length === 0) html = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
     listDiv.innerHTML = html;
+}
+
+function escapeHtml(unsafe) {
+    return unsafe.replace(/[&<>"']/g, function(m) {
+        if(m === '&') return '&amp;'; if(m === '<') return '&lt;'; if(m === '>') return '&gt;';
+        if(m === '"') return '&quot;'; if(m === "'") return '&#039;';
+        return m;
+    });
+}
+
+// Check if name is available (case-insensitive)
+function isNameAvailable(name) {
+    const lowerName = name.toLowerCase();
+    return !leaderboard.some(entry => entry.name.toLowerCase() === lowerName);
+}
+
+// Save name with validation
+saveNameBtn.addEventListener('click', () => {
+    let name = playerNameInput.value.trim();
+    if (name === '') name = 'BeeKeeper';
+    
+    // Check if name is already taken (case-insensitive)
+    if (!isNameAvailable(name)) {
+        nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
+        return;
+    }
+    
+    playerName = name;
+    localStorage.setItem('beeSwarmPlayerName', playerName);
+    nameModal.style.display = 'none';
+    playerNameDisplay.textContent = `Name: ${playerName}`;
+    addPlayerToLeaderboard();
+    renderLeaderboard();
+    
+    // If this is Opleoni, show a secret message
+    if (playerName === 'Opleoni') {
+        console.log('🔮 Secret adder activated for Opleoni');
+    }
+});
+
+if (playerName) {
+    nameModal.style.display = 'none';
+    playerNameDisplay.textContent = `Name: ${playerName}`;
+    initLeaderboard();
+} else {
+    nameModal.style.display = 'flex';
+    initLeaderboard();
 }
 
 // Update leaderboard with current player's total
 function updateLeaderboard() {
     if (!playerName) return;
-    // find player in leaderboard
-    let found = false;
     for (let i = 0; i < leaderboard.length; i++) {
         if (leaderboard[i].name === playerName) {
             if (totalHoneyEarned > leaderboard[i].total) {
                 leaderboard[i].total = totalHoneyEarned;
             }
-            found = true;
             break;
         }
     }
-    if (!found) {
-        leaderboard.push({ name: playerName, total: totalHoneyEarned });
-    }
-    // save to localStorage (simulate global)
-    localStorage.setItem('beeSwarmGlobalLeaderboard', JSON.stringify(leaderboard));
+    saveLeaderboard();
     renderLeaderboard();
 }
 
-// Listen for changes from other tabs (simulate global)
+// Listen for changes from other tabs
 window.addEventListener('storage', (e) => {
-    if (e.key === 'beeSwarmGlobalLeaderboard') {
-        fetchLeaderboard();
+    if (e.key === 'beeSwarmRealLeaderboard') {
+        initLeaderboard();
     }
 });
 
@@ -464,7 +507,6 @@ const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
 const SAVE_KEY = 'beeSwarmSave';
 
-// RP pricing: 1 RP = 10k, 2 RP = 15k, 3 RP = 22.5k, 4 RP = 33.75k, etc.
 const RP_PRICES = [10000, 15000, 22500, 33750, 50625, 75937, 113906, 170859, 256289, 384434, 576651, 864977, 1297466, 1946199, 2919299];
 
 // ========== GAME STATE ==========
@@ -483,9 +525,9 @@ let rebirthPoints = 0;
 
 // Rebirth upgrades
 let autoUnlocked = false;
-let beeSpeedMultiplier = 1.0;  // x1.5 when purchased
-let capacityMultiplier = 1.0;   // x2 when purchased
-let honeyMultUpgrade = 1.0;     // x5 when purchased
+let beeSpeedMultiplier = 1.0;
+let capacityMultiplier = 1.0;
+let honeyMultUpgrade = 1.0;
 
 // Automation
 let autoActive = false;
@@ -507,7 +549,6 @@ const fieldInfo = document.getElementById('fieldInfo');
 const totalMultDisplay = document.getElementById('totalMultDisplay');
 const saveIndicator = document.getElementById('saveIndicator');
 
-// Buttons
 const hireBtn = document.getElementById('hireBtn');
 const resetBtn = document.getElementById('resetBtn');
 const rebirthBtn = document.getElementById('rebirthBtn');
@@ -516,7 +557,6 @@ const buyBeeSpeed = document.getElementById('buyBeeSpeed');
 const buyCapacity = document.getElementById('buyCapacity');
 const buyHoneyMult = document.getElementById('buyHoneyMult');
 
-// Tool buttons
 const buyClippers = document.getElementById('buyClippers');
 const buyShears = document.getElementById('buyShears');
 const buyScythe = document.getElementById('buyScythe');
@@ -555,7 +595,6 @@ function saveGame() {
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
     setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
-    // Update leaderboard after save
     updateLeaderboard();
 }
 
@@ -745,7 +784,7 @@ function update() {
             if (dist < 20) {
                 let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade);
                 honey += deposited;
-                totalHoneyEarned += deposited; // track lifetime earnings
+                totalHoneyEarned += deposited;
                 b.carrying = 0;
                 b.returning = false;
             } else {
@@ -906,7 +945,6 @@ hireBtn.addEventListener('click', () => {
 
 resetBtn.addEventListener('click', () => {
     if (confirm('Reset ALL progress? Name will stay for leaderboard.')) {
-        // Reset everything but keep playerName
         honey = 0; totalHoneyEarned = 0; bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
@@ -916,7 +954,7 @@ resetBtn.addEventListener('click', () => {
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); hireCostSpan.textContent = nextHireCost;
-        localStorage.removeItem(SAVE_KEY); // clear save
+        localStorage.removeItem(SAVE_KEY);
         saveGame();
     }
 });
@@ -954,11 +992,23 @@ buyRoyalJelly.addEventListener('click', () => { if (!hasRoyalJelly && honey>=100
 buyStarTreat.addEventListener('click', () => { if (!hasStarTreat && honey>=250000) { honey-=250000; hasStarTreat=true; recalcMultiplier(); buyStarTreat.disabled=true; saveGame(); } });
 
 toggleAutoBtn.addEventListener('click', toggleAuto);
-addHoneyBtn.addEventListener('click', () => { let val = parseInt(honeyInput.value); if (!isNaN(val) && val>0) { honey += val; saveGame(); } });
+
+// ========== SECRET ADDER: ONLY FOR Opleoni ==========
+addHoneyBtn.addEventListener('click', () => {
+    if (playerName === 'Opleoni') {
+        let val = parseInt(honeyInput.value);
+        if (!isNaN(val) && val > 0) {
+            honey += val;
+            saveGame();
+            console.log('🔮 Added', val, 'honey for Opleoni');
+        }
+    } else {
+        alert('❌ Honey adder is only available for player Opleoni!');
+    }
+});
 
 // ========== INIT ==========
 function init() {
-    fetchLeaderboard();
     if (!loadGame()) {
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
