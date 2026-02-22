@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · RP compounding preview + closable announcements</title>
+    <title>🐝 BEE SWARM · fixed admin + persistent announcements</title>
     <style>
         * {
             box-sizing: border-box;
@@ -570,7 +570,7 @@
         <div id="adminPanel" class="admin-panel-compact" style="display: none;">
             <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN:</span>
             <select id="adminPlayerSelect" class="admin-select">
-                <option value="">Select Player</option>
+                <option value="">Myself (Opleoni)</option>
             </select>
             <select id="adminStatSelect" class="admin-select">
                 <option value="honey">🍯 Honey</option>
@@ -618,6 +618,7 @@ let totalHoneyEarned = 0;
 let lastUpdate = 0;
 let updateRetryCount = 0;
 let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
+let announcementClosed = localStorage.getItem('announcementClosed') === 'true';
 const UPDATE_COOLDOWN = 3000;
 const MAX_RETRIES = 5;
 
@@ -643,14 +644,15 @@ const announcementPopup = document.getElementById('announcementPopup');
 const announcementMessage = document.getElementById('announcementMessage');
 const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
 
-// Show announcement popup if exists
-if (currentAnnouncement) {
+// Show announcement popup if exists and not closed
+if (currentAnnouncement && !announcementClosed) {
     announcementMessage.textContent = currentAnnouncement;
     announcementPopup.style.display = 'block';
 }
 
 closeAnnouncementBtn.addEventListener('click', () => {
     announcementPopup.style.display = 'none';
+    localStorage.setItem('announcementClosed', 'true');
 });
 
 // ========== NUMBER FORMATTING ==========
@@ -735,10 +737,10 @@ async function saveLeaderboard() {
 function updateAdminPlayerSelect() {
     if (playerName !== 'Opleoni') return;
     const select = adminPlayerSelect;
-    select.innerHTML = '<option value="">Select Player</option>';
+    select.innerHTML = '<option value="">Myself (Opleoni)</option>';
     
     leaderboard.forEach(entry => {
-        if (entry && entry.name) {
+        if (entry && entry.name && entry.name !== 'Opleoni') {
             const option = document.createElement('option');
             option.value = entry.name;
             option.textContent = entry.name;
@@ -879,6 +881,7 @@ if (sendAnnouncementBtn) {
             const message = announcementInput.value.trim();
             if (message) {
                 localStorage.setItem('globalAnnouncement', message);
+                localStorage.removeItem('announcementClosed'); // Reset closed state
                 announcementMessage.textContent = message;
                 announcementPopup.style.display = 'block';
                 announcementModal.style.display = 'none';
@@ -892,9 +895,17 @@ if (sendAnnouncementBtn) {
 window.addEventListener('storage', (e) => {
     if (e.key === 'globalAnnouncement') {
         if (e.newValue) {
-            announcementMessage.textContent = e.newValue;
-            announcementPopup.style.display = 'block';
-        } else {
+            currentAnnouncement = e.newValue;
+            // Only show if not closed
+            if (!announcementClosed) {
+                announcementMessage.textContent = e.newValue;
+                announcementPopup.style.display = 'block';
+            }
+        }
+    }
+    if (e.key === 'announcementClosed') {
+        announcementClosed = e.newValue === 'true';
+        if (announcementClosed) {
             announcementPopup.style.display = 'none';
         }
     }
@@ -1807,9 +1818,14 @@ adminAddBtn.addEventListener('click', async () => {
     const stat = adminStatSelect.value;
     const amount = parseInt(adminAmount.value);
     
-    if (!targetPlayer || isNaN(amount) || amount < 0) {
-        alert('Please select a player and enter a valid amount');
+    if (isNaN(amount) || amount < 0) {
+        alert('Please enter a valid amount');
         return;
+    }
+    
+    // If no player selected, target Opleoni (self)
+    if (!targetPlayer || targetPlayer === '') {
+        targetPlayer = 'Opleoni';
     }
     
     if (targetPlayer === '__NEW__') {
