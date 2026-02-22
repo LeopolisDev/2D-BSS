@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · code redemption box</title>
+    <title>🐝 BEE SWARM · collapsible menu</title>
     <style>
         * {
             box-sizing: border-box;
@@ -25,6 +25,112 @@
             padding: 1.5rem;
             max-width: 1600px;
             width: fit-content;
+            position: relative;
+        }
+        .menu-button {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: #fecd4f;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 10px 20px;
+            color: #2a4820;
+            border-bottom: 5px solid #b57c2a;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #6b4f1c;
+            z-index: 100;
+            transition: 0.06s linear;
+        }
+        .menu-button:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+            box-shadow: 0 1px 0 #6b4f1c;
+        }
+        .menu-panel {
+            position: absolute;
+            top: 80px;
+            right: 30px;
+            background: #4a6b3a;
+            border-radius: 40px;
+            padding: 20px;
+            border: 4px solid #ffd966;
+            box-shadow: 0 10px 0 #2d4a2a;
+            z-index: 99;
+            display: none;
+            max-width: 400px;
+            min-width: 320px;
+        }
+        .menu-panel.show {
+            display: block;
+        }
+        .menu-section {
+            background: #5b7c4b;
+            border-radius: 30px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid #ffd966;
+        }
+        .menu-section-title {
+            color: #ffd966;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        .menu-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .menu-btn {
+            background: #e5d295;
+            border: none;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-bottom: 4px solid #9f8738;
+            color: #1f431f;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #655126;
+            white-space: nowrap;
+            flex: 1 1 auto;
+            min-width: 100px;
+        }
+        .menu-btn:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+            box-shadow: 0 1px 0 #655126;
+        }
+        .menu-input {
+            background: #efeac5;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            width: 100%;
+            text-align: center;
+            border-bottom: 4px solid #bd9f4b;
+            outline: none;
+            font-family: monospace;
+        }
+        .menu-code-display {
+            background: #2d4a2a;
+            border-radius: 40px;
+            padding: 10px;
+            font-size: 0.8rem;
+            color: #ffefc0;
+            border: 2px solid #ffd966;
+            word-break: break-all;
+            font-family: monospace;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .canvas-panel {
             display: flex;
@@ -332,7 +438,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 5px;
         }
         .footer-row {
             display: flex;
@@ -463,88 +569,6 @@
             margin-top: 5px;
             word-break: break-all;
         }
-        /* Redeem & Save/Load section */
-        .redeem-row {
-            background: #4a6b3a;
-            border-radius: 60px;
-            padding: 15px 20px;
-            margin-top: 15px;
-            border: 3px solid #ffd966;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            width: 100%;
-        }
-        .save-load-row {
-            background: #4a6b3a;
-            border-radius: 60px;
-            padding: 15px 20px;
-            margin-top: 15px;
-            border: 3px solid #ffd966;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            width: 100%;
-        }
-        .code-input {
-            background: #efeac5;
-            border: none;
-            border-radius: 40px;
-            padding: 10px 20px;
-            font-size: 1rem;
-            width: 200px;
-            text-align: center;
-            border-bottom: 4px solid #bd9f4b;
-            outline: none;
-            font-family: monospace;
-        }
-        .save-code-display {
-            background: #2d4a2a;
-            border-radius: 40px;
-            padding: 10px 20px;
-            font-size: 0.9rem;
-            color: #ffefc0;
-            border: 2px solid #ffd966;
-            max-width: 400px;
-            word-break: break-all;
-            font-family: monospace;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .copy-btn {
-            background: #fecd4f;
-            border: none;
-            border-radius: 30px;
-            padding: 5px 15px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            color: #2a4820;
-            border-bottom: 3px solid #b57c2a;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .copy-btn:active {
-            transform: translateY(2px);
-            border-bottom-width: 1px;
-        }
-        .redeem-btn {
-            background: #f0b34b;
-            border-bottom-color: #b57c2a;
-            color: #2a4820;
-            font-weight: bold;
-        }
-        .config-note {
-            font-size: 0.8rem;
-            color: #ffd966;
-            background: #2d4a2a;
-            padding: 5px 15px;
-            border-radius: 30px;
-        }
         .code-error {
             color: #ffaaaa;
             font-size: 0.9rem;
@@ -569,7 +593,7 @@
         </div>
     </div>
 
-    <!-- Announcement Popup (instant, no reload needed) -->
+    <!-- Announcement Popup -->
     <div id="announcementPopup" class="announcement-popup" style="display: none;">
         <h2 style="color:#2a4820;">📢 ANNOUNCEMENT</h2>
         <p id="announcementMessage"></p>
@@ -577,6 +601,72 @@
     </div>
 
 <div class="game-wrapper">
+    <!-- Menu Button (top right) -->
+    <button class="menu-button" id="menuToggleBtn">☰ MENU</button>
+    
+    <!-- Menu Panel (hidden by default) -->
+    <div class="menu-panel" id="menuPanel">
+        <!-- Admin Section (only visible for Opleoni) -->
+        <div class="menu-section" id="menuAdminSection" style="display: none;">
+            <div class="menu-section-title">👑 ADMIN</div>
+            <div class="menu-row">
+                <select id="menuAdminPlayerSelect" class="admin-select" style="width:100%;">
+                    <option value="">Myself (Opleoni)</option>
+                </select>
+            </div>
+            <div class="menu-row">
+                <select id="menuAdminStatSelect" class="admin-select" style="width:100%;">
+                    <option value="honey">🍯 Honey</option>
+                    <option value="rp">🔁 RP</option>
+                    <option value="sp">🔴 SP</option>
+                </select>
+                <input type="number" id="menuAdminAmount" class="adder-input" value="1000" min="0" style="width:100px;">
+                <button class="menu-btn" id="menuAdminAddBtn">➕ ADD</button>
+            </div>
+            <div class="menu-row">
+                <button class="menu-btn" id="menuOpenAnnouncementBtn">📢 ANNOUNCE</button>
+            </div>
+        </div>
+
+        <!-- Redeem Code Section -->
+        <div class="menu-section">
+            <div class="menu-section-title">🎁 REDEEM CODE</div>
+            <div class="menu-row">
+                <input type="text" id="menuRedeemCodeInput" class="menu-input" placeholder="Enter code here">
+                <button class="menu-btn" id="menuRedeemCodeBtn">✅ REDEEM</button>
+            </div>
+            <div class="menu-row">
+                <span id="menuRedeemMessage" class="code-error" style="display: none;">Invalid code</span>
+            </div>
+            <div style="font-size:0.8rem; color:#ffd966; text-align:center;">Codes can be found in my DISCORD server!</div>
+        </div>
+
+        <!-- Save/Load Section -->
+        <div class="menu-section">
+            <div class="menu-section-title">💾 SAVE / LOAD</div>
+            <div class="menu-row">
+                <button class="menu-btn" id="menuGenerateSaveBtn">📋 GENERATE CODE</button>
+            </div>
+            <div class="menu-code-display" id="menuSaveCodeDisplay">
+                <span style="flex:1; text-align:center;">Click generate</span>
+                <button class="copy-btn" id="menuCopySaveBtn" style="display:none;">📋 COPY</button>
+            </div>
+            <div class="menu-row">
+                <input type="text" id="menuLoadCodeInput" class="menu-input" placeholder="Paste save code here">
+                <button class="menu-btn" id="menuLoadSaveBtn">📂 LOAD</button>
+            </div>
+        </div>
+
+        <!-- Reset Buttons -->
+        <div class="menu-section">
+            <div class="menu-section-title">🔄 RESET</div>
+            <div class="menu-row">
+                <button class="menu-btn" id="menuResetAllBtn">🔄 RESET ALL</button>
+                <button class="menu-btn" id="menuResetHoneyBtn">🍯 RESET HONEY</button>
+            </div>
+        </div>
+    </div>
+
     <div class="canvas-panel">
         <canvas id="gameCanvas" width="800" height="400"></canvas>
 
@@ -595,7 +685,7 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Leaderboard Panel (FIREBASE - 64-bit) -->
+        <!-- Leaderboard Panel -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">
                 🌍 GLOBAL TOP 10
@@ -658,27 +748,11 @@
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
-        <!-- Controls row -->
+        <!-- Controls row (simplified) -->
         <div class="shop-row" style="background:#8f6d3c;">
             <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
             <button class="tool-btn rp-autobuy-toggle" id="toggleRPAutoBtn">🤖 RP AUTO (OFF)</button>
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
-        </div>
-
-        <!-- Admin Panel for Opleoni -->
-        <div id="adminPanel" class="admin-panel-compact" style="display: none;">
-            <span style="color:#ffaa00; font-weight:bold;">👑 ADMIN:</span>
-            <select id="adminPlayerSelect" class="admin-select">
-                <option value="">Myself (Opleoni)</option>
-            </select>
-            <select id="adminStatSelect" class="admin-select">
-                <option value="honey">🍯 Honey</option>
-                <option value="rp">🔁 RP</option>
-                <option value="sp">🔴 SP</option>
-            </select>
-            <input type="number" id="adminAmount" class="adder-input" value="1000" min="0">
-            <button class="tool-btn" id="adminAddBtn">➕ ADD</button>
-            <button class="tool-btn" id="openAnnouncementBtn">📢 ANNOUNCE</button>
         </div>
 
         <!-- Announcement Modal for Opleoni -->
@@ -690,35 +764,11 @@
             <button id="cancelAnnouncementBtn">CANCEL</button>
         </div>
 
-        <!-- Footer with RESET buttons, REDEEM CODE BOX, and SAVE/LOAD -->
+        <!-- Simple footer (no buttons) -->
         <footer>
             <div class="footer-row">
                 <span>🌸 Click flowers to boost them</span>
                 <span class="save-indicator" id="saveIndicator">💾 Auto-saved</span>
-            </div>
-            <div class="footer-row">
-                <button class="bee-btn reset-btn-bottom" id="resetBtn">🔄 RESET ALL PROGRESS</button>
-                <button class="bee-btn reset-btn-bottom" id="resetHoneyBtn">🍯 RESET HONEY (leaderboard too)</button>
-            </div>
-            
-            <!-- REDEEM CODE SECTION (type any code, press button) -->
-            <div class="redeem-row">
-                <span class="config-note">🎁 REDEEM CODE:</span>
-                <input type="text" id="redeemCodeInput" class="code-input" placeholder="Enter code here">
-                <button class="tool-btn redeem-btn" id="redeemCodeBtn">✅ REDEEM</button>
-                <span id="redeemMessage" class="code-error" style="display: none;">Invalid code</span>
-                <span class="config-note">Codes can be found in my DISCORD server!</span>
-            </div>
-            
-            <!-- SAVE/LOAD Section -->
-            <div class="save-load-row">
-                <button class="tool-btn" id="generateSaveBtn">📋 GENERATE SAVE CODE</button>
-                <div class="save-code-display" id="saveCodeDisplay">
-                    <span style="flex:1; text-align:center;">Click generate to create code</span>
-                    <button class="copy-btn" id="copySaveBtn" style="display:none;">📋 COPY</button>
-                </div>
-                <input type="text" id="loadCodeInput" class="code-input" placeholder="Paste save code here">
-                <button class="tool-btn" id="loadSaveBtn">📂 LOAD SAVE</button>
             </div>
         </footer>
     </div>
@@ -757,12 +807,6 @@ const playerNameDisplay = document.getElementById('playerNameDisplay');
 const nameError = document.getElementById('nameError');
 const refreshBtn = document.getElementById('refreshLeaderboard');
 const debugInfo = document.getElementById('debugInfo');
-const adminPanel = document.getElementById('adminPanel');
-const adminPlayerSelect = document.getElementById('adminPlayerSelect');
-const adminStatSelect = document.getElementById('adminStatSelect');
-const adminAmount = document.getElementById('adminAmount');
-const adminAddBtn = document.getElementById('adminAddBtn');
-const openAnnouncementBtn = document.getElementById('openAnnouncementBtn');
 const announcementModal = document.getElementById('announcementModal');
 const announcementInput = document.getElementById('announcementInput');
 const sendAnnouncementBtn = document.getElementById('sendAnnouncementBtn');
@@ -771,123 +815,122 @@ const announcementPopup = document.getElementById('announcementPopup');
 const announcementMessage = document.getElementById('announcementMessage');
 const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
 
-// Redeem & Save/Load elements
-const generateSaveBtn = document.getElementById('generateSaveBtn');
-const saveCodeDisplay = document.getElementById('saveCodeDisplay');
-const copySaveBtn = document.getElementById('copySaveBtn');
-const loadCodeInput = document.getElementById('loadCodeInput');
-const loadSaveBtn = document.getElementById('loadSaveBtn');
-const redeemCodeInput = document.getElementById('redeemCodeInput');
-const redeemCodeBtn = document.getElementById('redeemCodeBtn');
-const redeemMessage = document.getElementById('redeemMessage');
+// Menu elements
+const menuToggleBtn = document.getElementById('menuToggleBtn');
+const menuPanel = document.getElementById('menuPanel');
+const menuAdminSection = document.getElementById('menuAdminSection');
+const menuAdminPlayerSelect = document.getElementById('menuAdminPlayerSelect');
+const menuAdminStatSelect = document.getElementById('menuAdminStatSelect');
+const menuAdminAmount = document.getElementById('menuAdminAmount');
+const menuAdminAddBtn = document.getElementById('menuAdminAddBtn');
+const menuOpenAnnouncementBtn = document.getElementById('menuOpenAnnouncementBtn');
+const menuRedeemCodeInput = document.getElementById('menuRedeemCodeInput');
+const menuRedeemCodeBtn = document.getElementById('menuRedeemCodeBtn');
+const menuRedeemMessage = document.getElementById('menuRedeemMessage');
+const menuGenerateSaveBtn = document.getElementById('menuGenerateSaveBtn');
+const menuSaveCodeDisplay = document.getElementById('menuSaveCodeDisplay');
+const menuCopySaveBtn = document.getElementById('menuCopySaveBtn');
+const menuLoadCodeInput = document.getElementById('menuLoadCodeInput');
+const menuLoadSaveBtn = document.getElementById('menuLoadSaveBtn');
+const menuResetAllBtn = document.getElementById('menuResetAllBtn');
+const menuResetHoneyBtn = document.getElementById('menuResetHoneyBtn');
+
+// Original buttons (keep for functionality)
+const hireBtn = document.getElementById('hireBtn');
+const hireCostSpan = document.getElementById('hireCostSpan');
+const toggleAutoBtn = document.getElementById('toggleAutoBtn');
+const toggleRPAutoBtn = document.getElementById('toggleRPAutoBtn');
+const sacrificeBtn = document.getElementById('sacrificeBtn');
+const rebirthBtn = document.getElementById('rebirthBtn');
+const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
+const buyBeeSpeed = document.getElementById('buyBeeSpeed');
+const buyCapacity = document.getElementById('buyCapacity');
+const buyHoneyMult = document.getElementById('buyHoneyMult');
+const buyCompounding = document.getElementById('buyCompounding');
+const buyX10Honey = document.getElementById('buyX10Honey');
+const buyRPAuto = document.getElementById('buyRPAuto');
+const buyRPGen = document.getElementById('buyRPGen');
+const buyRPCompounding = document.getElementById('buyRPCompounding');
+const buyClippers = document.getElementById('buyClippers');
+const buyShears = document.getElementById('buyShears');
+const buyScythe = document.getElementById('buyScythe');
+const buyOil = document.getElementById('buyOil');
+const buyHoneycomb = document.getElementById('buyHoneycomb');
+const buyBeeGun = document.getElementById('buyBeeGun');
+const buyRoyalJelly = document.getElementById('buyRoyalJelly');
+const buyStarTreat = document.getElementById('buyStarTreat');
+const resetBtn = document.getElementById('resetBtn');
+const resetHoneyBtn = document.getElementById('resetHoneyBtn');
+
+// ========== MENU TOGGLE ==========
+menuToggleBtn.addEventListener('click', () => {
+    menuPanel.classList.toggle('show');
+});
+
+// Close menu when clicking outside (optional)
+document.addEventListener('click', (e) => {
+    if (!menuPanel.contains(e.target) && !menuToggleBtn.contains(e.target) && menuPanel.classList.contains('show')) {
+        menuPanel.classList.remove('show');
+    }
+});
 
 // ========== REDEEM CODE SYSTEM ==========
-// Define all valid codes here
 const validCodes = {
     'release': { honey: 100000, rp: 5, sp: 0, message: 'Release code redeemed! +100k Honey, +5 RP' },
-    // Add more codes here easily:
-    // 'beta': { honey: 50000, rp: 2, sp: 1, message: 'Beta code! +50k Honey, +2 RP, +1 SP' },
-    // 'alpha': { honey: 10000, rp: 1, sp: 0, message: 'Alpha tester bonus!' },
 };
 
 function redeemCode(code) {
     const lowerCode = code.toLowerCase().trim();
     
-    // Check if code exists
     if (validCodes[lowerCode]) {
         const reward = validCodes[lowerCode];
         
-        // Apply rewards
         honey += reward.honey;
         totalHoneyEarned += reward.honey;
         rebirthPoints += reward.rp;
         sacrificePoints += reward.sp;
         
-        // Update UI
         updateRebirthUI();
         saveGame();
         
-        // Show success message
-        redeemMessage.textContent = `✅ ${reward.message}`;
-        redeemMessage.style.color = '#aaffaa';
-        redeemMessage.style.display = 'inline-block';
+        menuRedeemMessage.textContent = `✅ ${reward.message}`;
+        menuRedeemMessage.style.color = '#aaffaa';
+        menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
-            redeemMessage.style.display = 'none';
+            menuRedeemMessage.style.display = 'none';
         }, 3000);
         
         return true;
     } else {
-        // Show error message
-        redeemMessage.textContent = `❌ Unknown code "${code}"`;
-        redeemMessage.style.color = '#ffaaaa';
-        redeemMessage.style.display = 'inline-block';
+        menuRedeemMessage.textContent = `❌ Unknown code "${code}"`;
+        menuRedeemMessage.style.color = '#ffaaaa';
+        menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
-            redeemMessage.style.display = 'none';
+            menuRedeemMessage.style.display = 'none';
         }, 3000);
         return false;
     }
 }
 
-// Redeem button click
-redeemCodeBtn.addEventListener('click', () => {
-    const code = redeemCodeInput.value.trim();
+menuRedeemCodeBtn.addEventListener('click', () => {
+    const code = menuRedeemCodeInput.value.trim();
     if (code) {
         redeemCode(code);
-        redeemCodeInput.value = ''; // Clear after attempt
+        menuRedeemCodeInput.value = '';
     } else {
-        redeemMessage.textContent = '❌ Please enter a code';
-        redeemMessage.style.display = 'inline-block';
+        menuRedeemMessage.textContent = '❌ Please enter a code';
+        menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
-            redeemMessage.style.display = 'none';
+            menuRedeemMessage.style.display = 'none';
         }, 2000);
     }
 });
 
-// Also allow pressing Enter in the input
-redeemCodeInput.addEventListener('keypress', (e) => {
+menuRedeemCodeInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        redeemCodeBtn.click();
+        menuRedeemCodeBtn.click();
     }
 });
-
-// ========== ANNOUNCEMENT SYSTEM (instant, no reload) ==========
-function setupAnnouncementListener() {
-    // Listen for changes in real-time
-    announcementRef.on('value', (snapshot) => {
-        const message = snapshot.val();
-        if (message && message.text) {
-            currentAnnouncement = message.text;
-            // Always show new announcements, regardless of previous closed state
-            announcementClosed = false;
-            localStorage.removeItem('announcementClosed');
-            announcementMessage.textContent = message.text;
-            announcementPopup.style.display = 'block';
-        }
-    });
-}
-
-// Close announcement
-closeAnnouncementBtn.addEventListener('click', () => {
-    announcementPopup.style.display = 'none';
-    localStorage.setItem('announcementClosed', 'true');
-});
-
-// Check for saved closed state on load
-if (currentAnnouncement && !announcementClosed) {
-    announcementMessage.textContent = currentAnnouncement;
-    announcementPopup.style.display = 'block';
-}
-
-// ========== NUMBER FORMATTING ==========
-function formatNumber(num) {
-    if (num === undefined || num === null) return '0';
-    if (num >= 1e15) return (num / 1e15).toFixed(2) + 'Qd';
-    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
-    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
-    return Math.floor(num).toString();
-}
 
 // ========== SAVE/LOAD FUNCTIONS ==========
 function generateSaveCode() {
@@ -911,15 +954,12 @@ function generateSaveCode() {
         autoActive
     };
     
-    // Convert to JSON and then to base64 for a compact code
     const jsonStr = JSON.stringify(saveData);
     const base64 = btoa(encodeURIComponent(jsonStr));
     
-    // Update display and show copy button
-    saveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${base64}</span><button class="copy-btn" id="copySaveBtn">📋 COPY</button>`;
+    menuSaveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${base64}</span><button class="copy-btn" id="menuCopySaveBtn">📋 COPY</button>`;
     
-    // Re-attach event listener to the new copy button
-    document.getElementById('copySaveBtn').addEventListener('click', () => {
+    document.getElementById('menuCopySaveBtn').addEventListener('click', () => {
         navigator.clipboard.writeText(base64).then(() => {
             alert('✅ Save code copied to clipboard!');
         }).catch(() => {
@@ -932,11 +972,9 @@ function generateSaveCode() {
 
 function loadSaveCode(code) {
     try {
-        // Decode from base64
         const jsonStr = decodeURIComponent(atob(code));
         const saveData = JSON.parse(jsonStr);
         
-        // Apply all saved values
         honey = saveData.honey || 0;
         totalHoneyEarned = saveData.totalHoneyEarned || 0;
         rebirthPoints = saveData.rebirthPoints || 0;
@@ -966,11 +1004,9 @@ function loadSaveCode(code) {
         rpAutobuyEnabled = saveData.rpAutobuyEnabled || false;
         autoActive = saveData.autoActive || false;
         
-        // Restart generators
         setupRPGenerator();
         setupRPAutoBuy();
         
-        // Update UI
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
             toggleAutoBtn.classList.add('auto-active');
@@ -1003,16 +1039,14 @@ function loadSaveCode(code) {
     }
 }
 
-generateSaveBtn.addEventListener('click', () => {
-    generateSaveCode();
-});
+menuGenerateSaveBtn.addEventListener('click', generateSaveCode);
 
-loadSaveBtn.addEventListener('click', () => {
-    const code = loadCodeInput.value.trim();
+menuLoadSaveBtn.addEventListener('click', () => {
+    const code = menuLoadCodeInput.value.trim();
     if (code) {
         const success = loadSaveCode(code);
         if (success) {
-            loadCodeInput.value = ''; // Clear after loading
+            menuLoadCodeInput.value = '';
         } else {
             alert('❌ Invalid save code!');
         }
@@ -1020,6 +1054,178 @@ loadSaveBtn.addEventListener('click', () => {
         alert('❌ Please enter a save code');
     }
 });
+
+// ========== RESET BUTTONS ==========
+menuResetAllBtn.addEventListener('click', () => {
+    if (confirm('Reset ALL progress? Name will stay on leaderboard.')) {
+        honey = 0; totalHoneyEarned = 0; bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
+        hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
+        hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+        rebirthPoints = 0; sacrificePoints = 0;
+        autoUnlocked = false; beeSpeedMultiplier = 1.0; capacityMultiplier = 1.0; honeyMultUpgrade = 1.0;
+        compoundingLevel = 0; compoundingMultiplier = 1.0;
+        x10HoneyPurchased = false; rpAutoBuyActive = false; rpGeneratorLevel = 0;
+        rpCompoundingLevel = 0; rpCompoundingMultiplier = 1.0;
+        autoActive = false; rpAutobuyEnabled = false;
+        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+        if (rpGeneratorInterval) { clearInterval(rpGeneratorInterval); rpGeneratorInterval = null; }
+        if (rpAutoBuyInterval) { clearInterval(rpAutoBuyInterval); rpAutoBuyInterval = null; }
+        toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
+        toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)'; toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+        addBee();
+        for (let i = 0; i < 14; i++) spawnFlower();
+        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
+        hireCostSpan.textContent = formatNumber(nextHireCost);
+        localStorage.removeItem(SAVE_KEY);
+        
+        submitScore(0);
+        saveGame();
+    }
+});
+
+menuResetHoneyBtn.addEventListener('click', () => {
+    honey = 0;
+    totalHoneyEarned = 0;
+    submitScore(0);
+    saveGame();
+    alert('Honey and leaderboard score reset to 0!');
+});
+
+// ========== ANNOUNCEMENT FUNCTIONS ==========
+function setupAnnouncementListener() {
+    announcementRef.on('value', (snapshot) => {
+        const message = snapshot.val();
+        if (message && message.text) {
+            currentAnnouncement = message.text;
+            announcementClosed = false;
+            localStorage.removeItem('announcementClosed');
+            announcementMessage.textContent = message.text;
+            announcementPopup.style.display = 'block';
+        }
+    });
+}
+
+closeAnnouncementBtn.addEventListener('click', () => {
+    announcementPopup.style.display = 'none';
+    localStorage.setItem('announcementClosed', 'true');
+});
+
+if (currentAnnouncement && !announcementClosed) {
+    announcementMessage.textContent = currentAnnouncement;
+    announcementPopup.style.display = 'block';
+}
+
+menuOpenAnnouncementBtn.addEventListener('click', () => {
+    if (playerName === 'Opleoni') {
+        announcementModal.style.display = 'block';
+        menuPanel.classList.remove('show');
+    }
+});
+
+sendAnnouncementBtn.addEventListener('click', async () => {
+    if (playerName === 'Opleoni') {
+        const message = announcementInput.value.trim();
+        if (message) {
+            await announcementRef.set({ text: message });
+            localStorage.removeItem('announcementClosed');
+            announcementModal.style.display = 'none';
+            announcementInput.value = '';
+        }
+    }
+});
+
+cancelAnnouncementBtn.addEventListener('click', () => {
+    announcementModal.style.display = 'none';
+});
+
+// ========== ADMIN PANEL (menu version) ==========
+function updateMenuAdminSelect() {
+    if (playerName !== 'Opleoni') return;
+    menuAdminSection.style.display = 'block';
+    const select = menuAdminPlayerSelect;
+    select.innerHTML = '<option value="">Myself (Opleoni)</option>';
+    
+    leaderboard.forEach(entry => {
+        if (entry && entry.name && entry.name !== 'Opleoni') {
+            const option = document.createElement('option');
+            option.value = entry.name;
+            option.textContent = entry.name;
+            select.appendChild(option);
+        }
+    });
+    
+    const newOption = document.createElement('option');
+    newOption.value = '__NEW__';
+    newOption.textContent = '➕ Create New Player...';
+    select.appendChild(newOption);
+}
+
+menuAdminAddBtn.addEventListener('click', async () => {
+    if (playerName !== 'Opleoni') return;
+    
+    let targetPlayer = menuAdminPlayerSelect.value;
+    const stat = menuAdminStatSelect.value;
+    const amount = parseInt(menuAdminAmount.value);
+    
+    if (isNaN(amount) || amount < 0) {
+        alert('Please enter a valid amount');
+        return;
+    }
+    
+    if (!targetPlayer || targetPlayer === '') {
+        targetPlayer = 'Opleoni';
+    }
+    
+    if (targetPlayer === '__NEW__') {
+        const newName = prompt('Enter new player name:');
+        if (!newName) return;
+        
+        const exists = await isNameAvailable(newName);
+        if (!exists) {
+            alert('❌ That name already exists!');
+            return;
+        }
+        
+        targetPlayer = newName;
+        await submitScore(0);
+    }
+    
+    switch(stat) {
+        case 'honey':
+            if (targetPlayer === playerName) {
+                honey += amount;
+                totalHoneyEarned += amount;
+            }
+            await submitScore(totalHoneyEarned);
+            break;
+        case 'rp':
+            if (targetPlayer === playerName) {
+                rebirthPoints += amount;
+            }
+            break;
+        case 'sp':
+            if (targetPlayer === playerName) {
+                sacrificePoints += amount;
+            }
+            break;
+    }
+    
+    updateRebirthUI();
+    updateSPUI();
+    saveGame();
+    alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
+});
+
+// ========== NUMBER FORMATTING ==========
+function formatNumber(num) {
+    if (num === undefined || num === null) return '0';
+    if (num >= 1e15) return (num / 1e15).toFixed(2) + 'Qd';
+    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
+    return Math.floor(num).toString();
+}
 
 // ========== FIREBASE LEADERBOARD FUNCTIONS ==========
 function fetchLeaderboard() {
@@ -1044,7 +1250,7 @@ function fetchLeaderboard() {
         debugInfo.textContent = `✅ Loaded ${leaderboard.length} players`;
         
         if (playerName === 'Opleoni') {
-            updateAdminPlayerSelect();
+            updateMenuAdminSelect();
         }
     }, (error) => {
         console.error('Firebase error:', error);
@@ -1066,27 +1272,6 @@ async function submitScore(score) {
         console.error('Failed to submit score:', error);
         debugInfo.innerHTML = `❌ Submit error: ${error.message}`;
     }
-}
-
-// ========== ADMIN FUNCTIONS ==========
-function updateAdminPlayerSelect() {
-    if (playerName !== 'Opleoni') return;
-    const select = adminPlayerSelect;
-    select.innerHTML = '<option value="">Myself (Opleoni)</option>';
-    
-    leaderboard.forEach(entry => {
-        if (entry && entry.name && entry.name !== 'Opleoni') {
-            const option = document.createElement('option');
-            option.value = entry.name;
-            option.textContent = entry.name;
-            select.appendChild(option);
-        }
-    });
-    
-    const newOption = document.createElement('option');
-    newOption.value = '__NEW__';
-    newOption.textContent = '➕ Create New Player...';
-    select.appendChild(newOption);
 }
 
 async function isNameAvailable(name) {
@@ -1159,11 +1344,9 @@ saveNameBtn.addEventListener('click', async () => {
     await submitScore(totalHoneyEarned);
     
     if (playerName === 'Opleoni') {
-        console.log('🔮 Admin panel activated');
-        adminPanel.style.display = 'flex';
-        setTimeout(updateAdminPlayerSelect, 1000);
+        updateMenuAdminSelect();
     } else {
-        adminPanel.style.display = 'none';
+        menuAdminSection.style.display = 'none';
     }
 });
 
@@ -1171,45 +1354,12 @@ refreshBtn.addEventListener('click', () => {
     fetchLeaderboard();
 });
 
-// ========== ANNOUNCEMENT SENDING (Opleoni only) ==========
-if (openAnnouncementBtn) {
-    openAnnouncementBtn.addEventListener('click', () => {
-        if (playerName === 'Opleoni') {
-            announcementModal.style.display = 'block';
-        }
-    });
-}
-
-if (cancelAnnouncementBtn) {
-    cancelAnnouncementBtn.addEventListener('click', () => {
-        announcementModal.style.display = 'none';
-    });
-}
-
-if (sendAnnouncementBtn) {
-    sendAnnouncementBtn.addEventListener('click', async () => {
-        if (playerName === 'Opleoni') {
-            const message = announcementInput.value.trim();
-            if (message) {
-                await announcementRef.set({ text: message });
-                localStorage.removeItem('announcementClosed');
-                announcementModal.style.display = 'none';
-                announcementInput.value = '';
-            }
-        }
-    });
-}
-
 // Initial load
 if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     fetchLeaderboard();
     setupAnnouncementListener();
-    if (playerName === 'Opleoni') {
-        adminPanel.style.display = 'flex';
-        setTimeout(updateAdminPlayerSelect, 1000);
-    }
 } else {
     nameModal.style.display = 'flex';
     fetchLeaderboard();
@@ -1292,7 +1442,7 @@ let autoActive = false;
 let autoInterval = null;
 let rpAutobuyEnabled = false;
 
-// ========== UI ELEMENTS ==========
+// ========== UI ELEMENTS (existing) ==========
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -1313,11 +1463,6 @@ const spBadge = document.getElementById('spBadge');
 const spShopDisplay = document.getElementById('spShopDisplay');
 
 // Rebirth shop buttons
-const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
-const buyBeeSpeed = document.getElementById('buyBeeSpeed');
-const buyCapacity = document.getElementById('buyCapacity');
-const buyHoneyMult = document.getElementById('buyHoneyMult');
-const buyCompounding = document.getElementById('buyCompounding');
 const autoStatus = document.getElementById('autoStatus');
 const speedStatus = document.getElementById('speedStatus');
 const capacityStatus = document.getElementById('capacityStatus');
@@ -1328,10 +1473,6 @@ const speedBoost = document.getElementById('speedBoost');
 const capacityBoost = document.getElementById('capacityBoost');
 
 // SP Shop buttons
-const buyX10Honey = document.getElementById('buyX10Honey');
-const buyRPAuto = document.getElementById('buyRPAuto');
-const buyRPGen = document.getElementById('buyRPGen');
-const buyRPCompounding = document.getElementById('buyRPCompounding');
 const rpGenLevel = document.getElementById('rpGenLevel');
 const rpGenCost = document.getElementById('rpGenCost');
 const rpGenTime = document.getElementById('rpGenTime');
@@ -1340,24 +1481,7 @@ const rpCompLevel = document.getElementById('rpCompLevel');
 const rpCompCost = document.getElementById('rpCompCost');
 const rpCompMult = document.getElementById('rpCompMult');
 
-// Tool buttons
-const buyClippers = document.getElementById('buyClippers');
-const buyShears = document.getElementById('buyShears');
-const buyScythe = document.getElementById('buyScythe');
-const buyOil = document.getElementById('buyOil');
-const buyHoneycomb = document.getElementById('buyHoneycomb');
-const buyBeeGun = document.getElementById('buyBeeGun');
-const buyRoyalJelly = document.getElementById('buyRoyalJelly');
-const buyStarTreat = document.getElementById('buyStarTreat');
-
-const toggleAutoBtn = document.getElementById('toggleAutoBtn');
-const toggleRPAutoBtn = document.getElementById('toggleRPAutoBtn');
-const sacrificeBtn = document.getElementById('sacrificeBtn');
-const resetBtn = document.getElementById('resetBtn');
-const resetHoneyBtn = document.getElementById('resetHoneyBtn');
-const rebirthBtn = document.getElementById('rebirthBtn');
-
-// ========== SAVE / LOAD ==========
+// ========== SAVE / LOAD (original) ==========
 function saveGame() {
     const saveData = {
         honey,
@@ -1820,7 +1944,7 @@ function toggleRPAuto() {
     saveGame();
 }
 
-// ========== EVENT LISTENERS ==========
+// ========== EVENT LISTENERS (original) ==========
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -1847,280 +1971,6 @@ hireBtn.addEventListener('click', () => {
         hireCostSpan.textContent = formatNumber(nextHireCost);
         saveGame();
     }
-});
-
-resetBtn.addEventListener('click', () => {
-    if (confirm('Reset ALL progress? Name will stay on leaderboard.')) {
-        honey = 0; totalHoneyEarned = 0; bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
-        hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
-        hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
-        rebirthPoints = 0; sacrificePoints = 0;
-        autoUnlocked = false; beeSpeedMultiplier = 1.0; capacityMultiplier = 1.0; honeyMultUpgrade = 1.0;
-        compoundingLevel = 0; compoundingMultiplier = 1.0;
-        x10HoneyPurchased = false; rpAutoBuyActive = false; rpGeneratorLevel = 0;
-        rpCompoundingLevel = 0; rpCompoundingMultiplier = 1.0;
-        autoActive = false; rpAutobuyEnabled = false;
-        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-        if (rpGeneratorInterval) { clearInterval(rpGeneratorInterval); rpGeneratorInterval = null; }
-        if (rpAutoBuyInterval) { clearInterval(rpAutoBuyInterval); rpAutoBuyInterval = null; }
-        toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
-        toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)'; toggleRPAutoBtn.classList.remove('rp-autobuy-active');
-        addBee();
-        for (let i = 0; i < 14; i++) spawnFlower();
-        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
-        hireCostSpan.textContent = formatNumber(nextHireCost);
-        localStorage.removeItem(SAVE_KEY);
-        
-        submitScore(0);
-        saveGame();
-    }
-});
-
-resetHoneyBtn.addEventListener('click', () => {
-    honey = 0;
-    totalHoneyEarned = 0;
-    
-    submitScore(0);
-    
-    saveGame();
-    alert('Honey and leaderboard score reset to 0!');
-});
-
-rebirthBtn.addEventListener('click', () => {
-    const maxRP = getMaxRPFromHoney();
-    if (maxRP > 0) {
-        const cost = getRPCost(maxRP);
-        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier);
-        rebirthPoints += rpGain;
-        
-        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
-        hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
-        hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
-        addBee();
-        for (let i = 0; i < 14; i++) spawnFlower();
-        honey = 0;
-        
-        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
-        hireCostSpan.textContent = formatNumber(nextHireCost);
-        saveGame();
-        alert(`✨ Purchased ${maxRP} RP (multiplied to ${rpGain} RP) for ${formatNumber(cost)} honey! Honey reset to 0.`);
-    } else {
-        alert(`❌ Need at least 10,000 honey for 1 RP!`);
-    }
-});
-
-sacrificeBtn.addEventListener('click', () => {
-    const maxSP = getMaxSPFromResources();
-    if (maxSP > 0) {
-        const cost = getSPCost(maxSP);
-        honey -= cost.honey;
-        rebirthPoints -= cost.rp;
-        sacrificePoints += maxSP;
-        
-        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
-        hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
-        hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
-        
-        autoUnlocked = false;
-        beeSpeedMultiplier = 1.0;
-        capacityMultiplier = 1.0;
-        honeyMultUpgrade = 1.0;
-        compoundingLevel = 0;
-        compoundingMultiplier = 1.0;
-        
-        rpCompoundingLevel = 0;
-        rpCompoundingMultiplier = 1.0;
-        
-        autoActive = false;
-        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-        toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
-        
-        setupRPGenerator();
-        
-        addBee();
-        for (let i = 0; i < 14; i++) spawnFlower();
-        
-        honey = 0;
-        
-        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
-        hireCostSpan.textContent = formatNumber(nextHireCost);
-        saveGame();
-        
-        alert(`🔥 Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped.`);
-    } else {
-        alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
-    }
-});
-
-// ========== SP SHOP ==========
-buyX10Honey.addEventListener('click', () => {
-    if (sacrificePoints >= 5 && !x10HoneyPurchased) {
-        sacrificePoints -= 5;
-        x10HoneyPurchased = true;
-        recalcMultiplier();
-        updateSPUI();
-        saveGame();
-        alert('🍯 x10 Honey multiplier purchased!');
-    }
-});
-
-buyRPAuto.addEventListener('click', () => {
-    if (sacrificePoints >= 10 && !rpAutoBuyActive) {
-        sacrificePoints -= 10;
-        rpAutoBuyActive = true;
-        if (rpAutobuyEnabled) {
-            setupRPAutoBuy();
-        }
-        updateSPUI();
-        saveGame();
-        alert('🤖 RP Autobuy unlocked! Toggle the button to enable.');
-    }
-});
-
-buyRPGen.addEventListener('click', () => {
-    const cost = rpGeneratorLevel + 1;
-    if (rpGeneratorLevel < 5 && sacrificePoints >= cost) {
-        sacrificePoints -= cost;
-        rpGeneratorLevel++;
-        setupRPGenerator();
-        updateSPUI();
-        saveGame();
-        alert(`⏱️ RP Generator upgraded to level ${rpGeneratorLevel}! Now generating ${Math.floor(1 * rpCompoundingMultiplier)} RP every ${Math.max(1, 5 - (rpGeneratorLevel - 1))}s.`);
-    }
-});
-
-buyRPCompounding.addEventListener('click', () => {
-    const cost = Math.pow(2, rpCompoundingLevel);
-    if (sacrificePoints >= cost) {
-        sacrificePoints -= cost;
-        rpCompoundingLevel++;
-        rpCompoundingMultiplier = Math.pow(1.25, rpCompoundingLevel);
-        setupRPGenerator();
-        updateSPUI();
-        updateRebirthUI();
-        saveGame();
-        alert(`📈 RP Compounding upgraded to level ${rpCompoundingLevel}! (${rpCompoundingMultiplier.toFixed(2)}x RP gain)`);
-    }
-});
-
-// ========== REBIRTH SHOP ==========
-buyAutoUpgrade.addEventListener('click', () => { 
-    if (rebirthPoints >= 2 && !autoUnlocked) { 
-        rebirthPoints -= 2; 
-        autoUnlocked = true; 
-        updateRebirthUI(); 
-        saveGame(); 
-    } 
-});
-
-buyBeeSpeed.addEventListener('click', () => { 
-    if (rebirthPoints >= 1 && beeSpeedMultiplier === 1.0) { 
-        rebirthPoints -= 1; 
-        beeSpeedMultiplier = 1.5; 
-        updateRebirthUI(); 
-        saveGame(); 
-    } 
-});
-
-buyCapacity.addEventListener('click', () => { 
-    if (rebirthPoints >= 3 && capacityMultiplier === 1.0) { 
-        rebirthPoints -= 3; 
-        capacityMultiplier = 2.0; 
-        updateRebirthUI(); 
-        saveGame(); 
-    } 
-});
-
-buyHoneyMult.addEventListener('click', () => { 
-    if (rebirthPoints >= 2 && honeyMultUpgrade === 1.0) { 
-        rebirthPoints -= 2; 
-        honeyMultUpgrade = 5.0; 
-        recalcMultiplier(); 
-        updateRebirthUI(); 
-        saveGame(); 
-    } 
-});
-
-buyCompounding.addEventListener('click', () => {
-    const cost = Math.pow(2, compoundingLevel);
-    if (rebirthPoints >= cost) {
-        rebirthPoints -= cost;
-        compoundingLevel++;
-        compoundingMultiplier = Math.pow(1.25, compoundingLevel);
-        recalcMultiplier();
-        updateRebirthUI();
-        saveGame();
-    }
-});
-
-// Tool purchases
-buyClippers.addEventListener('click', () => { if (!hasClippers && honey>=50) { honey-=50; hasClippers=true; recalcMultiplier(); buyClippers.disabled=true; saveGame(); } });
-buyShears.addEventListener('click', () => { if (!hasShears && honey>=150) { honey-=150; hasShears=true; recalcMultiplier(); buyShears.disabled=true; saveGame(); } });
-buyScythe.addEventListener('click', () => { if (!hasScythe && honey>=400) { honey-=400; hasScythe=true; recalcMultiplier(); buyScythe.disabled=true; saveGame(); } });
-buyOil.addEventListener('click', () => { if (!hasOil && honey>=900) { honey-=900; hasOil=true; recalcMultiplier(); buyOil.disabled=true; saveGame(); } });
-buyHoneycomb.addEventListener('click', () => { if (!hasHoneycomb && honey>=25000) { honey-=25000; hasHoneycomb=true; recalcMultiplier(); buyHoneycomb.disabled=true; saveGame(); } });
-buyBeeGun.addEventListener('click', () => { if (!hasBeeGun && honey>=50000) { honey-=50000; hasBeeGun=true; recalcMultiplier(); buyBeeGun.disabled=true; saveGame(); } });
-buyRoyalJelly.addEventListener('click', () => { if (!hasRoyalJelly && honey>=100000) { honey-=100000; hasRoyalJelly=true; recalcMultiplier(); buyRoyalJelly.disabled=true; saveGame(); } });
-buyStarTreat.addEventListener('click', () => { if (!hasStarTreat && honey>=250000) { honey-=250000; hasStarTreat=true; recalcMultiplier(); buyStarTreat.disabled=true; saveGame(); } });
-
-toggleAutoBtn.addEventListener('click', toggleAuto);
-toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
-
-// ========== ADMIN PANEL ==========
-adminAddBtn.addEventListener('click', async () => {
-    if (playerName !== 'Opleoni') return;
-    
-    let targetPlayer = adminPlayerSelect.value;
-    const stat = adminStatSelect.value;
-    const amount = parseInt(adminAmount.value);
-    
-    if (isNaN(amount) || amount < 0) {
-        alert('Please enter a valid amount');
-        return;
-    }
-    
-    if (!targetPlayer || targetPlayer === '') {
-        targetPlayer = 'Opleoni';
-    }
-    
-    if (targetPlayer === '__NEW__') {
-        const newName = prompt('Enter new player name:');
-        if (!newName) return;
-        
-        const exists = await isNameAvailable(newName);
-        if (!exists) {
-            alert('❌ That name already exists!');
-            return;
-        }
-        
-        targetPlayer = newName;
-        await submitScore(0);
-    }
-    
-    switch(stat) {
-        case 'honey':
-            if (targetPlayer === playerName) {
-                honey += amount;
-                totalHoneyEarned += amount;
-            }
-            await submitScore(totalHoneyEarned);
-            break;
-        case 'rp':
-            if (targetPlayer === playerName) {
-                rebirthPoints += amount;
-            }
-            break;
-        case 'sp':
-            if (targetPlayer === playerName) {
-                sacrificePoints += amount;
-            }
-            break;
-    }
-    
-    updateRebirthUI();
-    updateSPUI();
-    saveGame();
-    alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
 });
 
 // ========== INIT ==========
@@ -2182,4 +2032,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
