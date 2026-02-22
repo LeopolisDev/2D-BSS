@@ -811,6 +811,7 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const leaderboardRef = database.ref('leaderboard');
 const announcementRef = database.ref('announcement');
+const adminGrantsRef = database.ref('adminGrants');
 
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
@@ -1300,6 +1301,88 @@ menuRemovePlayerBtn.addEventListener('click', async () => {
     }, 3000);
 });
 
+function sanitizeFirebaseKey(name) {
+    return String(name || '').trim().replace(/[.#$\[\]\/]/g, '_');
+}
+
+function normalizePlayerName(name) {
+    return String(name || '').trim().slice(0, 20);
+}
+
+function toSafeAmount(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return Math.floor(parsed);
+}
+
+async function queueAdminGrant(targetPlayer, stat, amount) {
+    const sanitizedTarget = normalizePlayerName(targetPlayer);
+    const key = sanitizeFirebaseKey(sanitizedTarget);
+    if (!sanitizedTarget || !key) {
+        throw new Error('Invalid target player');
+    }
+
+    await adminGrantsRef.child(key).transaction((current) => {
+        const safeCurrent = current && typeof current === 'object' ? current : {};
+        const next = {
+            name: sanitizedTarget,
+            honey: toSafeAmount(safeCurrent.honey),
+            rp: toSafeAmount(safeCurrent.rp),
+            sp: toSafeAmount(safeCurrent.sp),
+            updatedAt: Date.now()
+        };
+
+        if (stat === 'honey') next.honey += amount;
+        if (stat === 'rp') next.rp += amount;
+        if (stat === 'sp') next.sp += amount;
+        return next;
+    });
+}
+
+async function claimAdminGrants() {
+    if (!playerName) return;
+    const key = sanitizeFirebaseKey(playerName);
+    if (!key) return;
+
+    try {
+        const grantRef = adminGrantsRef.child(key);
+        const snapshot = await grantRef.once('value');
+        if (!snapshot.exists()) return;
+
+        const data = snapshot.val() || {};
+        const honeyGrant = toSafeAmount(data.honey);
+        const rpGrant = toSafeAmount(data.rp);
+        const spGrant = toSafeAmount(data.sp);
+        const totalGrant = honeyGrant + rpGrant + spGrant;
+
+        if (totalGrant <= 0) {
+            await grantRef.remove();
+            return;
+        }
+
+        honey += honeyGrant;
+        totalHoneyEarned += honeyGrant;
+        rebirthPoints += rpGrant;
+        sacrificePoints += spGrant;
+
+        await grantRef.remove();
+
+        recalcMultiplier();
+        updateRebirthUI();
+        updateToolButtons();
+        updateSPUI();
+        saveGame();
+
+        const grantParts = [];
+        if (honeyGrant > 0) grantParts.push(`${formatNumber(honeyGrant)} Honey`);
+        if (rpGrant > 0) grantParts.push(`${formatNumber(rpGrant)} RP`);
+        if (spGrant > 0) grantParts.push(`${formatNumber(spGrant)} SP`);
+        alert(`Admin gift claimed: ${grantParts.join(', ')}`);
+    } catch (error) {
+        console.error('Failed to claim admin grants:', error);
+    }
+}
+
 // ========== ADMIN PANEL (menu version) ==========
 function updateMenuAdminSelect() {
     if (playerName !== 'Opleoni') {
@@ -1330,10 +1413,15 @@ menuAdminAddBtn.addEventListener('click', async () => {
     
     let targetPlayer = menuAdminPlayerSelect.value;
     const stat = menuAdminStatSelect.value;
-    const amount = parseInt(menuAdminAmount.value);
+    const amount = toSafeAmount(menuAdminAmount.value);
     
-    if (isNaN(amount) || amount < 0) {
-        alert('Please enter a valid amount');
+    if (!['honey', 'rp', 'sp'].includes(stat)) {
+        alert('Invalid currency type');
+        return;
+    }
+
+    if (amount <= 0) {
+        alert('Please enter an amount greater than 0');
         return;
     }
     
@@ -1342,49 +1430,47 @@ menuAdminAddBtn.addEventListener('click', async () => {
     }
     
     if (targetPlayer === '__NEW__') {
-        const newName = prompt('Enter new player name:');
-        if (!newName) return;
+        const newNameInput = prompt('Enter new player name:');
+        if (!newNameInput) return;
+        const newName = normalizePlayerName(newNameInput);
+        if (!newName) {
+            alert('Invalid name');
+            return;
+        }
         
-        const exists = await isNameAvailable(newName);
-        if (!exists) {
+        const available = await isNameAvailable(newName);
+        if (!available) {
             alert('❌ That name already exists!');
             return;
         }
         
         targetPlayer = newName;
-        await submitScore(0);
-        leaderboard.push({ name: targetPlayer, total: 0 });
     }
     
-    switch(stat) {
-        case 'honey':
-            if (targetPlayer === playerName) {
-                honey += amount;
-                totalHoneyEarned += amount;
-            }
-            // Update leaderboard entry
-            let playerEntry = leaderboard.find(e => e.name === targetPlayer);
-            if (playerEntry) {
-                playerEntry.total += amount;
-            }
+    if (targetPlayer === playerName) {
+        if (stat === 'honey') {
+            honey += amount;
+            totalHoneyEarned += amount;
             await submitScore(totalHoneyEarned);
-            break;
-        case 'rp':
-            if (targetPlayer === playerName) {
-                rebirthPoints += amount;
-            }
-            break;
-        case 'sp':
-            if (targetPlayer === playerName) {
-                sacrificePoints += amount;
-            }
-            break;
+        } else if (stat === 'rp') {
+            rebirthPoints += amount;
+        } else if (stat === 'sp') {
+            sacrificePoints += amount;
+        }
+    } else {
+        await queueAdminGrant(targetPlayer, stat, amount);
     }
     
+    recalcMultiplier();
     updateRebirthUI();
+    updateToolButtons();
     updateSPUI();
     saveGame();
-    alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
+    if (targetPlayer === playerName) {
+        alert(`Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
+    } else {
+        alert(`Queued ${amount} ${stat.toUpperCase()} for ${targetPlayer}. They will receive it when they load.`);
+    }
 });
 
 // ========== FIREBASE LEADERBOARD FUNCTIONS ==========
@@ -1549,6 +1635,7 @@ saveNameBtn.addEventListener('click', async () => {
         playerNameDisplay.textContent = `Name: ${playerName}`;
         
         await submitScore(totalHoneyEarned);
+        await claimAdminGrants();
         
         if (playerName === 'Opleoni') {
             updateMenuAdminSelect();
@@ -1575,6 +1662,7 @@ if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     fetchLeaderboard();
+    claimAdminGrants();
     setupAnnouncementListener();
 } else {
     nameModal.style.display = 'flex';
@@ -2418,4 +2506,5 @@ gameLoop();
 </script>
 </body>
 </html>
+
 
