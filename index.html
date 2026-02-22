@@ -630,20 +630,6 @@
                 </select>
                 <button class="menu-btn remove-btn" id="menuAdminResetBtn">RESET PLAYER STAT</button>
             </div>
-            
-            <!-- NEW REMOVE SECTION -->
-            <div class="menu-row" style="border-top: 2px solid #ffd966; padding-top: 10px; margin-top: 10px;">
-                <span style="color:#ffd966; width:100%; text-align:center; margin-bottom:5px;">🗑️ REMOVE PLAYER</span>
-            </div>
-            <div class="menu-row">
-                <input type="text" id="menuRemoveNameInput" class="menu-input" placeholder="Enter username to remove" style="width:100%;">
-            </div>
-            <div class="menu-row">
-                <button class="menu-btn remove-btn" id="menuRemovePlayerBtn">🗑️ REMOVE</button>
-            </div>
-            <div class="menu-row">
-                <span id="menuRemoveMessage" style="display: none;"></span>
-            </div>
             <div class="menu-row">
                 <button class="menu-btn" id="menuOpenAnnouncementBtn">📢 ANNOUNCE</button>
             </div>
@@ -878,9 +864,6 @@ const menuLoadSaveBtn = document.getElementById('menuLoadSaveBtn');
 const menuPerformanceBtn = document.getElementById('menuPerformanceBtn');
 const menuResetStatSelect = document.getElementById('menuResetStatSelect');
 const menuResetSelectedBtn = document.getElementById('menuResetSelectedBtn');
-const menuRemoveNameInput = document.getElementById('menuRemoveNameInput');
-const menuRemovePlayerBtn = document.getElementById('menuRemovePlayerBtn');
-const menuRemoveMessage = document.getElementById('menuRemoveMessage');
 
 // Game buttons
 const hireBtn = document.getElementById('hireBtn');
@@ -1247,69 +1230,6 @@ sendAnnouncementBtn.addEventListener('click', async () => {
 
 cancelAnnouncementBtn.addEventListener('click', () => {
     announcementModal.style.display = 'none';
-});
-
-// ========== ADMIN REMOVAL FUNCTION ==========
-async function removePlayerFromLeaderboard(username) {
-    if (!username || username.trim() === '') {
-        return { success: false, message: 'Please enter a username' };
-    }
-    
-    try {
-        const snapshot = await leaderboardRef.once('value');
-        const data = snapshot.val();
-        let foundKey = null;
-        
-        if (data) {
-            // Find the key for this username
-            for (const [key, value] of Object.entries(data)) {
-                if (value && value.name === username) {
-                    foundKey = key;
-                    break;
-                }
-            }
-        }
-        
-        if (foundKey) {
-            await leaderboardRef.child(foundKey).remove();
-            return { success: true, message: `✅ Player "${username}" removed from leaderboard` };
-        } else {
-            return { success: false, message: `❌ Player "${username}" not found` };
-        }
-    } catch (error) {
-        console.error('Error removing player:', error);
-        return { success: false, message: '❌ Error removing player' };
-    }
-}
-
-menuRemovePlayerBtn.addEventListener('click', async () => {
-    if (playerName !== 'Opleoni') return;
-    
-    const username = menuRemoveNameInput.value.trim();
-    
-    // Show loading state
-    menuRemovePlayerBtn.disabled = true;
-    menuRemovePlayerBtn.textContent = 'REMOVING...';
-    menuRemoveMessage.style.display = 'none';
-    
-    const result = await removePlayerFromLeaderboard(username);
-    
-    menuRemoveMessage.textContent = result.message;
-    menuRemoveMessage.style.color = result.success ? '#aaffaa' : '#ffaaaa';
-    menuRemoveMessage.style.display = 'inline-block';
-    
-    menuRemovePlayerBtn.disabled = false;
-    menuRemovePlayerBtn.textContent = '🗑️ REMOVE';
-    
-    if (result.success) {
-        menuRemoveNameInput.value = '';
-        // Refresh leaderboard
-        fetchLeaderboard();
-    }
-    
-    setTimeout(() => {
-        menuRemoveMessage.style.display = 'none';
-    }, 3000);
 });
 
 function sanitizeFirebaseKey(name) {
