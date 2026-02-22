@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · save & honey upgrade</title>
+    <title>🐝 BEE SWARM · infinite rebirths & working honey boost</title>
     <style>
         * {
             box-sizing: border-box;
@@ -222,6 +222,7 @@
                 <div class="stat-item">🍯 <span id="honeyDisplay">0</span></div>
                 <div class="stat-item">🐝 <span id="beeCountDisplay">1</span></div>
                 <div class="stat-item">✨ x<span id="multiplierDisplay">1.00</span></div>
+                <div class="stat-item">🍯 x<span id="honeyMultDisplay">1.0</span></div>
                 <div class="stat-item">🔁 <span id="rpDisplay">0</span> RP</div>
             </div>
             <div class="button-group">
@@ -294,13 +295,13 @@
 
     // Rebirth
     let rebirthPoints = 0;
-    let rebirthCount = 0;
+    let rebirthCount = 0;  // Number of rebirths performed, used for scaling cost
 
     // Rebirth upgrades
     let autoUnlocked = false;
     let beeSpeedBoost = 1.0;
     let capacityBoost = 0;
-    let honeyMultUpgrade = 1.0;  // New: honey multiplier from rebirth shop (x5 when purchased)
+    let honeyMultUpgrade = 1.0;  // x5 when purchased
 
     // Automation
     let autoActive = false;
@@ -314,6 +315,7 @@
     const honeySpan = document.getElementById('honeyDisplay');
     const beeCountSpan = document.getElementById('beeCountDisplay');
     const multiplierSpan = document.getElementById('multiplierDisplay');
+    const honeyMultDisplay = document.getElementById('honeyMultDisplay');
     const rpSpan = document.getElementById('rpDisplay');
     const rpBadge = document.getElementById('rpBadge');
     const rpShopDisplay = document.getElementById('rpShopDisplay');
@@ -426,6 +428,7 @@
         toolMultiplier = mult;
         multiplierSpan.textContent = toolMultiplier.toFixed(2);
         totalMultDisplay.textContent = `✖️ ${toolMultiplier.toFixed(2)}`;
+        honeyMultDisplay.textContent = honeyMultUpgrade.toFixed(1);
     }
 
     function updateToolButtons() {
@@ -489,6 +492,8 @@
         return bestIndex;
     }
 
+    // ========== INFINITE SCALING REBIRTH COST ==========
+    // Cost starts at 10k, then multiplies by 1.5 each rebirth: 10k, 15k, 22.5k, 33.75k, ...
     function getRebirthCost() {
         if (rebirthCount === 0) return 10000;
         let cost = 10000;
@@ -625,6 +630,7 @@
         const activeFlowers = flowers.filter(f => f.active).length;
         fieldInfo.textContent = `🌸 ${activeFlowers} flowers`;
         hireCostSpan.textContent = nextHireCost;
+        honeyMultDisplay.textContent = honeyMultUpgrade.toFixed(1);
     }
 
     // ========== DRAWING ==========
@@ -762,21 +768,25 @@
             hasClippers = true;
             recalcMultiplier();
             buyClippers.disabled = true;
+            saveGame();
         } else if (!hasShears && honey >= 150) {
             honey -= 150;
             hasShears = true;
             recalcMultiplier();
             buyShears.disabled = true;
+            saveGame();
         } else if (!hasScythe && honey >= 400) {
             honey -= 400;
             hasScythe = true;
             recalcMultiplier();
             buyScythe.disabled = true;
+            saveGame();
         } else if (!hasOil && honey >= 900) {
             honey -= 900;
             hasOil = true;
             recalcMultiplier();
             buyOil.disabled = true;
+            saveGame();
         }
 
         // Hire bees
@@ -784,6 +794,7 @@
             honey -= nextHireCost;
             addBee();
             nextHireCost = Math.floor(nextHireCost * 1.5);
+            saveGame();
         }
         hireCostSpan.textContent = nextHireCost;
     }
@@ -807,6 +818,7 @@
                 autoInterval = null;
             }
         }
+        saveGame();
     }
 
     // ========== EVENT LISTENERS ==========
@@ -839,6 +851,7 @@
             addBee();
             nextHireCost = Math.floor(nextHireCost * 1.5);
             hireCostSpan.textContent = nextHireCost;
+            saveGame();
         }
     });
 
@@ -854,12 +867,13 @@
         if (honey >= cost) {
             honey -= cost;
             rebirthPoints++;
-            rebirthCount++;
+            rebirthCount++;  // Increment rebirth count for next cost scaling
             
-            // Reset progress but keep rebirth points
+            // Reset progress but keep rebirth points and upgrades
             bees = [];
             flowers = [];
             nextHireCost = HIRE_COST_BASE;
+            // Tools reset (but rebirth upgrades remain)
             hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
             
             addBee();
@@ -900,11 +914,12 @@
         }
     });
 
-    // NEW: Honey Multiplier upgrade (x5 for 2 RP)
+    // Honey Multiplier upgrade (x5 for 2 RP)
     buyHoneyMult.addEventListener('click', () => {
         if (rebirthPoints >= 2 && honeyMultUpgrade === 1.0) {
             rebirthPoints -= 2;
             honeyMultUpgrade = 5.0;
+            recalcMultiplier(); // Updates display
             updateRebirthUI();
             saveGame();
         }
@@ -938,6 +953,7 @@
         let val = parseInt(honeyInput.value);
         if (!isNaN(val) && val > 0) {
             honey += val;
+            saveGame();
         }
     });
 
