@@ -773,6 +773,10 @@ let totalHoneyEarned = 0;
 let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
 let announcementClosed = localStorage.getItem('announcementClosed') === 'true';
 
+// ========== CANVAS ELEMENTS (MUST BE BEFORE EVENT LISTENERS) ==========
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
 // ========== UI ELEMENTS ==========
 const nameModal = document.getElementById('nameModal');
 const playerNameInput = document.getElementById('playerNameInput');
