@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · collapsible menu</title>
+    <title>🐝 BEE SWARM · working menu version</title>
     <style>
         * {
             box-sizing: border-box;
@@ -131,6 +131,22 @@
             display: flex;
             align-items: center;
             gap: 10px;
+        }
+        .copy-btn {
+            background: #fecd4f;
+            border: none;
+            border-radius: 30px;
+            padding: 5px 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #2a4820;
+            border-bottom: 3px solid #b57c2a;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .copy-btn:active {
+            transform: translateY(2px);
+            border-bottom-width: 1px;
         }
         .canvas-panel {
             display: flex;
@@ -491,42 +507,6 @@
             text-align: center;
             margin-top: 5px;
         }
-        .admin-panel-compact {
-            background: #2a2a2a;
-            border-radius: 60px;
-            padding: 12px 20px;
-            margin-top: 12px;
-            border: 3px solid #ffaa00;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-        }
-        .admin-select {
-            background: #efeac5;
-            border: none;
-            border-radius: 40px;
-            padding: 8px 15px;
-            font-size: 1rem;
-            border-bottom: 4px solid #bd9f4b;
-            outline: none;
-            min-width: 140px;
-        }
-        .reset-btn-bottom {
-            background: #cab577;
-            border-bottom: 5px solid #7e6237;
-            color: #1f3d16;
-        }
-        .rp-autobuy-toggle {
-            background: #5b8c5a;
-            border-bottom-color: #2d5a2c;
-            color: white;
-        }
-        .rp-autobuy-active {
-            background: #4caf50;
-            border-bottom-color: #2e7d32;
-        }
         .announcement-popup {
             position: fixed;
             top: 50%; left: 50%;
@@ -562,12 +542,6 @@
             font-size: 0.9rem;
             color: #ffaa00;
             margin-left: 5px;
-        }
-        .error-details {
-            color: #ff6b6b;
-            font-size: 0.8rem;
-            margin-top: 5px;
-            word-break: break-all;
         }
         .code-error {
             color: #ffaaaa;
@@ -748,7 +722,7 @@
             <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
         </div>
 
-        <!-- Controls row (simplified) -->
+        <!-- Controls row -->
         <div class="shop-row" style="background:#8f6d3c;">
             <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
             <button class="tool-btn rp-autobuy-toggle" id="toggleRPAutoBtn">🤖 RP AUTO (OFF)</button>
@@ -764,7 +738,7 @@
             <button id="cancelAnnouncementBtn">CANCEL</button>
         </div>
 
-        <!-- Simple footer (no buttons) -->
+        <!-- Footer with save indicator only -->
         <footer>
             <div class="footer-row">
                 <span>🌸 Click flowers to boost them</span>
@@ -835,7 +809,7 @@ const menuLoadSaveBtn = document.getElementById('menuLoadSaveBtn');
 const menuResetAllBtn = document.getElementById('menuResetAllBtn');
 const menuResetHoneyBtn = document.getElementById('menuResetHoneyBtn');
 
-// Original buttons (keep for functionality)
+// Game buttons
 const hireBtn = document.getElementById('hireBtn');
 const hireCostSpan = document.getElementById('hireCostSpan');
 const toggleAutoBtn = document.getElementById('toggleAutoBtn');
@@ -862,17 +836,58 @@ const buyStarTreat = document.getElementById('buyStarTreat');
 const resetBtn = document.getElementById('resetBtn');
 const resetHoneyBtn = document.getElementById('resetHoneyBtn');
 
+// Display elements
+const honeySpan = document.getElementById('honeyDisplay');
+const beeCountSpan = document.getElementById('beeCountDisplay');
+const totalEarnedSpan = document.getElementById('totalEarnedDisplay');
+const rpSpan = document.getElementById('rpDisplay');
+const rpBadge = document.getElementById('rpBadge');
+const rpShopDisplay = document.getElementById('rpShopDisplay');
+const rebirthInfo = document.getElementById('rebirthInfo');
+const sacrificeInfo = document.getElementById('sacrificeInfo');
+const fieldInfo = document.getElementById('fieldInfo');
+const totalMultDisplay = document.getElementById('totalMultDisplay');
+const saveIndicator = document.getElementById('saveIndicator');
+const spDisplay = document.getElementById('spDisplay');
+const spBadge = document.getElementById('spBadge');
+const spShopDisplay = document.getElementById('spShopDisplay');
+const autoStatus = document.getElementById('autoStatus');
+const speedStatus = document.getElementById('speedStatus');
+const capacityStatus = document.getElementById('capacityStatus');
+const honeyMultStatus = document.getElementById('honeyMultStatus');
+const compoundingLevelSpan = document.getElementById('compoundingLevel');
+const compoundingCostSpan = document.getElementById('compoundingCost');
+const speedBoost = document.getElementById('speedBoost');
+const capacityBoost = document.getElementById('capacityBoost');
+const rpGenLevel = document.getElementById('rpGenLevel');
+const rpGenCost = document.getElementById('rpGenCost');
+const rpGenTime = document.getElementById('rpGenTime');
+const rpGenPreview = document.getElementById('rpGenPreview');
+const rpCompLevel = document.getElementById('rpCompLevel');
+const rpCompCost = document.getElementById('rpCompCost');
+const rpCompMult = document.getElementById('rpCompMult');
+
 // ========== MENU TOGGLE ==========
 menuToggleBtn.addEventListener('click', () => {
     menuPanel.classList.toggle('show');
 });
 
-// Close menu when clicking outside (optional)
 document.addEventListener('click', (e) => {
     if (!menuPanel.contains(e.target) && !menuToggleBtn.contains(e.target) && menuPanel.classList.contains('show')) {
         menuPanel.classList.remove('show');
     }
 });
+
+// ========== NUMBER FORMATTING ==========
+function formatNumber(num) {
+    if (num === undefined || num === null) return '0';
+    if (num >= 1e15) return (num / 1e15).toFixed(2) + 'Qd';
+    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
+    return Math.floor(num).toString();
+}
 
 // ========== REDEEM CODE SYSTEM ==========
 const validCodes = {
@@ -1003,9 +1018,6 @@ function loadSaveCode(code) {
         rpCompoundingMultiplier = saveData.rpCompoundingMultiplier || 1.0;
         rpAutobuyEnabled = saveData.rpAutobuyEnabled || false;
         autoActive = saveData.autoActive || false;
-        
-        setupRPGenerator();
-        setupRPAutoBuy();
         
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
@@ -1140,7 +1152,10 @@ cancelAnnouncementBtn.addEventListener('click', () => {
 
 // ========== ADMIN PANEL (menu version) ==========
 function updateMenuAdminSelect() {
-    if (playerName !== 'Opleoni') return;
+    if (playerName !== 'Opleoni') {
+        menuAdminSection.style.display = 'none';
+        return;
+    }
     menuAdminSection.style.display = 'block';
     const select = menuAdminPlayerSelect;
     select.innerHTML = '<option value="">Myself (Opleoni)</option>';
@@ -1188,6 +1203,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
         
         targetPlayer = newName;
         await submitScore(0);
+        leaderboard.push({ name: targetPlayer, total: 0 });
     }
     
     switch(stat) {
@@ -1195,6 +1211,11 @@ menuAdminAddBtn.addEventListener('click', async () => {
             if (targetPlayer === playerName) {
                 honey += amount;
                 totalHoneyEarned += amount;
+            }
+            // Update leaderboard entry
+            let playerEntry = leaderboard.find(e => e.name === targetPlayer);
+            if (playerEntry) {
+                playerEntry.total += amount;
             }
             await submitScore(totalHoneyEarned);
             break;
@@ -1215,17 +1236,6 @@ menuAdminAddBtn.addEventListener('click', async () => {
     saveGame();
     alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
 });
-
-// ========== NUMBER FORMATTING ==========
-function formatNumber(num) {
-    if (num === undefined || num === null) return '0';
-    if (num >= 1e15) return (num / 1e15).toFixed(2) + 'Qd';
-    if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
-    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
-    return Math.floor(num).toString();
-}
 
 // ========== FIREBASE LEADERBOARD FUNCTIONS ==========
 function fetchLeaderboard() {
@@ -1261,7 +1271,7 @@ function fetchLeaderboard() {
 }
 
 async function submitScore(score) {
-    if (!playerName || score < 0) return;
+    if (!playerName) return;
     
     try {
         await leaderboardRef.child(playerName.replace(/[.#$\[\]]/g, '_')).set({
@@ -1270,7 +1280,6 @@ async function submitScore(score) {
         });
     } catch (error) {
         console.error('Failed to submit score:', error);
-        debugInfo.innerHTML = `❌ Submit error: ${error.message}`;
     }
 }
 
@@ -1441,142 +1450,6 @@ let rpCompoundingMultiplier = 1.0;
 let autoActive = false;
 let autoInterval = null;
 let rpAutobuyEnabled = false;
-
-// ========== UI ELEMENTS (existing) ==========
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-const honeySpan = document.getElementById('honeyDisplay');
-const beeCountSpan = document.getElementById('beeCountDisplay');
-const totalEarnedSpan = document.getElementById('totalEarnedDisplay');
-const rpSpan = document.getElementById('rpDisplay');
-const rpBadge = document.getElementById('rpBadge');
-const rpShopDisplay = document.getElementById('rpShopDisplay');
-const rebirthInfo = document.getElementById('rebirthInfo');
-const sacrificeInfo = document.getElementById('sacrificeInfo');
-const hireCostSpan = document.getElementById('hireCostSpan');
-const fieldInfo = document.getElementById('fieldInfo');
-const totalMultDisplay = document.getElementById('totalMultDisplay');
-const saveIndicator = document.getElementById('saveIndicator');
-const spDisplay = document.getElementById('spDisplay');
-const spBadge = document.getElementById('spBadge');
-const spShopDisplay = document.getElementById('spShopDisplay');
-
-// Rebirth shop buttons
-const autoStatus = document.getElementById('autoStatus');
-const speedStatus = document.getElementById('speedStatus');
-const capacityStatus = document.getElementById('capacityStatus');
-const honeyMultStatus = document.getElementById('honeyMultStatus');
-const compoundingLevelSpan = document.getElementById('compoundingLevel');
-const compoundingCostSpan = document.getElementById('compoundingCost');
-const speedBoost = document.getElementById('speedBoost');
-const capacityBoost = document.getElementById('capacityBoost');
-
-// SP Shop buttons
-const rpGenLevel = document.getElementById('rpGenLevel');
-const rpGenCost = document.getElementById('rpGenCost');
-const rpGenTime = document.getElementById('rpGenTime');
-const rpGenPreview = document.getElementById('rpGenPreview');
-const rpCompLevel = document.getElementById('rpCompLevel');
-const rpCompCost = document.getElementById('rpCompCost');
-const rpCompMult = document.getElementById('rpCompMult');
-
-// ========== SAVE / LOAD (original) ==========
-function saveGame() {
-    const saveData = {
-        honey,
-        totalHoneyEarned,
-        bees: bees.map(b => ({
-            x: b.x, y: b.y, vx: b.vx, vy: b.vy,
-            carrying: b.carrying,
-            targetFlower: b.targetFlower,
-            returning: b.returning
-        })),
-        flowers: flowers.map(f => ({
-            x: f.x, y: f.y, pollen: f.pollen,
-            active: f.active, timer: f.timer
-        })),
-        nextHireCost,
-        hasClippers, hasShears, hasScythe, hasOil,
-        hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
-        rebirthPoints, sacrificePoints,
-        autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
-        compoundingLevel, compoundingMultiplier,
-        autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
-        rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled
-    };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
-    saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
-    setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
-    
-    submitScore(totalHoneyEarned);
-}
-
-function loadGame() {
-    const saved = localStorage.getItem(SAVE_KEY);
-    if (!saved) return false;
-    try {
-        const data = JSON.parse(saved);
-        honey = data.honey || 0;
-        totalHoneyEarned = data.totalHoneyEarned || 0;
-        bees = data.bees || [];
-        flowers = data.flowers || [];
-        nextHireCost = data.nextHireCost || HIRE_COST_BASE;
-        hasClippers = data.hasClippers || false;
-        hasShears = data.hasShears || false;
-        hasScythe = data.hasScythe || false;
-        hasOil = data.hasOil || false;
-        hasHoneycomb = data.hasHoneycomb || false;
-        hasBeeGun = data.hasBeeGun || false;
-        hasRoyalJelly = data.hasRoyalJelly || false;
-        hasStarTreat = data.hasStarTreat || false;
-        rebirthPoints = data.rebirthPoints || 0;
-        sacrificePoints = data.sacrificePoints || 0;
-        autoUnlocked = data.autoUnlocked || false;
-        beeSpeedMultiplier = data.beeSpeedMultiplier || 1.0;
-        capacityMultiplier = data.capacityMultiplier || 1.0;
-        honeyMultUpgrade = data.honeyMultUpgrade || 1.0;
-        compoundingLevel = data.compoundingLevel || 0;
-        compoundingMultiplier = data.compoundingMultiplier || 1.0;
-        autoActive = data.autoActive || false;
-        x10HoneyPurchased = data.x10HoneyPurchased || false;
-        rpAutoBuyActive = data.rpAutoBuyActive || false;
-        rpGeneratorLevel = data.rpGeneratorLevel || 0;
-        rpCompoundingLevel = data.rpCompoundingLevel || 0;
-        rpCompoundingMultiplier = data.rpCompoundingMultiplier || 1.0;
-        rpAutobuyEnabled = data.rpAutobuyEnabled || false;
-
-        if (autoActive && autoUnlocked) {
-            toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
-            toggleAutoBtn.classList.add('auto-active');
-            if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
-        } else {
-            autoActive = false;
-            toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
-            toggleAutoBtn.classList.remove('auto-active');
-        }
-
-        setupRPGenerator();
-        setupRPAutoBuy();
-
-        if (rpAutobuyEnabled && rpAutoBuyActive) {
-            toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
-            toggleRPAutoBtn.classList.add('rp-autobuy-active');
-        } else {
-            toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
-            toggleRPAutoBtn.classList.remove('rp-autobuy-active');
-        }
-
-        recalcMultiplier();
-        updateRebirthUI();
-        updateToolButtons();
-        updateSPUI();
-        return true;
-    } catch (e) {
-        console.error('Failed to load save', e);
-        return false;
-    }
-}
 
 // ========== GAME MECHANICS ==========
 function update() {
@@ -1944,7 +1817,7 @@ function toggleRPAuto() {
     saveGame();
 }
 
-// ========== EVENT LISTENERS (original) ==========
+// ========== EVENT LISTENERS ==========
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -1972,6 +1845,283 @@ hireBtn.addEventListener('click', () => {
         saveGame();
     }
 });
+
+rebirthBtn.addEventListener('click', () => {
+    const maxRP = getMaxRPFromHoney();
+    if (maxRP > 0) {
+        const cost = getRPCost(maxRP);
+        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier);
+        rebirthPoints += rpGain;
+        
+        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
+        hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
+        hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+        addBee();
+        for (let i = 0; i < 14; i++) spawnFlower();
+        honey = 0;
+        
+        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
+        hireCostSpan.textContent = formatNumber(nextHireCost);
+        saveGame();
+        alert(`✨ Purchased ${maxRP} RP (multiplied to ${rpGain} RP) for ${formatNumber(cost)} honey! Honey reset to 0.`);
+    } else {
+        alert(`❌ Need at least 10,000 honey for 1 RP!`);
+    }
+});
+
+sacrificeBtn.addEventListener('click', () => {
+    const maxSP = getMaxSPFromResources();
+    if (maxSP > 0) {
+        const cost = getSPCost(maxSP);
+        honey -= cost.honey;
+        rebirthPoints -= cost.rp;
+        sacrificePoints += maxSP;
+        
+        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
+        hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
+        hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
+        
+        autoUnlocked = false;
+        beeSpeedMultiplier = 1.0;
+        capacityMultiplier = 1.0;
+        honeyMultUpgrade = 1.0;
+        compoundingLevel = 0;
+        compoundingMultiplier = 1.0;
+        
+        rpCompoundingLevel = 0;
+        rpCompoundingMultiplier = 1.0;
+        
+        autoActive = false;
+        if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+        toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
+        
+        setupRPGenerator();
+        
+        addBee();
+        for (let i = 0; i < 14; i++) spawnFlower();
+        
+        honey = 0;
+        
+        recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
+        hireCostSpan.textContent = formatNumber(nextHireCost);
+        saveGame();
+        
+        alert(`🔥 Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped.`);
+    } else {
+        alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
+    }
+});
+
+// ========== SP SHOP ==========
+buyX10Honey.addEventListener('click', () => {
+    if (sacrificePoints >= 5 && !x10HoneyPurchased) {
+        sacrificePoints -= 5;
+        x10HoneyPurchased = true;
+        recalcMultiplier();
+        updateSPUI();
+        saveGame();
+        alert('🍯 x10 Honey multiplier purchased!');
+    }
+});
+
+buyRPAuto.addEventListener('click', () => {
+    if (sacrificePoints >= 10 && !rpAutoBuyActive) {
+        sacrificePoints -= 10;
+        rpAutoBuyActive = true;
+        if (rpAutobuyEnabled) {
+            setupRPAutoBuy();
+        }
+        updateSPUI();
+        saveGame();
+        alert('🤖 RP Autobuy unlocked! Toggle the button to enable.');
+    }
+});
+
+buyRPGen.addEventListener('click', () => {
+    const cost = rpGeneratorLevel + 1;
+    if (rpGeneratorLevel < 5 && sacrificePoints >= cost) {
+        sacrificePoints -= cost;
+        rpGeneratorLevel++;
+        setupRPGenerator();
+        updateSPUI();
+        saveGame();
+        alert(`⏱️ RP Generator upgraded to level ${rpGeneratorLevel}! Now generating ${Math.floor(1 * rpCompoundingMultiplier)} RP every ${Math.max(1, 5 - (rpGeneratorLevel - 1))}s.`);
+    }
+});
+
+buyRPCompounding.addEventListener('click', () => {
+    const cost = Math.pow(2, rpCompoundingLevel);
+    if (sacrificePoints >= cost) {
+        sacrificePoints -= cost;
+        rpCompoundingLevel++;
+        rpCompoundingMultiplier = Math.pow(1.25, rpCompoundingLevel);
+        setupRPGenerator();
+        updateSPUI();
+        updateRebirthUI();
+        saveGame();
+        alert(`📈 RP Compounding upgraded to level ${rpCompoundingLevel}! (${rpCompoundingMultiplier.toFixed(2)}x RP gain)`);
+    }
+});
+
+// ========== REBIRTH SHOP ==========
+buyAutoUpgrade.addEventListener('click', () => { 
+    if (rebirthPoints >= 2 && !autoUnlocked) { 
+        rebirthPoints -= 2; 
+        autoUnlocked = true; 
+        updateRebirthUI(); 
+        saveGame(); 
+    } 
+});
+
+buyBeeSpeed.addEventListener('click', () => { 
+    if (rebirthPoints >= 1 && beeSpeedMultiplier === 1.0) { 
+        rebirthPoints -= 1; 
+        beeSpeedMultiplier = 1.5; 
+        updateRebirthUI(); 
+        saveGame(); 
+    } 
+});
+
+buyCapacity.addEventListener('click', () => { 
+    if (rebirthPoints >= 3 && capacityMultiplier === 1.0) { 
+        rebirthPoints -= 3; 
+        capacityMultiplier = 2.0; 
+        updateRebirthUI(); 
+        saveGame(); 
+    } 
+});
+
+buyHoneyMult.addEventListener('click', () => { 
+    if (rebirthPoints >= 2 && honeyMultUpgrade === 1.0) { 
+        rebirthPoints -= 2; 
+        honeyMultUpgrade = 5.0; 
+        recalcMultiplier(); 
+        updateRebirthUI(); 
+        saveGame(); 
+    } 
+});
+
+buyCompounding.addEventListener('click', () => {
+    const cost = Math.pow(2, compoundingLevel);
+    if (rebirthPoints >= cost) {
+        rebirthPoints -= cost;
+        compoundingLevel++;
+        compoundingMultiplier = Math.pow(1.25, compoundingLevel);
+        recalcMultiplier();
+        updateRebirthUI();
+        saveGame();
+    }
+});
+
+// Tool purchases
+buyClippers.addEventListener('click', () => { if (!hasClippers && honey>=50) { honey-=50; hasClippers=true; recalcMultiplier(); buyClippers.disabled=true; saveGame(); } });
+buyShears.addEventListener('click', () => { if (!hasShears && honey>=150) { honey-=150; hasShears=true; recalcMultiplier(); buyShears.disabled=true; saveGame(); } });
+buyScythe.addEventListener('click', () => { if (!hasScythe && honey>=400) { honey-=400; hasScythe=true; recalcMultiplier(); buyScythe.disabled=true; saveGame(); } });
+buyOil.addEventListener('click', () => { if (!hasOil && honey>=900) { honey-=900; hasOil=true; recalcMultiplier(); buyOil.disabled=true; saveGame(); } });
+buyHoneycomb.addEventListener('click', () => { if (!hasHoneycomb && honey>=25000) { honey-=25000; hasHoneycomb=true; recalcMultiplier(); buyHoneycomb.disabled=true; saveGame(); } });
+buyBeeGun.addEventListener('click', () => { if (!hasBeeGun && honey>=50000) { honey-=50000; hasBeeGun=true; recalcMultiplier(); buyBeeGun.disabled=true; saveGame(); } });
+buyRoyalJelly.addEventListener('click', () => { if (!hasRoyalJelly && honey>=100000) { honey-=100000; hasRoyalJelly=true; recalcMultiplier(); buyRoyalJelly.disabled=true; saveGame(); } });
+buyStarTreat.addEventListener('click', () => { if (!hasStarTreat && honey>=250000) { honey-=250000; hasStarTreat=true; recalcMultiplier(); buyStarTreat.disabled=true; saveGame(); } });
+
+toggleAutoBtn.addEventListener('click', toggleAuto);
+toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
+
+// ========== SAVE GAME FUNCTION ==========
+function saveGame() {
+    const saveData = {
+        honey,
+        totalHoneyEarned,
+        bees: bees.map(b => ({
+            x: b.x, y: b.y, vx: b.vx, vy: b.vy,
+            carrying: b.carrying,
+            targetFlower: b.targetFlower,
+            returning: b.returning
+        })),
+        flowers: flowers.map(f => ({
+            x: f.x, y: f.y, pollen: f.pollen,
+            active: f.active, timer: f.timer
+        })),
+        nextHireCost,
+        hasClippers, hasShears, hasScythe, hasOil,
+        hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
+        rebirthPoints, sacrificePoints,
+        autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
+        compoundingLevel, compoundingMultiplier,
+        autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
+        rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+    saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
+    setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
+    
+    submitScore(totalHoneyEarned);
+}
+
+function loadGame() {
+    const saved = localStorage.getItem(SAVE_KEY);
+    if (!saved) return false;
+    try {
+        const data = JSON.parse(saved);
+        honey = data.honey || 0;
+        totalHoneyEarned = data.totalHoneyEarned || 0;
+        bees = data.bees || [];
+        flowers = data.flowers || [];
+        nextHireCost = data.nextHireCost || HIRE_COST_BASE;
+        hasClippers = data.hasClippers || false;
+        hasShears = data.hasShears || false;
+        hasScythe = data.hasScythe || false;
+        hasOil = data.hasOil || false;
+        hasHoneycomb = data.hasHoneycomb || false;
+        hasBeeGun = data.hasBeeGun || false;
+        hasRoyalJelly = data.hasRoyalJelly || false;
+        hasStarTreat = data.hasStarTreat || false;
+        rebirthPoints = data.rebirthPoints || 0;
+        sacrificePoints = data.sacrificePoints || 0;
+        autoUnlocked = data.autoUnlocked || false;
+        beeSpeedMultiplier = data.beeSpeedMultiplier || 1.0;
+        capacityMultiplier = data.capacityMultiplier || 1.0;
+        honeyMultUpgrade = data.honeyMultUpgrade || 1.0;
+        compoundingLevel = data.compoundingLevel || 0;
+        compoundingMultiplier = data.compoundingMultiplier || 1.0;
+        autoActive = data.autoActive || false;
+        x10HoneyPurchased = data.x10HoneyPurchased || false;
+        rpAutoBuyActive = data.rpAutoBuyActive || false;
+        rpGeneratorLevel = data.rpGeneratorLevel || 0;
+        rpCompoundingLevel = data.rpCompoundingLevel || 0;
+        rpCompoundingMultiplier = data.rpCompoundingMultiplier || 1.0;
+        rpAutobuyEnabled = data.rpAutobuyEnabled || false;
+
+        if (autoActive && autoUnlocked) {
+            toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
+            toggleAutoBtn.classList.add('auto-active');
+            if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
+        } else {
+            autoActive = false;
+            toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+            toggleAutoBtn.classList.remove('auto-active');
+        }
+
+        setupRPGenerator();
+        setupRPAutoBuy();
+
+        if (rpAutobuyEnabled && rpAutoBuyActive) {
+            toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
+            toggleRPAutoBtn.classList.add('rp-autobuy-active');
+        } else {
+            toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+            toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+        }
+
+        recalcMultiplier();
+        updateRebirthUI();
+        updateToolButtons();
+        updateSPUI();
+        return true;
+    } catch (e) {
+        console.error('Failed to load save', e);
+        return false;
+    }
+}
 
 // ========== INIT ==========
 function init() {
