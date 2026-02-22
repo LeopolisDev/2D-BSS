@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · infinite rebirths & working honey boost</title>
+    <title>🐝 BEE SWARM · fixed tool multiplier display</title>
     <style>
         * {
             box-sizing: border-box;
@@ -148,10 +148,12 @@
         .multiplier-badge {
             background: #5e4d23;
             color: #ffe484;
-            padding: 5px 15px;
+            padding: 5px 20px;
             border-radius: 40px;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
             font-weight: bold;
+            min-width: 100px;
+            text-align: center;
         }
         .rebirth-row {
             display: flex;
@@ -221,8 +223,6 @@
             <div class="stats">
                 <div class="stat-item">🍯 <span id="honeyDisplay">0</span></div>
                 <div class="stat-item">🐝 <span id="beeCountDisplay">1</span></div>
-                <div class="stat-item">✨ x<span id="multiplierDisplay">1.00</span></div>
-                <div class="stat-item">🍯 x<span id="honeyMultDisplay">1.0</span></div>
                 <div class="stat-item">🔁 <span id="rpDisplay">0</span> RP</div>
             </div>
             <div class="button-group">
@@ -232,14 +232,16 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Rebirth row -->
+        <!-- Convert Honey to RP row (scaling) -->
         <div class="rebirth-row">
-            <span style="color:#fff4c2; font-weight:bold;">🌀 REBIRTH:</span>
-            <button class="tool-btn" id="rebirthBtn">🔁 REBIRTH (<span id="rebirthCostSpan">10000</span>🍯) → +1 RP</button>
+            <span style="color:#fff4c2; font-weight:bold;">🔄 CONVERT HONEY TO RP:</span>
+            <button class="tool-btn" id="convert1Btn">🍯 10k → 1 RP</button>
+            <button class="tool-btn" id="convert2Btn">🍯 15k → 2 RP</button>
+            <button class="tool-btn" id="convert3Btn">🍯 22.5k → 3 RP</button>
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
-        <!-- Rebirth shop (with Honey Upgrade) -->
+        <!-- Rebirth shop (permanent upgrades) -->
         <div class="rebirth-shop-row">
             <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
             <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO (2 RP)</button>
@@ -249,7 +251,7 @@
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
-        <!-- Tool shop -->
+        <!-- Tool shop with combined multiplier display -->
         <div class="shop-row">
             <span style="color:#fff4c2; font-weight:bold;">🛒 TOOLS:</span>
             <button class="tool-btn" id="buyClippers">✂️ 1.2x (50🍯)</button>
@@ -295,7 +297,6 @@
 
     // Rebirth
     let rebirthPoints = 0;
-    let rebirthCount = 0;  // Number of rebirths performed, used for scaling cost
 
     // Rebirth upgrades
     let autoUnlocked = false;
@@ -314,21 +315,20 @@
     // Display spans
     const honeySpan = document.getElementById('honeyDisplay');
     const beeCountSpan = document.getElementById('beeCountDisplay');
-    const multiplierSpan = document.getElementById('multiplierDisplay');
-    const honeyMultDisplay = document.getElementById('honeyMultDisplay');
     const rpSpan = document.getElementById('rpDisplay');
     const rpBadge = document.getElementById('rpBadge');
     const rpShopDisplay = document.getElementById('rpShopDisplay');
     const hireCostSpan = document.getElementById('hireCostSpan');
     const fieldInfo = document.getElementById('fieldInfo');
     const totalMultDisplay = document.getElementById('totalMultDisplay');
-    const rebirthCostSpan = document.getElementById('rebirthCostSpan');
     const saveIndicator = document.getElementById('saveIndicator');
 
     // Buttons
     const hireBtn = document.getElementById('hireBtn');
     const resetBtn = document.getElementById('resetBtn');
-    const rebirthBtn = document.getElementById('rebirthBtn');
+    const convert1Btn = document.getElementById('convert1Btn');
+    const convert2Btn = document.getElementById('convert2Btn');
+    const convert3Btn = document.getElementById('convert3Btn');
     const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
     const buyBeeSpeed = document.getElementById('buyBeeSpeed');
     const buyCapacity = document.getElementById('buyCapacity');
@@ -357,7 +357,7 @@
             })),
             nextHireCost,
             hasClippers, hasShears, hasScythe, hasOil,
-            rebirthPoints, rebirthCount,
+            rebirthPoints,
             autoUnlocked, beeSpeedBoost, capacityBoost, honeyMultUpgrade,
             autoActive
         };
@@ -381,7 +381,6 @@
             hasScythe = data.hasScythe || false;
             hasOil = data.hasOil || false;
             rebirthPoints = data.rebirthPoints || 0;
-            rebirthCount = data.rebirthCount || 0;
             autoUnlocked = data.autoUnlocked || false;
             beeSpeedBoost = data.beeSpeedBoost || 1.0;
             capacityBoost = data.capacityBoost || 0;
@@ -420,15 +419,17 @@
 
     // ========== HELPER FUNCTIONS ==========
     function recalcMultiplier() {
-        let mult = 1.0;
-        if (hasClippers) mult *= 1.2;
-        if (hasShears) mult *= 1.5;
-        if (hasScythe) mult *= 2.0;
-        if (hasOil) mult *= 3.0;
-        toolMultiplier = mult;
-        multiplierSpan.textContent = toolMultiplier.toFixed(2);
-        totalMultDisplay.textContent = `✖️ ${toolMultiplier.toFixed(2)}`;
-        honeyMultDisplay.textContent = honeyMultUpgrade.toFixed(1);
+        // Tool multiplier
+        let toolMult = 1.0;
+        if (hasClippers) toolMult *= 1.2;
+        if (hasShears) toolMult *= 1.5;
+        if (hasScythe) toolMult *= 2.0;
+        if (hasOil) toolMult *= 3.0;
+        toolMultiplier = toolMult;
+        
+        // Total multiplier (tools * honey upgrade)
+        const totalMult = toolMult * honeyMultUpgrade;
+        totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
     }
 
     function updateToolButtons() {
@@ -492,22 +493,10 @@
         return bestIndex;
     }
 
-    // ========== INFINITE SCALING REBIRTH COST ==========
-    // Cost starts at 10k, then multiplies by 1.5 each rebirth: 10k, 15k, 22.5k, 33.75k, ...
-    function getRebirthCost() {
-        if (rebirthCount === 0) return 10000;
-        let cost = 10000;
-        for (let i = 0; i < rebirthCount; i++) {
-            cost = Math.floor(cost * 1.5);
-        }
-        return cost;
-    }
-
     function updateRebirthUI() {
         rpSpan.textContent = rebirthPoints;
         rpBadge.textContent = `RP: ${rebirthPoints}`;
         rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
-        rebirthCostSpan.textContent = getRebirthCost();
 
         // Update rebirth shop buttons
         buyAutoUpgrade.disabled = autoUnlocked || rebirthPoints < 2;
@@ -630,7 +619,6 @@
         const activeFlowers = flowers.filter(f => f.active).length;
         fieldInfo.textContent = `🌸 ${activeFlowers} flowers`;
         hireCostSpan.textContent = nextHireCost;
-        honeyMultDisplay.textContent = honeyMultUpgrade.toFixed(1);
     }
 
     // ========== DRAWING ==========
@@ -862,26 +850,30 @@
         }
     });
 
-    rebirthBtn.addEventListener('click', () => {
-        const cost = getRebirthCost();
-        if (honey >= cost) {
-            honey -= cost;
-            rebirthPoints++;
-            rebirthCount++;  // Increment rebirth count for next cost scaling
-            
-            // Reset progress but keep rebirth points and upgrades
-            bees = [];
-            flowers = [];
-            nextHireCost = HIRE_COST_BASE;
-            // Tools reset (but rebirth upgrades remain)
-            hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
-            
-            addBee();
-            for (let i = 0; i < 14; i++) spawnFlower();
-            
-            recalcMultiplier();
+    // Convert honey to RP buttons
+    convert1Btn.addEventListener('click', () => {
+        if (honey >= 10000) {
+            honey -= 10000;
+            rebirthPoints += 1;
             updateRebirthUI();
-            updateToolButtons();
+            saveGame();
+        }
+    });
+
+    convert2Btn.addEventListener('click', () => {
+        if (honey >= 15000) {
+            honey -= 15000;
+            rebirthPoints += 2;
+            updateRebirthUI();
+            saveGame();
+        }
+    });
+
+    convert3Btn.addEventListener('click', () => {
+        if (honey >= 22500) {
+            honey -= 22500;
+            rebirthPoints += 3;
+            updateRebirthUI();
             saveGame();
         }
     });
