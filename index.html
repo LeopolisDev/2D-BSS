@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · RP generator 5 levels + compounding rebirths</title>
+    <title>🐝 BEE SWARM · COMPLETE WORKING VERSION</title>
     <style>
         * {
             box-sizing: border-box;
@@ -552,8 +552,9 @@
 
 <script>
 // ================== JSONBIN.IO CONFIGURATION ==================
-const JSONBIN_API_KEY = '$2a$10$ON.SJigSCL.vy4bO8AMaauHNDgTQo.PRT9aDlQbEl/dkNTQ9E/nSy'; // ← YOUR MASTER KEY
-const JSONBIN_BIN_ID = '699ab34ad0ea881f40ce4a59'; // ← YOUR BIN ID
+// REPLACE THESE WITH YOUR ACTUAL VALUES
+const JSONBIN_API_KEY = '$2a$10$ON.SJigSCL.vy4bO8AMaauHNDgTQo.PRT9aDlQbEl/dkNTQ9E/nSy';
+const JSONBIN_BIN_ID = '699ab34ad0ea881f40ce4a59';
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
 // ========== GLOBAL VARIABLES ==========
@@ -574,15 +575,12 @@ const nameError = document.getElementById('nameError');
 const refreshBtn = document.getElementById('refreshLeaderboard');
 const debugInfo = document.getElementById('debugInfo');
 const adminPanel = document.getElementById('adminPanel');
-const spDisplay = document.getElementById('spDisplay');
-const spBadge = document.getElementById('spBadge');
-const spShopDisplay = document.getElementById('spShopDisplay');
 const adminPlayerSelect = document.getElementById('adminPlayerSelect');
 const adminStatSelect = document.getElementById('adminStatSelect');
 const adminAmount = document.getElementById('adminAmount');
 const adminAddBtn = document.getElementById('adminAddBtn');
 
-// ========== NUMBER FORMATTING FUNCTION (abbreviates) ==========
+// ========== NUMBER FORMATTING FUNCTION ==========
 function formatNumber(num) {
     if (num === undefined || num === null) return '0';
     if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
@@ -756,6 +754,7 @@ saveNameBtn.addEventListener('click', async () => {
     if (playerName === 'Opleoni') {
         console.log('🔮 Admin panel activated for Opleoni');
         adminPanel.style.display = 'flex';
+        updateAdminPlayerSelect();
     } else {
         adminPanel.style.display = 'none';
     }
@@ -767,7 +766,10 @@ if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     fetchLeaderboard();
-    if (playerName === 'Opleoni') adminPanel.style.display = 'flex';
+    if (playerName === 'Opleoni') {
+        adminPanel.style.display = 'flex';
+        setTimeout(updateAdminPlayerSelect, 1000);
+    }
 } else {
     nameModal.style.display = 'flex';
     fetchLeaderboard();
@@ -795,11 +797,11 @@ function getMaxRPFromHoney() {
     return rpCount - 1;
 }
 
-// ========== SP PRICING (Sacrifice) ==========
+// ========== SP PRICING ==========
 function getSPCost(spNumber) {
     return {
-        honey: Math.floor(100000000 * Math.pow(1.5, spNumber - 1)), // 100M, 150M, 225M...
-        rp: Math.floor(10 * Math.pow(1.5, spNumber - 1)) // 10, 15, 22.5...
+        honey: Math.floor(100000000 * Math.pow(1.5, spNumber - 1)),
+        rp: Math.floor(10 * Math.pow(1.5, spNumber - 1))
     };
 }
 
@@ -842,19 +844,17 @@ let compoundingMultiplier = 1.0;
 // SP Upgrades
 let x10HoneyPurchased = false;
 let rpAutoBuyActive = false;
-let rpGeneratorLevel = 0; // 0-5 now
+let rpGeneratorLevel = 0;
 let rpGeneratorInterval = null;
 let rpAutoBuyInterval = null;
 
-// RP Compounding upgrade (infinite)
+// RP Compounding upgrade
 let rpCompoundingLevel = 0;
-let rpCompoundingMultiplier = 1.0; // 1.25^level, affects RP gain from rebirth and generator
+let rpCompoundingMultiplier = 1.0;
 
 // Automation
 let autoActive = false;
 let autoInterval = null;
-
-// RP Autobuy toggle (separate from purchased upgrade)
 let rpAutobuyEnabled = false;
 
 // ========== UI ELEMENTS ==========
@@ -873,6 +873,9 @@ const hireCostSpan = document.getElementById('hireCostSpan');
 const fieldInfo = document.getElementById('fieldInfo');
 const totalMultDisplay = document.getElementById('totalMultDisplay');
 const saveIndicator = document.getElementById('saveIndicator');
+const spDisplay = document.getElementById('spDisplay');
+const spBadge = document.getElementById('spBadge');
+const spShopDisplay = document.getElementById('spShopDisplay');
 
 // Rebirth shop buttons
 const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
@@ -916,11 +919,7 @@ const toggleRPAutoBtn = document.getElementById('toggleRPAutoBtn');
 const sacrificeBtn = document.getElementById('sacrificeBtn');
 const resetBtn = document.getElementById('resetBtn');
 const resetHoneyBtn = document.getElementById('resetHoneyBtn');
-
-// Admin elements
-const adminStatSelect = document.getElementById('adminStatSelect');
-const adminAmount = document.getElementById('adminAmount');
-const adminAddBtn = document.getElementById('adminAddBtn');
+const rebirthBtn = document.getElementById('rebirthBtn');
 
 // ========== SAVE / LOAD ==========
 function saveGame() {
@@ -996,13 +995,9 @@ function loadGame() {
             toggleAutoBtn.classList.remove('auto-active');
         }
 
-        // Setup RP generator if level > 0
         setupRPGenerator();
-        
-        // Setup RP AutoBuy if active
         setupRPAutoBuy();
 
-        // Update RP Autobuy toggle button
         if (rpAutobuyEnabled && rpAutoBuyActive) {
             toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
             toggleRPAutoBtn.classList.add('rp-autobuy-active');
@@ -1025,10 +1020,8 @@ function loadGame() {
 function setupRPGenerator() {
     if (rpGeneratorInterval) clearInterval(rpGeneratorInterval);
     if (rpGeneratorLevel > 0) {
-        // Level 1: 5s, Level 2: 4s, Level 3: 3s, Level 4: 2s, Level 5: 1s
         const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000);
         rpGeneratorInterval = setInterval(() => {
-            // Apply RP compounding multiplier to generator
             let rpGain = Math.floor(1 * rpCompoundingMultiplier);
             rebirthPoints += rpGain;
             updateRebirthUI();
@@ -1041,7 +1034,6 @@ function setupRPAutoBuy() {
     if (rpAutoBuyInterval) clearInterval(rpAutoBuyInterval);
     if (rpAutoBuyActive && rpAutobuyEnabled) {
         rpAutoBuyInterval = setInterval(() => {
-            // Auto-buy RP upgrades (compounding first, then others if enough RP)
             if (rebirthPoints >= Math.pow(2, compoundingLevel)) {
                 buyCompounding.click();
             } else if (!autoUnlocked && rebirthPoints >= 2) {
@@ -1212,9 +1204,8 @@ function updateSPUI() {
     buyX10Honey.disabled = x10HoneyPurchased || sacrificePoints < 5;
     buyRPAuto.disabled = rpAutoBuyActive || sacrificePoints < 10;
     
-    // RP Generator: now up to level 5 (costs 1,2,3,4,5 SP)
     const nextLevel = rpGeneratorLevel + 1;
-    const genCost = nextLevel; // 1,2,3,4,5
+    const genCost = nextLevel;
     rpGenLevel.textContent = rpGeneratorLevel;
     rpGenCost.textContent = genCost;
     let intervalTime = 5;
@@ -1224,8 +1215,7 @@ function updateSPUI() {
     rpGenTime.textContent = intervalTime + 's';
     buyRPGen.disabled = rpGeneratorLevel >= 5 || sacrificePoints < genCost;
 
-    // RP Compounding upgrade (infinite)
-    const compCost = Math.pow(2, rpCompoundingLevel); // 1,2,4,8,16...
+    const compCost = Math.pow(2, rpCompoundingLevel);
     rpCompLevel.textContent = rpCompoundingLevel;
     rpCompCost.textContent = compCost;
     rpCompMult.textContent = rpCompoundingMultiplier.toFixed(2);
@@ -1468,9 +1458,8 @@ resetBtn.addEventListener('click', () => {
 
 resetHoneyBtn.addEventListener('click', () => {
     honey = 0;
-    totalHoneyEarned = 0; // Reset leaderboard total too
+    totalHoneyEarned = 0;
     
-    // Update leaderboard
     let playerEntry = leaderboard.find(entry => entry.name === playerName);
     if (playerEntry) {
         playerEntry.total = 0;
@@ -1481,12 +1470,10 @@ resetHoneyBtn.addEventListener('click', () => {
     alert('Honey and leaderboard score reset to 0!');
 });
 
-// ========== REBIRTH (now affected by RP compounding) ==========
 rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
         const cost = getRPCost(maxRP);
-        // Apply RP compounding multiplier
         const rpGain = Math.floor(maxRP * rpCompoundingMultiplier);
         rebirthPoints += rpGain;
         
@@ -1506,7 +1493,6 @@ rebirthBtn.addEventListener('click', () => {
     }
 });
 
-// ========== SACRIFICE (wipes everything except SP) ==========
 sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
@@ -1515,12 +1501,10 @@ sacrificeBtn.addEventListener('click', () => {
         rebirthPoints -= cost.rp;
         sacrificePoints += maxSP;
         
-        // WIPE EVERYTHING except SP and SP upgrades
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         
-        // Reset rebirth upgrades
         autoUnlocked = false;
         beeSpeedMultiplier = 1.0;
         capacityMultiplier = 1.0;
@@ -1528,16 +1512,13 @@ sacrificeBtn.addEventListener('click', () => {
         compoundingLevel = 0;
         compoundingMultiplier = 1.0;
         
-        // Reset RP compounding (keeps SP upgrades but resets this)
         rpCompoundingLevel = 0;
         rpCompoundingMultiplier = 1.0;
         
-        // Stop automation
         autoActive = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
         
-        // Restart generator with new multiplier
         setupRPGenerator();
         
         addBee();
@@ -1590,17 +1571,15 @@ buyRPGen.addEventListener('click', () => {
     }
 });
 
-// RP Compounding upgrade (infinite)
 buyRPCompounding.addEventListener('click', () => {
     const cost = Math.pow(2, rpCompoundingLevel);
     if (sacrificePoints >= cost) {
         sacrificePoints -= cost;
         rpCompoundingLevel++;
         rpCompoundingMultiplier = Math.pow(1.25, rpCompoundingLevel);
-        // Update generator if active
         setupRPGenerator();
         updateSPUI();
-        updateRebirthUI(); // Update rebirth display
+        updateRebirthUI();
         saveGame();
         alert(`📈 RP Compounding upgraded to level ${rpCompoundingLevel}! (${rpCompoundingMultiplier.toFixed(2)}x RP gain)`);
     }
@@ -1682,10 +1661,8 @@ adminAddBtn.addEventListener('click', () => {
         return;
     }
     
-    // Find player in leaderboard
     let playerEntry = leaderboard.find(entry => entry.name === targetPlayer);
     if (!playerEntry) {
-        // Create new entry if doesn't exist
         playerEntry = { name: targetPlayer, total: 0 };
         leaderboard.push(playerEntry);
     }
