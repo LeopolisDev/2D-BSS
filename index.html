@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · Firebase 64-bit Leaderboard</title>
+    <title>🐝 BEE SWARM · save/load codes + Firebase</title>
     <style>
         * {
             box-sizing: border-box;
@@ -338,6 +338,8 @@
             display: flex;
             gap: 20px;
             align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         .you-row {
             background: #4a6b3a;
@@ -461,6 +463,43 @@
             margin-top: 5px;
             word-break: break-all;
         }
+        /* Save/Load section */
+        .save-load-row {
+            background: #4a6b3a;
+            border-radius: 60px;
+            padding: 15px 20px;
+            margin-top: 15px;
+            border: 3px solid #ffd966;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+        }
+        .save-code-input {
+            background: #efeac5;
+            border: none;
+            border-radius: 40px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            width: 300px;
+            text-align: center;
+            border-bottom: 4px solid #bd9f4b;
+            outline: none;
+            font-family: monospace;
+        }
+        .save-code-display {
+            background: #2d4a2a;
+            border-radius: 40px;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            color: #ffefc0;
+            border: 2px solid #ffd966;
+            max-width: 400px;
+            word-break: break-all;
+            font-family: monospace;
+        }
     </style>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -507,7 +546,7 @@
         <!-- Leaderboard Panel (FIREBASE - 64-bit) -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">
-                🌍 GLOBAL TOP 10
+                🌍 GLOBAL TOP 10 (Firebase)
                 <span class="refresh-btn" id="refreshLeaderboard">↻</span>
             </div>
             <div id="leaderboardList">
@@ -599,7 +638,7 @@
             <button id="cancelAnnouncementBtn">CANCEL</button>
         </div>
 
-        <!-- Footer -->
+        <!-- Footer with RESET buttons and SAVE/LOAD -->
         <footer>
             <div class="footer-row">
                 <span>🌸 Click flowers to boost them</span>
@@ -609,13 +648,20 @@
                 <button class="bee-btn reset-btn-bottom" id="resetBtn">🔄 RESET ALL PROGRESS</button>
                 <button class="bee-btn reset-btn-bottom" id="resetHoneyBtn">🍯 RESET HONEY (leaderboard too)</button>
             </div>
+            
+            <!-- SAVE/LOAD Section -->
+            <div class="save-load-row">
+                <button class="tool-btn" id="generateSaveBtn">📋 GENERATE SAVE CODE</button>
+                <div class="save-code-display" id="saveCodeDisplay">Click generate to create code</div>
+                <input type="text" id="loadCodeInput" class="save-code-input" placeholder="Paste save code here">
+                <button class="tool-btn" id="loadSaveBtn">📂 LOAD SAVE</button>
+            </div>
         </footer>
     </div>
 </div>
 
 <script>
 // ================== FIREBASE CONFIGURATION ==================
-// YOUR FIREBASE CONFIG - COPY FROM YOUR FIREBASE CONSOLE
 const firebaseConfig = {
     apiKey: "AIzaSyCw-Ldw_t2XV5sV3FxBROtE72dPxuH3Z-I",
     authDomain: "bee-swarm-5b9f9.firebaseapp.com",
@@ -661,6 +707,12 @@ const announcementPopup = document.getElementById('announcementPopup');
 const announcementMessage = document.getElementById('announcementMessage');
 const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
 
+// Save/Load elements
+const generateSaveBtn = document.getElementById('generateSaveBtn');
+const saveCodeDisplay = document.getElementById('saveCodeDisplay');
+const loadCodeInput = document.getElementById('loadCodeInput');
+const loadSaveBtn = document.getElementById('loadSaveBtn');
+
 // Show announcement if exists
 if (currentAnnouncement && !announcementClosed) {
     announcementMessage.textContent = currentAnnouncement;
@@ -682,6 +734,122 @@ function formatNumber(num) {
     if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
     return Math.floor(num).toString();
 }
+
+// ========== SAVE/LOAD FUNCTIONS ==========
+function generateSaveCode() {
+    const saveData = {
+        honey,
+        totalHoneyEarned,
+        rebirthPoints,
+        sacrificePoints,
+        hasClippers, hasShears, hasScythe, hasOil,
+        hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
+        autoUnlocked,
+        beeSpeedMultiplier,
+        capacityMultiplier,
+        honeyMultUpgrade,
+        compoundingLevel, compoundingMultiplier,
+        x10HoneyPurchased,
+        rpAutoBuyActive,
+        rpGeneratorLevel,
+        rpCompoundingLevel, rpCompoundingMultiplier,
+        rpAutobuyEnabled,
+        autoActive
+    };
+    
+    // Convert to JSON and then to base64 for a compact code
+    const jsonStr = JSON.stringify(saveData);
+    const base64 = btoa(encodeURIComponent(jsonStr));
+    saveCodeDisplay.textContent = base64;
+    return base64;
+}
+
+function loadSaveCode(code) {
+    try {
+        // Decode from base64
+        const jsonStr = decodeURIComponent(atob(code));
+        const saveData = JSON.parse(jsonStr);
+        
+        // Apply all saved values
+        honey = saveData.honey || 0;
+        totalHoneyEarned = saveData.totalHoneyEarned || 0;
+        rebirthPoints = saveData.rebirthPoints || 0;
+        sacrificePoints = saveData.sacrificePoints || 0;
+        
+        hasClippers = saveData.hasClippers || false;
+        hasShears = saveData.hasShears || false;
+        hasScythe = saveData.hasScythe || false;
+        hasOil = saveData.hasOil || false;
+        hasHoneycomb = saveData.hasHoneycomb || false;
+        hasBeeGun = saveData.hasBeeGun || false;
+        hasRoyalJelly = saveData.hasRoyalJelly || false;
+        hasStarTreat = saveData.hasStarTreat || false;
+        
+        autoUnlocked = saveData.autoUnlocked || false;
+        beeSpeedMultiplier = saveData.beeSpeedMultiplier || 1.0;
+        capacityMultiplier = saveData.capacityMultiplier || 1.0;
+        honeyMultUpgrade = saveData.honeyMultUpgrade || 1.0;
+        compoundingLevel = saveData.compoundingLevel || 0;
+        compoundingMultiplier = saveData.compoundingMultiplier || 1.0;
+        
+        x10HoneyPurchased = saveData.x10HoneyPurchased || false;
+        rpAutoBuyActive = saveData.rpAutoBuyActive || false;
+        rpGeneratorLevel = saveData.rpGeneratorLevel || 0;
+        rpCompoundingLevel = saveData.rpCompoundingLevel || 0;
+        rpCompoundingMultiplier = saveData.rpCompoundingMultiplier || 1.0;
+        rpAutobuyEnabled = saveData.rpAutobuyEnabled || false;
+        autoActive = saveData.autoActive || false;
+        
+        // Restart generators
+        setupRPGenerator();
+        setupRPAutoBuy();
+        
+        // Update UI
+        if (autoActive && autoUnlocked) {
+            toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
+            toggleAutoBtn.classList.add('auto-active');
+            if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
+        } else {
+            autoActive = false;
+            toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+            toggleAutoBtn.classList.remove('auto-active');
+        }
+        
+        if (rpAutobuyEnabled && rpAutoBuyActive) {
+            toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
+            toggleRPAutoBtn.classList.add('rp-autobuy-active');
+        } else {
+            toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+            toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+        }
+        
+        recalcMultiplier();
+        updateRebirthUI();
+        updateToolButtons();
+        updateSPUI();
+        saveGame();
+        
+        alert('✅ Save loaded successfully!');
+        return true;
+    } catch (e) {
+        console.error('Failed to load save:', e);
+        alert('❌ Invalid save code!');
+        return false;
+    }
+}
+
+generateSaveBtn.addEventListener('click', () => {
+    generateSaveCode();
+});
+
+loadSaveBtn.addEventListener('click', () => {
+    const code = loadCodeInput.value.trim();
+    if (code) {
+        loadSaveCode(code);
+    } else {
+        alert('❌ Please enter a save code');
+    }
+});
 
 // ========== FIREBASE LEADERBOARD FUNCTIONS ==========
 function fetchLeaderboard() {
@@ -711,6 +879,8 @@ function fetchLeaderboard() {
     }, (error) => {
         console.error('Firebase error:', error);
         debugInfo.innerHTML = `❌ Error: ${error.message}`;
+        document.getElementById('leaderboardList').innerHTML = 
+            '<div class="leaderboard-entry">⚠️ Firebase connection error. Check rules.</div>';
     });
 }
 
@@ -718,14 +888,10 @@ async function submitScore(score) {
     if (!playerName || score < 0) return;
     
     try {
-        console.log('Submitting score to Firebase:', { playerName, score });
-        
         await leaderboardRef.child(playerName.replace(/[.#$\[\]]/g, '_')).set({
             name: playerName,
             total: score
         });
-        
-        console.log('Submit success');
     } catch (error) {
         console.error('Failed to submit score:', error);
         debugInfo.innerHTML = `❌ Submit error: ${error.message}`;
@@ -834,7 +1000,7 @@ saveNameBtn.addEventListener('click', async () => {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
     
-    await submitScore(0);
+    await submitScore(totalHoneyEarned);
     
     if (playerName === 'Opleoni') {
         console.log('🔮 Admin panel activated');
@@ -1869,5 +2035,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
-
