@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · smart rebirth + working reset</title>
+    <title>🐝 BEE SWARM · fixed RP scaling & boosted upgrades</title>
     <style>
         * {
             box-sizing: border-box;
@@ -244,8 +244,8 @@
         <div class="rebirth-shop-row">
             <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
             <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO (2 RP)</button>
-            <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED (1 RP)</button>
-            <button class="tool-btn" id="buyCapacity">📦 CAPACITY (3 RP)</button>
+            <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED x1.5 (1 RP)</button>
+            <button class="tool-btn" id="buyCapacity">📦 CAPACITY x2 (3 RP)</button>
             <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 (2 RP)</button>
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
@@ -279,7 +279,7 @@
     const HIVE_X = 100, HIVE_Y = 200;
     const FLOWER_RADIUS = 16;
     const MAX_FLOWERS = 22;
-    const BEE_SPEED = 1.1;
+    const BEE_SPEED_BASE = 1.1;
     const BEE_CAPACITY_BASE = 8;
     const HIRE_COST_BASE = 20;
     const SAVE_KEY = 'beeSwarmSave';
@@ -297,11 +297,11 @@
     // Rebirth
     let rebirthPoints = 0;
 
-    // Rebirth upgrades
+    // Rebirth upgrades (now with proper multipliers)
     let autoUnlocked = false;
-    let beeSpeedBoost = 1.0;
-    let capacityBoost = 0;
-    let honeyMultUpgrade = 1.0;  // x5 when purchased
+    let beeSpeedMultiplier = 1.0;  // x1.5 when purchased
+    let capacityMultiplier = 1.0;   // x2 when purchased
+    let honeyMultUpgrade = 1.0;     // x5 when purchased
 
     // Automation
     let autoActive = false;
@@ -356,7 +356,7 @@
             nextHireCost,
             hasClippers, hasShears, hasScythe, hasOil,
             rebirthPoints,
-            autoUnlocked, beeSpeedBoost, capacityBoost, honeyMultUpgrade,
+            autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
             autoActive
         };
         localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
@@ -380,8 +380,8 @@
             hasOil = data.hasOil || false;
             rebirthPoints = data.rebirthPoints || 0;
             autoUnlocked = data.autoUnlocked || false;
-            beeSpeedBoost = data.beeSpeedBoost || 1.0;
-            capacityBoost = data.capacityBoost || 0;
+            beeSpeedMultiplier = data.beeSpeedMultiplier || 1.0;
+            capacityMultiplier = data.capacityMultiplier || 1.0;
             honeyMultUpgrade = data.honeyMultUpgrade || 1.0;
             autoActive = data.autoActive || false;
 
@@ -464,7 +464,8 @@
     }
 
     function addBee() {
-        let capacity = BEE_CAPACITY_BASE + capacityBoost;
+        // Apply capacity multiplier
+        let capacity = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
         bees.push({
             x: HIVE_X + (Math.random() * 30 - 15),
             y: HIVE_Y + (Math.random() * 30 - 15),
@@ -491,18 +492,29 @@
         return bestIndex;
     }
 
-    // Calculate how many RP you can get from current honey (scaling: 10k for 1st, 15k for 2nd, 22.5k for 3rd, etc.)
-    function getMaxRPFromHoney() {
-        let honeyRemaining = honey;
-        let rpGain = 0;
-        let cost = 10000; // First RP costs 10k
+    // ========== FIXED RP CONVERSION (Multiplicative scaling) ==========
+    // 10k = 1 RP, 15k = 2 RP, 22.5k = 3 RP, 33.75k = 4 RP, etc.
+    function calculateRPFromHoney(honeyAmount) {
+        let remainingHoney = honeyAmount;
+        let rpGained = 0;
+        let targetRP = 1;
+        let costForNextRP = 10000; // First RP costs 10k
         
-        while (honeyRemaining >= cost) {
-            honeyRemaining -= cost;
-            rpGain++;
-            cost = Math.floor(cost * 1.5); // Next RP costs 1.5x more
+        // Keep buying RP while we have enough honey for the next one
+        while (remainingHoney >= costForNextRP) {
+            remainingHoney -= costForNextRP;
+            rpGained++;
+            targetRP++;
+            // Cost for next RP is 1.5x the previous cost
+            costForNextRP = Math.floor(10000 * Math.pow(1.5, targetRP - 1));
         }
-        return { rpGain, nextCost: cost };
+        
+        return { 
+            rpGained, 
+            remainingHoney, 
+            nextCost: costForNextRP,
+            nextRPCost: costForNextRP
+        };
     }
 
     function updateRebirthUI() {
@@ -510,18 +522,16 @@
         rpBadge.textContent = `RP: ${rebirthPoints}`;
         rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
 
-        // Update rebirth info
-        const { rpGain, nextCost } = getMaxRPFromHoney();
-        if (rpGain > 0) {
-            rebirthInfo.textContent = `${nextCost.toLocaleString()}🍯 = ${rpGain + 1} RP`;
-        } else {
-            rebirthInfo.textContent = `${nextCost.toLocaleString()}🍯 = 1 RP`;
-        }
+        // Update rebirth info with CORRECT multiplicative calculation
+        const { rpGained, nextRPCost } = calculateRPFromHoney(honey);
+        const nextRPCostDisplay = Math.floor(nextRPCost).toLocaleString();
+        const currentRPMultiplier = rpGained + 1;
+        rebirthInfo.textContent = `${nextRPCostDisplay}🍯 = ${currentRPMultiplier} RP`;
 
         // Update rebirth shop buttons
         buyAutoUpgrade.disabled = autoUnlocked || rebirthPoints < 2;
-        buyBeeSpeed.disabled = beeSpeedBoost > 1.0 || rebirthPoints < 1;
-        buyCapacity.disabled = capacityBoost > 0 || rebirthPoints < 3;
+        buyBeeSpeed.disabled = beeSpeedMultiplier > 1.0 || rebirthPoints < 1;
+        buyCapacity.disabled = capacityMultiplier > 1.0 || rebirthPoints < 3;
         buyHoneyMult.disabled = honeyMultUpgrade > 1.0 || rebirthPoints < 2;
     }
 
@@ -542,8 +552,8 @@
         // Reset rebirth points and upgrades
         rebirthPoints = 0;
         autoUnlocked = false;
-        beeSpeedBoost = 1.0;
-        capacityBoost = 0;
+        beeSpeedMultiplier = 1.0;
+        capacityMultiplier = 1.0;
         honeyMultUpgrade = 1.0;
         
         // Reset automation
@@ -600,7 +610,8 @@
 
         // Update bees
         for (let b of bees) {
-            let maxCap = BEE_CAPACITY_BASE + capacityBoost;
+            // Apply capacity multiplier
+            let maxCap = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
 
             // Check if should return to hive
             if (b.carrying >= maxCap) {
@@ -621,9 +632,9 @@
                     b.carrying = 0;
                     b.returning = false;
                 } else {
-                    // Move toward hive
-                    b.vx += (dx / dist) * 0.1 * beeSpeedBoost;
-                    b.vy += (dy / dist) * 0.1 * beeSpeedBoost;
+                    // Move toward hive with speed multiplier
+                    b.vx += (dx / dist) * 0.1 * beeSpeedMultiplier;
+                    b.vy += (dy / dist) * 0.1 * beeSpeedMultiplier;
                 }
             } else {
                 // Find target flower
@@ -651,23 +662,23 @@
                                 b.targetFlower = null;
                             }
                         } else {
-                            // Move toward flower
-                            b.vx += (dx / dist) * 0.1 * beeSpeedBoost;
-                            b.vy += (dy / dist) * 0.1 * beeSpeedBoost;
+                            // Move toward flower with speed multiplier
+                            b.vx += (dx / dist) * 0.1 * beeSpeedMultiplier;
+                            b.vy += (dy / dist) * 0.1 * beeSpeedMultiplier;
                         }
                     } else {
                         b.targetFlower = null;
                     }
                 } else {
-                    // Wander
-                    b.vx += (Math.random() - 0.5) * 0.1 * beeSpeedBoost;
-                    b.vy += (Math.random() - 0.5) * 0.1 * beeSpeedBoost;
+                    // Wander with speed multiplier
+                    b.vx += (Math.random() - 0.5) * 0.1 * beeSpeedMultiplier;
+                    b.vy += (Math.random() - 0.5) * 0.1 * beeSpeedMultiplier;
                 }
             }
 
-            // Speed limit
+            // Speed limit with multiplier
             const speed = Math.hypot(b.vx, b.vy);
-            const maxSpeed = BEE_SPEED * beeSpeedBoost;
+            const maxSpeed = BEE_SPEED_BASE * beeSpeedMultiplier;
             if (speed > maxSpeed) {
                 b.vx = (b.vx / speed) * maxSpeed;
                 b.vy = (b.vy / speed) * maxSpeed;
@@ -923,21 +934,12 @@
         }
     });
 
-    // Single rebirth button that converts as much honey as possible
+    // FIXED: Single rebirth button with multiplicative scaling
     rebirthBtn.addEventListener('click', () => {
-        let honeyRemaining = honey;
-        let rpGained = 0;
-        let cost = 10000;
-        
-        // Keep converting while we have enough honey
-        while (honeyRemaining >= cost) {
-            honeyRemaining -= cost;
-            rpGained++;
-            cost = Math.floor(cost * 1.5);
-        }
+        const { rpGained, remainingHoney, nextRPCost } = calculateRPFromHoney(honey);
         
         if (rpGained > 0) {
-            honey = honeyRemaining; // Update honey to remaining amount
+            honey = remainingHoney;
             rebirthPoints += rpGained;
             
             // Reset game state but keep rebirth points and upgrades
@@ -966,13 +968,13 @@
             hireCostSpan.textContent = nextHireCost;
             saveGame();
             
-            alert(`Converted ${rpGained} RP! Next RP costs ${cost.toLocaleString()} honey.`);
+            alert(`✨ Converted honey into ${rpGained} RP! Next RP costs ${Math.floor(nextRPCost).toLocaleString()} honey.`);
         } else {
-            alert(`Need at least 10,000 honey to convert!`);
+            alert(`❌ Need at least 10,000 honey to convert! (You have ${Math.floor(honey).toLocaleString()} honey)`);
         }
     });
 
-    // Rebirth shop purchases
+    // Rebirth shop purchases (with boosted multipliers)
     buyAutoUpgrade.addEventListener('click', () => {
         if (rebirthPoints >= 2 && !autoUnlocked) {
             rebirthPoints -= 2;
@@ -983,18 +985,18 @@
     });
 
     buyBeeSpeed.addEventListener('click', () => {
-        if (rebirthPoints >= 1 && beeSpeedBoost === 1.0) {
+        if (rebirthPoints >= 1 && beeSpeedMultiplier === 1.0) {
             rebirthPoints -= 1;
-            beeSpeedBoost = 1.25;
+            beeSpeedMultiplier = 1.5; // x1.5 speed boost
             updateRebirthUI();
             saveGame();
         }
     });
 
     buyCapacity.addEventListener('click', () => {
-        if (rebirthPoints >= 3 && capacityBoost === 0) {
+        if (rebirthPoints >= 3 && capacityMultiplier === 1.0) {
             rebirthPoints -= 3;
-            capacityBoost = 4;
+            capacityMultiplier = 2.0; // x2 capacity boost
             updateRebirthUI();
             saveGame();
         }
