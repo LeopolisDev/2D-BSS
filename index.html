@@ -107,6 +107,12 @@
             border-bottom-width: 2px;
             box-shadow: 0 1px 0 #655126;
         }
+        .menu-btn.remove-btn {
+            background: #c44b4b;
+            color: white;
+            border-bottom-color: #6b2a2a;
+            box-shadow: 0 3px 0 #4a1e1e;
+        }
         .menu-input {
             background: #efeac5;
             border: none;
@@ -550,6 +556,17 @@
             padding: 5px 15px;
             border-radius: 30px;
         }
+        .success-message {
+            color: #aaffaa;
+            font-size: 0.9rem;
+            background: #2a4820;
+            padding: 5px 15px;
+            border-radius: 30px;
+        }
+        .rp-autobuy-active {
+            background: #8fc97f;
+            border-bottom-color: #427c2b;
+        }
     </style>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -596,6 +613,20 @@
                 </select>
                 <input type="number" id="menuAdminAmount" class="adder-input" value="1000" min="0" style="width:100px;">
                 <button class="menu-btn" id="menuAdminAddBtn">➕ ADD</button>
+            </div>
+            
+            <!-- NEW REMOVE SECTION -->
+            <div class="menu-row" style="border-top: 2px solid #ffd966; padding-top: 10px; margin-top: 10px;">
+                <span style="color:#ffd966; width:100%; text-align:center; margin-bottom:5px;">🗑️ REMOVE PLAYER</span>
+            </div>
+            <div class="menu-row">
+                <input type="text" id="menuRemoveNameInput" class="menu-input" placeholder="Enter username to remove" style="width:100%;">
+            </div>
+            <div class="menu-row">
+                <button class="menu-btn remove-btn" id="menuRemovePlayerBtn">🗑️ REMOVE</button>
+            </div>
+            <div class="menu-row">
+                <span id="menuRemoveMessage" style="display: none;"></span>
             </div>
             <div class="menu-row">
                 <button class="menu-btn" id="menuOpenAnnouncementBtn">📢 ANNOUNCE</button>
@@ -753,7 +784,7 @@
 const firebaseConfig = {
     apiKey: "AIzaSyCw-Ldw_t2XV5sV3FxBROtE72dPxuH3Z-I",
     authDomain: "bee-swarm-5b9f9.firebaseapp.com",
-    databaseURL: "https://beeswarmleaderboard-default-rtdb.firebaseio.com",
+    databaseURL: "https://bee-swarm-5b9f9-default-rtdb.firebaseio.com",
     projectId: "bee-swarm-5b9f9",
     storageBucket: "bee-swarm-5b9f9.firebasestorage.app",
     messagingSenderId: "67074504006",
@@ -772,6 +803,7 @@ let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
 let totalHoneyEarned = 0;
 let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
 let announcementClosed = localStorage.getItem('announcementClosed') === 'true';
+let lastAnnouncementId = localStorage.getItem('lastAnnouncementId') || null;
 
 // ========== CANVAS ELEMENTS (MUST BE BEFORE EVENT LISTENERS) ==========
 const canvas = document.getElementById('gameCanvas');
@@ -812,6 +844,9 @@ const menuLoadCodeInput = document.getElementById('menuLoadCodeInput');
 const menuLoadSaveBtn = document.getElementById('menuLoadSaveBtn');
 const menuResetAllBtn = document.getElementById('menuResetAllBtn');
 const menuResetHoneyBtn = document.getElementById('menuResetHoneyBtn');
+const menuRemoveNameInput = document.getElementById('menuRemoveNameInput');
+const menuRemovePlayerBtn = document.getElementById('menuRemovePlayerBtn');
+const menuRemoveMessage = document.getElementById('menuRemoveMessage');
 
 // Game buttons
 const hireBtn = document.getElementById('hireBtn');
@@ -837,8 +872,6 @@ const buyHoneycomb = document.getElementById('buyHoneycomb');
 const buyBeeGun = document.getElementById('buyBeeGun');
 const buyRoyalJelly = document.getElementById('buyRoyalJelly');
 const buyStarTreat = document.getElementById('buyStarTreat');
-const resetBtn = document.getElementById('resetBtn');
-const resetHoneyBtn = document.getElementById('resetHoneyBtn');
 
 // Display elements
 const honeySpan = document.getElementById('honeyDisplay');
@@ -1110,13 +1143,22 @@ menuResetHoneyBtn.addEventListener('click', () => {
 // ========== ANNOUNCEMENT FUNCTIONS ==========
 function setupAnnouncementListener() {
     announcementRef.on('value', (snapshot) => {
-        const message = snapshot.val();
-        if (message && message.text) {
-            currentAnnouncement = message.text;
-            announcementClosed = false;
-            localStorage.removeItem('announcementClosed');
-            announcementMessage.textContent = message.text;
-            announcementPopup.style.display = 'block';
+        const messageData = snapshot.val();
+        
+        // Check if there's a new announcement (different from last seen)
+        if (messageData && messageData.text) {
+            const announcementId = messageData.timestamp || messageData.text;
+            
+            // Only show if it's a different announcement than last time
+            if (lastAnnouncementId !== announcementId) {
+                currentAnnouncement = messageData.text;
+                lastAnnouncementId = announcementId;
+                localStorage.setItem('lastAnnouncementId', announcementId);
+                announcementClosed = false;
+                localStorage.removeItem('announcementClosed');
+                announcementMessage.textContent = messageData.text;
+                announcementPopup.style.display = 'block';
+            }
         }
     });
 }
@@ -1126,6 +1168,7 @@ closeAnnouncementBtn.addEventListener('click', () => {
     localStorage.setItem('announcementClosed', 'true');
 });
 
+// Check for saved announcement on load
 if (currentAnnouncement && !announcementClosed) {
     announcementMessage.textContent = currentAnnouncement;
     announcementPopup.style.display = 'block';
@@ -1142,7 +1185,10 @@ sendAnnouncementBtn.addEventListener('click', async () => {
     if (playerName === 'Opleoni') {
         const message = announcementInput.value.trim();
         if (message) {
-            await announcementRef.set({ text: message });
+            await announcementRef.set({ 
+                text: message,
+                timestamp: Date.now()
+            });
             localStorage.removeItem('announcementClosed');
             announcementModal.style.display = 'none';
             announcementInput.value = '';
@@ -1152,6 +1198,69 @@ sendAnnouncementBtn.addEventListener('click', async () => {
 
 cancelAnnouncementBtn.addEventListener('click', () => {
     announcementModal.style.display = 'none';
+});
+
+// ========== ADMIN REMOVAL FUNCTION ==========
+async function removePlayerFromLeaderboard(username) {
+    if (!username || username.trim() === '') {
+        return { success: false, message: 'Please enter a username' };
+    }
+    
+    try {
+        const snapshot = await leaderboardRef.once('value');
+        const data = snapshot.val();
+        let foundKey = null;
+        
+        if (data) {
+            // Find the key for this username
+            for (const [key, value] of Object.entries(data)) {
+                if (value && value.name === username) {
+                    foundKey = key;
+                    break;
+                }
+            }
+        }
+        
+        if (foundKey) {
+            await leaderboardRef.child(foundKey).remove();
+            return { success: true, message: `✅ Player "${username}" removed from leaderboard` };
+        } else {
+            return { success: false, message: `❌ Player "${username}" not found` };
+        }
+    } catch (error) {
+        console.error('Error removing player:', error);
+        return { success: false, message: '❌ Error removing player' };
+    }
+}
+
+menuRemovePlayerBtn.addEventListener('click', async () => {
+    if (playerName !== 'Opleoni') return;
+    
+    const username = menuRemoveNameInput.value.trim();
+    
+    // Show loading state
+    menuRemovePlayerBtn.disabled = true;
+    menuRemovePlayerBtn.textContent = 'REMOVING...';
+    menuRemoveMessage.style.display = 'none';
+    
+    const result = await removePlayerFromLeaderboard(username);
+    
+    menuRemoveMessage.textContent = result.message;
+    menuRemoveMessage.style.color = result.success ? '#aaffaa' : '#ffaaaa';
+    menuRemoveMessage.style.display = 'inline-block';
+    
+    menuRemovePlayerBtn.disabled = false;
+    menuRemovePlayerBtn.textContent = '🗑️ REMOVE';
+    
+    if (result.success) {
+        menuRemoveNameInput.value = '';
+        // Refresh leaderboard
+        fetchLeaderboard();
+    }
+    
+    setTimeout(() => {
+        menuRemoveMessage.style.display = 'none';
+    }, 3000);
 });
 
 // ========== ADMIN PANEL (menu version) ==========
@@ -1248,20 +1357,28 @@ function fetchLeaderboard() {
     leaderboardRef.on('value', (snapshot) => {
         const data = snapshot.val();
         leaderboard = [];
+        const nameMap = new Map(); // Track unique names
         
         if (data) {
             Object.keys(data).forEach(key => {
                 if (data[key] && data[key].name && typeof data[key].total === 'number') {
-                    leaderboard.push({
-                        name: data[key].name,
-                        total: data[key].total
-                    });
+                    const name = data[key].name;
+                    const total = data[key].total;
+                    
+                    // Only add if we haven't seen this name before
+                    if (!nameMap.has(name)) {
+                        nameMap.set(name, total);
+                        leaderboard.push({
+                            name: name,
+                            total: total
+                        });
+                    }
                 }
             });
         }
         
         renderLeaderboard();
-        debugInfo.textContent = `✅ Loaded ${leaderboard.length} players`;
+        debugInfo.textContent = `✅ Loaded ${leaderboard.length} unique players`;
         
         if (playerName === 'Opleoni') {
             updateMenuAdminSelect();
@@ -1278,7 +1395,28 @@ async function submitScore(score) {
     if (!playerName) return;
     
     try {
-        await leaderboardRef.child(playerName.replace(/[.#$\[\]]/g, '_')).set({
+        // Use a sanitized key but also store the name field
+        const sanitizedName = playerName.replace(/[.#$\[\]]/g, '_');
+        
+        // First, check if this name already exists under any key
+        const snapshot = await leaderboardRef.once('value');
+        const data = snapshot.val();
+        let existingKey = null;
+        
+        if (data) {
+            // Find if this name already exists in the database
+            for (const [key, value] of Object.entries(data)) {
+                if (value && value.name === playerName) {
+                    existingKey = key;
+                    break;
+                }
+            }
+        }
+        
+        // Use the existing key if found, otherwise use sanitized name
+        const keyToUse = existingKey || sanitizedName;
+        
+        await leaderboardRef.child(keyToUse).set({
             name: playerName,
             total: score
         });
@@ -1288,8 +1426,18 @@ async function submitScore(score) {
 }
 
 async function isNameAvailable(name) {
-    const snapshot = await leaderboardRef.child(name.replace(/[.#$\[\]]/g, '_')).once('value');
-    return !snapshot.exists();
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val();
+    
+    if (!data) return true;
+    
+    // Check if any entry has this exact name
+    for (const key in data) {
+        if (data[key] && data[key].name === name) {
+            return false;
+        }
+    }
+    return true;
 }
 
 function renderLeaderboard() {
@@ -1343,23 +1491,41 @@ saveNameBtn.addEventListener('click', async () => {
     let name = playerNameInput.value.trim();
     if (name === '') name = 'BeeKeeper';
     
-    const available = await isNameAvailable(name);
-    if (!available) {
-        nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
-        return;
-    }
+    // Add loading state
+    saveNameBtn.disabled = true;
+    saveNameBtn.textContent = 'CHECKING...';
+    nameError.textContent = '';
     
-    playerName = name;
-    localStorage.setItem('beeSwarmPlayerName', playerName);
-    nameModal.style.display = 'none';
-    playerNameDisplay.textContent = `Name: ${playerName}`;
-    
-    await submitScore(totalHoneyEarned);
-    
-    if (playerName === 'Opleoni') {
-        updateMenuAdminSelect();
-    } else {
-        menuAdminSection.style.display = 'none';
+    try {
+        const available = await isNameAvailable(name);
+        
+        if (!available) {
+            nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
+            saveNameBtn.disabled = false;
+            saveNameBtn.textContent = 'START HIVE';
+            return;
+        }
+        
+        playerName = name;
+        localStorage.setItem('beeSwarmPlayerName', playerName);
+        nameModal.style.display = 'none';
+        playerNameDisplay.textContent = `Name: ${playerName}`;
+        
+        await submitScore(totalHoneyEarned);
+        
+        if (playerName === 'Opleoni') {
+            updateMenuAdminSelect();
+        } else {
+            menuAdminSection.style.display = 'none';
+        }
+        
+        saveNameBtn.disabled = false;
+        saveNameBtn.textContent = 'START HIVE';
+    } catch (error) {
+        console.error('Error checking name:', error);
+        nameError.textContent = '❌ Error checking name availability. Please try again.';
+        saveNameBtn.disabled = false;
+        saveNameBtn.textContent = 'START HIVE';
     }
 });
 
@@ -1873,7 +2039,7 @@ rebirthBtn.addEventListener('click', () => {
     }
 });
 
-// ========== SACRIFICE (fixed - keeps RP compounding) ==========
+// ========== SACRIFICE ==========
 sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
@@ -2189,4 +2355,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
