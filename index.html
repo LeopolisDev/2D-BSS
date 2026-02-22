@@ -995,6 +995,34 @@ function formatNumber(num) {
     return sign + Math.floor(absNum).toString();
 }
 
+function formatMultiplierValue(mult) {
+    if (mult === undefined || mult === null || Number.isNaN(mult)) return '1.00';
+
+    const sign = mult < 0 ? '-' : '';
+    const absNum = Math.abs(mult);
+    const suffixes = [
+        { value: 1e33, suffix: 'Dc' },
+        { value: 1e30, suffix: 'No' },
+        { value: 1e27, suffix: 'Oc' },
+        { value: 1e24, suffix: 'Sp' },
+        { value: 1e21, suffix: 'Sx' },
+        { value: 1e18, suffix: 'Qi' },
+        { value: 1e15, suffix: 'Qa' },
+        { value: 1e12, suffix: 'T' },
+        { value: 1e9, suffix: 'B' },
+        { value: 1e6, suffix: 'M' },
+        { value: 1e3, suffix: 'k' }
+    ];
+
+    for (const entry of suffixes) {
+        if (absNum >= entry.value) {
+            return sign + (absNum / entry.value).toFixed(2) + entry.suffix;
+        }
+    }
+
+    return sign + absNum.toFixed(2);
+}
+
 function parseBoolean(value, fallback = false) {
     return typeof value === 'boolean' ? value : fallback;
 }
@@ -2269,7 +2297,7 @@ function recalcMultiplier() {
     
     let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
     if (x10HoneyPurchased) totalMult *= 10;
-    totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
+    totalMultDisplay.textContent = `✖️ ${formatMultiplierValue(totalMult)}`;
 }
 
 function updateToolButtons() {
