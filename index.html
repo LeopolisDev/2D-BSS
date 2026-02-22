@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · fixed rebirth (honey = 0)</title>
+    <title>🐝 BEE SWARM · REAL global leaderboard</title>
     <style>
         * {
             box-sizing: border-box;
@@ -211,6 +211,8 @@
             border: 3px solid #ffd966;
             color: #ffefc0;
             width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
         }
         .leaderboard-title {
             font-size: 1.3rem;
@@ -291,6 +293,11 @@
             border-radius: 20px;
             border: 1px solid #ffaa00;
         }
+        .loading {
+            text-align: center;
+            padding: 10px;
+            color: #ffefc0;
+        }
     </style>
 </head>
 <body>
@@ -324,11 +331,11 @@
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
 
-        <!-- Leaderboard Panel (only real players) -->
+        <!-- Leaderboard Panel (GLOBAL) -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">🌍 GLOBAL HONEY LEADERBOARD</div>
             <div id="leaderboardList">
-                <div class="leaderboard-entry">Loading...</div>
+                <div class="loading">Loading leaderboard...</div>
             </div>
         </div>
 
@@ -380,10 +387,17 @@
 </div>
 
 <script>
-// ================== NAME RESERVATION SYSTEM ==================
-let leaderboard = []; // Array of { name, total }
+// ================== GLOBAL LEADERBOARD USING JSONBIN.IO ==================
+// You need to create a free account at https://jsonbin.io/ and replace these values
+const JSONBIN_API_KEY = '$2a$10$YourActualApiKeyHere'; // Replace with your actual API key
+const JSONBIN_BIN_ID = 'your-bin-id-here'; // Replace with your bin ID
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
+let leaderboard = [];
 let playerName = localStorage.getItem('beeSwarmPlayerName') || '';
 let totalHoneyEarned = 0;
+let lastUpdate = 0;
+const UPDATE_COOLDOWN = 5000; // 5 seconds between updates to avoid rate limiting
 
 // Name modal elements
 const nameModal = document.getElementById('nameModal');
@@ -392,47 +406,75 @@ const saveNameBtn = document.getElementById('saveNameBtn');
 const playerNameDisplay = document.getElementById('playerNameDisplay');
 const nameError = document.getElementById('nameError');
 
-// Initialize leaderboard from localStorage
-function initLeaderboard() {
-    const stored = localStorage.getItem('beeSwarmRealLeaderboard');
-    if (stored) {
-        try {
-            leaderboard = JSON.parse(stored);
-        } catch (e) { 
-            leaderboard = []; 
+// ========== LEADERBOARD FUNCTIONS ==========
+async function fetchLeaderboard() {
+    try {
+        const response = await fetch(JSONBIN_URL, {
+            headers: {
+                'X-Master-Key': JSONBIN_API_KEY
+            }
+        });
+        const data = await response.json();
+        leaderboard = data.record.players || [];
+        renderLeaderboard();
+    } catch (error) {
+        console.error('Failed to fetch leaderboard:', error);
+        document.getElementById('leaderboardList').innerHTML = '<div class="leaderboard-entry">Failed to load leaderboard</div>';
+    }
+}
+
+async function saveLeaderboard() {
+    try {
+        await fetch(JSONBIN_URL, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': JSONBIN_API_KEY
+            },
+            body: JSON.stringify({ players: leaderboard })
+        });
+    } catch (error) {
+        console.error('Failed to save leaderboard:', error);
+    }
+}
+
+async function updateLeaderboard() {
+    if (!playerName) return;
+    
+    // Rate limiting
+    const now = Date.now();
+    if (now - lastUpdate < UPDATE_COOLDOWN) return;
+    lastUpdate = now;
+    
+    // Find or create player entry
+    let playerEntry = leaderboard.find(entry => entry.name === playerName);
+    if (playerEntry) {
+        if (totalHoneyEarned > playerEntry.total) {
+            playerEntry.total = totalHoneyEarned;
+            await saveLeaderboard();
         }
     } else {
-        leaderboard = [];
+        leaderboard.push({ name: playerName, total: totalHoneyEarned });
+        await saveLeaderboard();
     }
-    // If current player exists but not in leaderboard, add them
-    if (playerName) {
-        addPlayerToLeaderboard();
-    }
+    
     renderLeaderboard();
-}
-
-function addPlayerToLeaderboard() {
-    if (!playerName) return;
-    const exists = leaderboard.some(entry => entry.name === playerName);
-    if (!exists) {
-        leaderboard.push({ name: playerName, total: 0 });
-        saveLeaderboard();
-    }
-}
-
-function saveLeaderboard() {
-    localStorage.setItem('beeSwarmRealLeaderboard', JSON.stringify(leaderboard));
 }
 
 function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
     const sorted = [...leaderboard].sort((a,b) => b.total - a.total).slice(0, 10);
+    
+    if (sorted.length === 0) {
+        listDiv.innerHTML = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
+        return;
+    }
+    
     let html = '';
     sorted.forEach((entry, index) => {
         const isYou = entry.name === playerName ? 'you-row' : '';
         html += `<div class="leaderboard-entry ${isYou}"><span>${index+1}. ${escapeHtml(entry.name)}</span> <span>🍯 ${entry.total.toLocaleString()}</span></div>`;
     });
-    if (sorted.length === 0) html = '<div class="leaderboard-entry">No players yet. Be the first!</div>';
     listDiv.innerHTML = html;
 }
 
@@ -445,18 +487,20 @@ function escapeHtml(unsafe) {
 }
 
 // Check if name is available (case-insensitive)
-function isNameAvailable(name) {
+async function isNameAvailable(name) {
+    await fetchLeaderboard(); // Refresh leaderboard first
     const lowerName = name.toLowerCase();
     return !leaderboard.some(entry => entry.name.toLowerCase() === lowerName);
 }
 
 // Save name with validation
-saveNameBtn.addEventListener('click', () => {
+saveNameBtn.addEventListener('click', async () => {
     let name = playerNameInput.value.trim();
     if (name === '') name = 'BeeKeeper';
     
-    // Check if name is already taken (case-insensitive)
-    if (!isNameAvailable(name)) {
+    // Check if name is already taken
+    const available = await isNameAvailable(name);
+    if (!available) {
         nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
         return;
     }
@@ -465,7 +509,10 @@ saveNameBtn.addEventListener('click', () => {
     localStorage.setItem('beeSwarmPlayerName', playerName);
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
-    addPlayerToLeaderboard();
+    
+    // Add to leaderboard
+    leaderboard.push({ name: playerName, total: 0 });
+    await saveLeaderboard();
     renderLeaderboard();
     
     // If this is Opleoni, show a secret message
@@ -474,36 +521,22 @@ saveNameBtn.addEventListener('click', () => {
     }
 });
 
+// Initial load
 if (playerName) {
     nameModal.style.display = 'none';
     playerNameDisplay.textContent = `Name: ${playerName}`;
-    initLeaderboard();
+    fetchLeaderboard();
 } else {
     nameModal.style.display = 'flex';
-    initLeaderboard();
+    fetchLeaderboard();
 }
 
-// Update leaderboard with current player's total
-function updateLeaderboard() {
-    if (!playerName) return;
-    for (let i = 0; i < leaderboard.length; i++) {
-        if (leaderboard[i].name === playerName) {
-            if (totalHoneyEarned > leaderboard[i].total) {
-                leaderboard[i].total = totalHoneyEarned;
-            }
-            break;
-        }
+// Update leaderboard periodically (every 30 seconds)
+setInterval(() => {
+    if (playerName) {
+        updateLeaderboard();
     }
-    saveLeaderboard();
-    renderLeaderboard();
-}
-
-// Listen for changes from other tabs
-window.addEventListener('storage', (e) => {
-    if (e.key === 'beeSwarmRealLeaderboard') {
-        initLeaderboard();
-    }
-});
+}, 30000);
 
 // ========== GAME CONSTANTS ==========
 const HIVE_X = 100, HIVE_Y = 200;
@@ -514,75 +547,17 @@ const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
 const SAVE_KEY = 'beeSwarmSave';
 
-// ========== RP PRICING (each RP has its own price) ==========
-// 1 RP = 10k, 2 RP = 15k, 3 RP = 22.5k, 4 RP = 33.75k, etc.
+// ========== RP PRICING ==========
 function getRPCost(rpNumber) {
-    // rpNumber starts at 1 for first RP
     return Math.floor(10000 * Math.pow(1.5, rpNumber - 1));
 }
 
-// Calculate how many RPs you can buy with current honey
 function getMaxRPFromHoney() {
     let rpCount = 1;
     while (honey >= getRPCost(rpCount)) {
         rpCount++;
     }
-    return rpCount - 1; // Return the number of RPs you can buy
-}
-
-function updateRebirthUI() {
-    rpSpan.textContent = rebirthPoints;
-    rpBadge.textContent = `RP: ${rebirthPoints}`;
-    rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
-    totalEarnedSpan.textContent = totalHoneyEarned.toLocaleString();
-
-    const maxRP = getMaxRPFromHoney();
-    if (maxRP > 0) {
-        rebirthInfo.textContent = `${maxRP} RP = ${getRPCost(maxRP).toLocaleString()}🍯`;
-    } else {
-        rebirthInfo.textContent = `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
-    }
-
-    // Update one-time upgrade buttons with MAXED status
-    if (autoUnlocked) {
-        autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyAutoUpgrade.disabled = true;
-    } else {
-        autoStatus.textContent = '(2 RP)';
-        buyAutoUpgrade.disabled = rebirthPoints < 2;
-    }
-    
-    if (beeSpeedMultiplier > 1.0) {
-        speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyBeeSpeed.disabled = true;
-    } else {
-        speedStatus.textContent = '(1 RP)';
-        buyBeeSpeed.disabled = rebirthPoints < 1;
-    }
-    
-    if (capacityMultiplier > 1.0) {
-        capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyCapacity.disabled = true;
-    } else {
-        capacityStatus.textContent = '(3 RP)';
-        buyCapacity.disabled = rebirthPoints < 3;
-    }
-    
-    if (honeyMultUpgrade > 1.0) {
-        honeyMultStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        buyHoneyMult.disabled = true;
-    } else {
-        honeyMultStatus.textContent = '(2 RP)';
-        buyHoneyMult.disabled = rebirthPoints < 2;
-    }
-    
-    // Compounding upgrade (unlimited)
-    const compoundingCost = Math.pow(2, compoundingLevel); // 1, 2, 4, 8, 16...
-    compoundingLevelSpan.textContent = compoundingLevel;
-    compoundingCostSpan.textContent = compoundingCost;
-    const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
-    buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
-    buyCompounding.disabled = rebirthPoints < compoundingCost;
+    return rpCount - 1;
 }
 
 // ========== GAME STATE ==========
@@ -591,7 +566,7 @@ let bees = [];
 let flowers = [];
 let nextHireCost = HIRE_COST_BASE;
 
-// Tools (8 tools)
+// Tools
 let hasClippers = false, hasShears = false, hasScythe = false, hasOil = false;
 let hasHoneycomb = false, hasBeeGun = false, hasRoyalJelly = false, hasStarTreat = false;
 let toolMultiplier = 1.0;
@@ -599,15 +574,13 @@ let toolMultiplier = 1.0;
 // Rebirth
 let rebirthPoints = 0;
 
-// Rebirth upgrades (one-time)
+// Rebirth upgrades
 let autoUnlocked = false;
 let beeSpeedMultiplier = 1.0;
 let capacityMultiplier = 1.0;
 let honeyMultUpgrade = 1.0;
-
-// Compounding upgrade (unlimited levels)
 let compoundingLevel = 0;
-let compoundingMultiplier = 1.0; // 1.25^level
+let compoundingMultiplier = 1.0;
 
 // Automation
 let autoActive = false;
@@ -629,7 +602,7 @@ const fieldInfo = document.getElementById('fieldInfo');
 const totalMultDisplay = document.getElementById('totalMultDisplay');
 const saveIndicator = document.getElementById('saveIndicator');
 
-// Rebirth shop buttons and status spans
+// Rebirth shop buttons
 const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
 const buyBeeSpeed = document.getElementById('buyBeeSpeed');
 const buyCapacity = document.getElementById('buyCapacity');
@@ -682,6 +655,8 @@ function saveGame() {
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
     saveIndicator.textContent = '💾 Saved ' + new Date().toLocaleTimeString();
     setTimeout(() => { saveIndicator.textContent = '💾 Auto-saved'; }, 2000);
+    
+    // Update global leaderboard
     updateLeaderboard();
 }
 
@@ -751,7 +726,6 @@ function recalcMultiplier() {
     if (hasStarTreat) toolMult *= 5.0;
     toolMultiplier = toolMult;
     
-    // Total multiplier = tools * honeyMultUpgrade * compoundingMultiplier
     const totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
     totalMultDisplay.textContent = `✖️ ${totalMult.toFixed(2)}`;
 }
@@ -815,6 +789,59 @@ function findBestFlower(beeX, beeY) {
     return bestIndex;
 }
 
+function updateRebirthUI() {
+    rpSpan.textContent = rebirthPoints;
+    rpBadge.textContent = `RP: ${rebirthPoints}`;
+    rpShopDisplay.textContent = `RP: ${rebirthPoints}`;
+    totalEarnedSpan.textContent = totalHoneyEarned.toLocaleString();
+
+    const maxRP = getMaxRPFromHoney();
+    if (maxRP > 0) {
+        rebirthInfo.textContent = `${maxRP} RP = ${getRPCost(maxRP).toLocaleString()}🍯`;
+    } else {
+        rebirthInfo.textContent = `1 RP = ${getRPCost(1).toLocaleString()}🍯`;
+    }
+
+    if (autoUnlocked) {
+        autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyAutoUpgrade.disabled = true;
+    } else {
+        autoStatus.textContent = '(2 RP)';
+        buyAutoUpgrade.disabled = rebirthPoints < 2;
+    }
+    
+    if (beeSpeedMultiplier > 1.0) {
+        speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyBeeSpeed.disabled = true;
+    } else {
+        speedStatus.textContent = '(1 RP)';
+        buyBeeSpeed.disabled = rebirthPoints < 1;
+    }
+    
+    if (capacityMultiplier > 1.0) {
+        capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyCapacity.disabled = true;
+    } else {
+        capacityStatus.textContent = '(3 RP)';
+        buyCapacity.disabled = rebirthPoints < 3;
+    }
+    
+    if (honeyMultUpgrade > 1.0) {
+        honeyMultStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
+        buyHoneyMult.disabled = true;
+    } else {
+        honeyMultStatus.textContent = '(2 RP)';
+        buyHoneyMult.disabled = rebirthPoints < 2;
+    }
+    
+    const compoundingCost = Math.pow(2, compoundingLevel);
+    compoundingLevelSpan.textContent = compoundingLevel;
+    compoundingCostSpan.textContent = compoundingCost;
+    const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
+    buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
+    buyCompounding.disabled = rebirthPoints < compoundingCost;
+}
+
 // ========== GAME MECHANICS ==========
 function update() {
     for (let i = flowers.length - 1; i >= 0; i--) {
@@ -843,7 +870,6 @@ function update() {
             const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
             const dist = Math.hypot(dx, dy);
             if (dist < 20) {
-                // Apply ALL multipliers: tools * honeyMultUpgrade * compoundingMultiplier
                 let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier);
                 honey += deposited;
                 totalHoneyEarned += deposited;
@@ -1006,7 +1032,7 @@ hireBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', () => {
-    if (confirm('Reset ALL progress? Name will stay for leaderboard.')) {
+    if (confirm('Reset ALL progress? Name will stay on leaderboard.')) {
         honey = 0; totalHoneyEarned = 0; bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
@@ -1022,7 +1048,7 @@ resetBtn.addEventListener('click', () => {
     }
 });
 
-// ========== FIXED REBIRTH (honey = 0 after) ==========
+// ========== REBIRTH ==========
 rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     
@@ -1030,27 +1056,20 @@ rebirthBtn.addEventListener('click', () => {
         const cost = getRPCost(maxRP);
         rebirthPoints += maxRP;
         
-        // Reset game state but keep rebirth points and upgrades
         bees = []; 
         flowers = []; 
         nextHireCost = HIRE_COST_BASE;
         
-        // Reset tools (but keep rebirth upgrades)
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         
-        // Add starting bee
         addBee();
-        
-        // Spawn initial flowers
         for (let i = 0; i < 14; i++) {
             spawnFlower();
         }
         
-        // Set honey to 0 (spend all honey)
         honey = 0;
         
-        // Update UI
         recalcMultiplier(); 
         updateRebirthUI(); 
         updateToolButtons(); 
@@ -1063,7 +1082,7 @@ rebirthBtn.addEventListener('click', () => {
     }
 });
 
-// ========== REBIRTH SHOP PURCHASES ==========
+// ========== REBIRTH SHOP ==========
 buyAutoUpgrade.addEventListener('click', () => { 
     if (rebirthPoints >= 2 && !autoUnlocked) { 
         rebirthPoints -= 2; 
@@ -1101,7 +1120,6 @@ buyHoneyMult.addEventListener('click', () => {
     } 
 });
 
-// ========== COMPOUNDING UPGRADE (unlimited) ==========
 buyCompounding.addEventListener('click', () => {
     const cost = Math.pow(2, compoundingLevel);
     if (rebirthPoints >= cost) {
@@ -1126,7 +1144,7 @@ buyStarTreat.addEventListener('click', () => { if (!hasStarTreat && honey>=25000
 
 toggleAutoBtn.addEventListener('click', toggleAuto);
 
-// ========== SECRET ADDER: ONLY FOR Opleoni ==========
+// ========== SECRET ADDER ==========
 addHoneyBtn.addEventListener('click', () => {
     if (playerName === 'Opleoni') {
         let val = parseInt(honeyInput.value);
