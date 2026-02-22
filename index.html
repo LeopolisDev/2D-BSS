@@ -1873,6 +1873,7 @@ rebirthBtn.addEventListener('click', () => {
     }
 });
 
+// ========== SACRIFICE (fixed - keeps RP compounding) ==========
 sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
@@ -1885,6 +1886,7 @@ sacrificeBtn.addEventListener('click', () => {
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         
+        // Reset rebirth upgrades but KEEP SP upgrades
         autoUnlocked = false;
         beeSpeedMultiplier = 1.0;
         capacityMultiplier = 1.0;
@@ -1892,14 +1894,15 @@ sacrificeBtn.addEventListener('click', () => {
         compoundingLevel = 0;
         compoundingMultiplier = 1.0;
         
-        rpCompoundingLevel = 0;
-        rpCompoundingMultiplier = 1.0;
+        // DO NOT reset RP compounding - it's an SP shop upgrade!
+        // rpCompoundingLevel = 0;  ← REMOVE THIS LINE
+        // rpCompoundingMultiplier = 1.0; ← REMOVE THIS LINE
         
         autoActive = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
         toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
         
-        setupRPGenerator();
+        setupRPGenerator(); // This will use the preserved rpCompoundingMultiplier
         
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
@@ -1910,7 +1913,7 @@ sacrificeBtn.addEventListener('click', () => {
         hireCostSpan.textContent = formatNumber(nextHireCost);
         saveGame();
         
-        alert(`🔥 Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped.`);
+        alert(`🔥 Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped. RP Compounding preserved at level ${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
     } else {
         alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
     }
@@ -2186,3 +2189,4 @@ gameLoop();
 </script>
 </body>
 </html>
+
