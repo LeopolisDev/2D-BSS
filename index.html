@@ -2694,7 +2694,11 @@ saveNameBtn.addEventListener('click', async () => {
         saveNameBtn.textContent = 'START HIVE';
     } catch (error) {
         console.error('Error checking name:', error);
-        nameError.textContent = '❌ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
+        if (forcedRenameFromName) {
+            nameError.textContent = '❌ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
+        } else {
+            nameError.textContent = `❌ Error: ${error.message || 'Unknown error'}`;
+        }
         saveNameBtn.disabled = false;
         saveNameBtn.textContent = getNameActionButtonLabel();
     }
