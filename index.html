@@ -802,7 +802,6 @@
         <div class="shop-row" style="background:#8f6d3c;">
             <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
             <button class="tool-btn rp-autobuy-toggle" id="toggleRPAutoBtn">🤖 RP AUTO (OFF)</button>
-            <button class="tool-btn" id="toggleAutoSpendBtn">AUTO % (10%)</button>
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
         </div>
 
@@ -847,6 +846,7 @@ const adminGrantsRef = database.ref('adminGrants');
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
 let playerName = normalizePlayerName(localStorage.getItem('beeSwarmPlayerName') || '');
+let forcedRenameFromName = '';
 let totalHoneyEarned = 0;
 let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
 let announcementClosed = localStorage.getItem('announcementClosed') === 'true';
@@ -901,7 +901,6 @@ const hireBtn = document.getElementById('hireBtn');
 const hireCostSpan = document.getElementById('hireCostSpan');
 const toggleAutoBtn = document.getElementById('toggleAutoBtn');
 const toggleRPAutoBtn = document.getElementById('toggleRPAutoBtn');
-const toggleAutoSpendBtn = document.getElementById('toggleAutoSpendBtn');
 const sacrificeBtn = document.getElementById('sacrificeBtn');
 const rebirthBtn = document.getElementById('rebirthBtn');
 const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
@@ -1121,7 +1120,6 @@ function generateSaveCode() {
         rpCompoundingLevel, rpCompoundingMultiplier,
         rpAutobuyEnabled,
         autoActive,
-        autoSpendPercent,
         performanceMode
     };
     
@@ -1178,7 +1176,6 @@ function loadSaveCode(code) {
         rpCompoundingMultiplier = saveData.rpCompoundingMultiplier || 1.0;
         rpAutobuyEnabled = saveData.rpAutobuyEnabled || false;
         autoActive = saveData.autoActive || false;
-        autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(saveData.performanceMode, false);
         updatePerformanceButton();
 
@@ -1208,7 +1205,6 @@ function loadSaveCode(code) {
             toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
             toggleRPAutoBtn.classList.remove('rp-autobuy-active');
         }
-        updateAutoSpendButton();
         updateHireCostDisplay();
         
         recalcMultiplier();
@@ -1330,6 +1326,26 @@ function sanitizeFirebaseKey(name) {
 
 function normalizePlayerName(name) {
     return String(name || '').trim().slice(0, 20);
+}
+
+const BLOCKED_NAME_TERMS = [
+    'fuck',
+    'gay',
+    'epstein',
+    'nigger',
+    'bitch'
+];
+
+function isBlockedPlayerName(name) {
+    const normalized = normalizePlayerName(name)
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+    if (!normalized) return false;
+    return BLOCKED_NAME_TERMS.some(term => normalized.includes(term));
+}
+
+function getNameActionButtonLabel() {
+    return forcedRenameFromName ? 'CHANGE NAME' : 'START HIVE';
 }
 
 function isAdminUser(name = playerName) {
@@ -1637,6 +1653,10 @@ menuAdminAddBtn.addEventListener('click', async () => {
                 alert('Invalid name');
                 return;
             }
+            if (isBlockedPlayerName(newName)) {
+                alert('That name is not allowed.');
+                return;
+            }
         
             const available = await isNameAvailable(newName);
             if (!available) {
@@ -1891,6 +1911,42 @@ async function isNameAvailable(name) {
     return true;
 }
 
+async function renameLeaderboardPlayer(oldName, newName) {
+    const normalizedOld = normalizePlayerName(oldName);
+    const normalizedNew = normalizePlayerName(newName);
+    if (!normalizedOld || !normalizedNew || normalizedOld === normalizedNew) return null;
+
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val();
+    if (!data) return null;
+
+    let oldKey = null;
+    let oldTotal = 0;
+    let newNameKey = null;
+
+    for (const [key, value] of Object.entries(data)) {
+        if (!value || typeof value !== 'object') continue;
+        if (value.name === normalizedOld) {
+            oldKey = key;
+            oldTotal = toSafeAmount(value.total);
+        }
+        if (value.name === normalizedNew) {
+            newNameKey = key;
+        }
+    }
+
+    if (newNameKey && newNameKey !== oldKey) {
+        throw new Error('Target name already exists');
+    }
+    if (!oldKey) return null;
+
+    await leaderboardRef.child(oldKey).update({
+        name: normalizedNew,
+        total: oldTotal
+    });
+    return oldTotal;
+}
+
 function renderLeaderboard() {
     const listDiv = document.getElementById('leaderboardList');
     if (!leaderboard || leaderboard.length === 0) {
@@ -1939,7 +1995,7 @@ function escapeHtml(unsafe) {
 }
 
 saveNameBtn.addEventListener('click', async () => {
-    let name = playerNameInput.value.trim();
+    let name = normalizePlayerName(playerNameInput.value);
     if (name === '') name = 'BeeKeeper';
     
     // Add loading state
@@ -1948,16 +2004,33 @@ saveNameBtn.addEventListener('click', async () => {
     nameError.textContent = '';
     
     try {
+        if (isBlockedPlayerName(name)) {
+            nameError.textContent = '❌ That name is not allowed. Choose a different one.';
+            saveNameBtn.disabled = false;
+            saveNameBtn.textContent = getNameActionButtonLabel();
+            return;
+        }
+
         const available = await isNameAvailable(name);
         
         if (!available) {
             nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
             saveNameBtn.disabled = false;
-            saveNameBtn.textContent = 'START HIVE';
+            saveNameBtn.textContent = getNameActionButtonLabel();
             return;
+        }
+
+        const oldNameForRename = forcedRenameFromName;
+        let migratedTotal = null;
+        if (oldNameForRename) {
+            migratedTotal = await renameLeaderboardPlayer(oldNameForRename, name);
+        }
+        if (Number.isFinite(migratedTotal)) {
+            totalHoneyEarned = Math.max(totalHoneyEarned, migratedTotal);
         }
         
         playerName = name;
+        forcedRenameFromName = '';
         localStorage.setItem('beeSwarmPlayerName', playerName);
         nameModal.style.display = 'none';
         playerNameDisplay.textContent = `Name: ${playerName}`;
@@ -1976,9 +2049,9 @@ saveNameBtn.addEventListener('click', async () => {
         saveNameBtn.textContent = 'START HIVE';
     } catch (error) {
         console.error('Error checking name:', error);
-        nameError.textContent = '❌ Error checking name availability. Please try again.';
+        nameError.textContent = '❌ Error checking or changing name. Please try again.';
         saveNameBtn.disabled = false;
-        saveNameBtn.textContent = 'START HIVE';
+        saveNameBtn.textContent = getNameActionButtonLabel();
     }
 });
 
@@ -1987,16 +2060,24 @@ refreshBtn.addEventListener('click', () => {
 });
 
 // Initial load
-if (playerName) {
+if (playerName && isBlockedPlayerName(playerName)) {
+    forcedRenameFromName = playerName;
+    playerName = '';
+    localStorage.removeItem('beeSwarmPlayerName');
+    playerNameInput.value = '';
+    nameModal.style.display = 'flex';
+    saveNameBtn.textContent = getNameActionButtonLabel();
+    nameError.textContent = '❌ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
+} else if (playerName) {
     nameModal.style.display = 'none';
+    saveNameBtn.textContent = getNameActionButtonLabel();
     playerNameDisplay.textContent = `Name: ${playerName}`;
-    fetchLeaderboard();
-    setupAnnouncementListener();
 } else {
     nameModal.style.display = 'flex';
-    fetchLeaderboard();
-    setupAnnouncementListener();
+    saveNameBtn.textContent = getNameActionButtonLabel();
 }
+fetchLeaderboard();
+setupAnnouncementListener();
 
 // ========== GAME CONSTANTS ==========
 const HIVE_X = 100, HIVE_Y = 200;
@@ -2005,9 +2086,7 @@ const MAX_FLOWERS = 22;
 const BEE_SPEED_BASE = 1.1;
 const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
-const HIRE_CLICK_PERCENT = 10;
-const DEFAULT_AUTO_SPEND_PERCENT = 10;
-const AUTO_SPEND_OPTIONS = [5, 10, 25, 50, 100];
+const AUTO_BEE_SPEND_PERCENT = 10;
 const SAVE_KEY = 'beeSwarmSave';
 
 // ========== RP PRICING ==========
@@ -2077,7 +2156,6 @@ let rpCompoundingMultiplier = 1.0;
 let autoActive = false;
 let autoInterval = null;
 let rpAutobuyEnabled = false;
-let autoSpendPercent = DEFAULT_AUTO_SPEND_PERCENT;
 let performanceMode = false;
 
 // ========== GAME MECHANICS ==========
@@ -2399,50 +2477,15 @@ function getSafeBeeCount(value, fallback = 1) {
 
 function computeNextHireCostFromBeeCount(beeCount) {
     const safeBeeCount = getSafeBeeCount(beeCount, 1);
-    if (safeBeeCount <= 0) return 0;
-    return getManualHireCost();
-}
-
-function normalizeAutoSpendPercent(value) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return DEFAULT_AUTO_SPEND_PERCENT;
-    const rounded = Math.floor(numeric);
-    if (AUTO_SPEND_OPTIONS.includes(rounded)) return rounded;
-
-    let closest = DEFAULT_AUTO_SPEND_PERCENT;
-    let minDistance = Infinity;
-    for (const option of AUTO_SPEND_OPTIONS) {
-        const distance = Math.abs(option - rounded);
-        if (distance < minDistance) {
-            minDistance = distance;
-            closest = option;
-        }
+    let cost = HIRE_COST_BASE;
+    for (let i = 1; i < safeBeeCount; i++) {
+        cost = Math.floor(cost * 1.5);
     }
-    return closest;
-}
-
-function getPercentSpendCost(currentHoney, spendPercent) {
-    const safeHoney = Number.isFinite(currentHoney) ? Math.max(0, Math.floor(currentHoney)) : 0;
-    if (safeHoney <= 0) return 0;
-    const safePercent = normalizeAutoSpendPercent(spendPercent);
-    return Math.max(1, Math.floor((safeHoney * safePercent) / 100));
-}
-
-function getManualHireCost() {
-    return getPercentSpendCost(honey, HIRE_CLICK_PERCENT);
-}
-
-function getAutoSpendBudget() {
-    return getPercentSpendCost(honey, autoSpendPercent);
+    return cost;
 }
 
 function updateHireCostDisplay() {
-    nextHireCost = getManualHireCost();
     hireCostSpan.textContent = formatNumber(nextHireCost);
-}
-
-function updateAutoSpendButton() {
-    toggleAutoSpendBtn.textContent = `AUTO % (${autoSpendPercent}%)`;
 }
 
 function findBestFlower(beeX, beeY) {
@@ -2459,35 +2502,25 @@ function findBestFlower(beeX, beeY) {
 // ========== AUTOMATION ==========
 function autoBuy() {
     if (!autoActive || !autoUnlocked) return;
-    let spendBudget = getAutoSpendBudget();
-    if (spendBudget <= 0) return;
+    if (!hasClippers && honey >= 50) { honey -= 50; hasClippers = true; recalcMultiplier(); buyClippers.disabled = true; }
+    else if (!hasShears && honey >= 150) { honey -= 150; hasShears = true; recalcMultiplier(); buyShears.disabled = true; }
+    else if (!hasScythe && honey >= 400) { honey -= 400; hasScythe = true; recalcMultiplier(); buyScythe.disabled = true; }
+    else if (!hasOil && honey >= 900) { honey -= 900; hasOil = true; recalcMultiplier(); buyOil.disabled = true; }
+    else if (!hasHoneycomb && honey >= 25000) { honey -= 25000; hasHoneycomb = true; recalcMultiplier(); buyHoneycomb.disabled = true; }
+    else if (!hasBeeGun && honey >= 50000) { honey -= 50000; hasBeeGun = true; recalcMultiplier(); buyBeeGun.disabled = true; }
+    else if (!hasRoyalJelly && honey >= 100000) { honey -= 100000; hasRoyalJelly = true; recalcMultiplier(); buyRoyalJelly.disabled = true; }
+    else if (!hasStarTreat && honey >= 250000) { honey -= 250000; hasStarTreat = true; recalcMultiplier(); buyStarTreat.disabled = true; }
+    else if (!hasMoonCharm && honey >= 5000000000) { honey -= 5000000000; hasMoonCharm = true; recalcMultiplier(); buyMoonCharm.disabled = true; }
+    else if (!hasSunRelic && honey >= 25000000000) { honey -= 25000000000; hasSunRelic = true; recalcMultiplier(); buySunRelic.disabled = true; }
+    else if (!hasStormTotem && honey >= 100000000000) { honey -= 100000000000; hasStormTotem = true; recalcMultiplier(); buyStormTotem.disabled = true; }
+    else if (!hasGalaxyCrown && honey >= 250000000000) { honey -= 250000000000; hasGalaxyCrown = true; recalcMultiplier(); buyGalaxyCrown.disabled = true; }
 
-    const tryAutoPurchase = (cost, purchaseFn) => {
-        if (honey < cost || spendBudget < cost) return false;
-        honey -= cost;
-        spendBudget -= cost;
-        purchaseFn();
-        return true;
-    };
-
-    if (!hasClippers && tryAutoPurchase(50, () => { hasClippers = true; recalcMultiplier(); buyClippers.disabled = true; })) {}
-    else if (!hasShears && tryAutoPurchase(150, () => { hasShears = true; recalcMultiplier(); buyShears.disabled = true; })) {}
-    else if (!hasScythe && tryAutoPurchase(400, () => { hasScythe = true; recalcMultiplier(); buyScythe.disabled = true; })) {}
-    else if (!hasOil && tryAutoPurchase(900, () => { hasOil = true; recalcMultiplier(); buyOil.disabled = true; })) {}
-    else if (!hasHoneycomb && tryAutoPurchase(25000, () => { hasHoneycomb = true; recalcMultiplier(); buyHoneycomb.disabled = true; })) {}
-    else if (!hasBeeGun && tryAutoPurchase(50000, () => { hasBeeGun = true; recalcMultiplier(); buyBeeGun.disabled = true; })) {}
-    else if (!hasRoyalJelly && tryAutoPurchase(100000, () => { hasRoyalJelly = true; recalcMultiplier(); buyRoyalJelly.disabled = true; })) {}
-    else if (!hasStarTreat && tryAutoPurchase(250000, () => { hasStarTreat = true; recalcMultiplier(); buyStarTreat.disabled = true; })) {}
-    else if (!hasMoonCharm && tryAutoPurchase(5000000000, () => { hasMoonCharm = true; recalcMultiplier(); buyMoonCharm.disabled = true; })) {}
-    else if (!hasSunRelic && tryAutoPurchase(25000000000, () => { hasSunRelic = true; recalcMultiplier(); buySunRelic.disabled = true; })) {}
-    else if (!hasStormTotem && tryAutoPurchase(100000000000, () => { hasStormTotem = true; recalcMultiplier(); buyStormTotem.disabled = true; })) {}
-    else if (!hasGalaxyCrown && tryAutoPurchase(250000000000, () => { hasGalaxyCrown = true; recalcMultiplier(); buyGalaxyCrown.disabled = true; })) {}
-
-    const autoHireCost = getPercentSpendCost(honey, autoSpendPercent);
-    if (autoHireCost > 0 && honey >= autoHireCost && spendBudget >= autoHireCost) {
-        honey -= autoHireCost;
-        spendBudget -= autoHireCost;
+    let beeBudget = Math.max(0, Math.floor(honey * (AUTO_BEE_SPEND_PERCENT / 100)));
+    while (beeBudget >= nextHireCost && honey >= nextHireCost) {
+        honey -= nextHireCost;
+        beeBudget -= nextHireCost;
         addBee();
+        nextHireCost = Math.floor(nextHireCost * 1.5);
     }
 
     updateHireCostDisplay();
@@ -2524,16 +2557,6 @@ function toggleRPAuto() {
     saveGame();
 }
 
-function configureAutoSpendPercent() {
-    const current = normalizeAutoSpendPercent(autoSpendPercent);
-    const currentIndex = AUTO_SPEND_OPTIONS.indexOf(current);
-    const nextIndex = (currentIndex + 1) % AUTO_SPEND_OPTIONS.length;
-    autoSpendPercent = AUTO_SPEND_OPTIONS[nextIndex];
-    updateAutoSpendButton();
-    updateHireCostDisplay();
-    saveGame();
-}
-
 // ========== EVENT LISTENERS ==========
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -2554,10 +2577,10 @@ canvas.addEventListener('click', (e) => {
 });
 
 hireBtn.addEventListener('click', () => {
-    const hireCost = getManualHireCost();
-    if (hireCost > 0 && honey >= hireCost) {
-        honey -= hireCost;
+    if (honey >= nextHireCost) {
+        honey -= nextHireCost;
         addBee();
+        nextHireCost = Math.floor(nextHireCost * 1.5);
         updateHireCostDisplay();
         saveGame();
     }
@@ -2570,7 +2593,7 @@ rebirthBtn.addEventListener('click', () => {
         const rpGain = Math.floor(maxRP * rpCompoundingMultiplier);
         rebirthPoints += rpGain;
         
-        bees = []; flowers = []; nextHireCost = 0;
+        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         hasMoonCharm = false; hasSunRelic = false; hasStormTotem = false; hasGalaxyCrown = false;
@@ -2596,7 +2619,7 @@ sacrificeBtn.addEventListener('click', () => {
         rebirthPoints -= cost.rp;
         sacrificePoints += maxSP;
         
-        bees = []; flowers = []; nextHireCost = 0;
+        bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         hasMoonCharm = false; hasSunRelic = false; hasStormTotem = false; hasGalaxyCrown = false;
@@ -2757,7 +2780,6 @@ buyGalaxyCrown.addEventListener('click', () => { if (!hasGalaxyCrown && honey>=2
 
 toggleAutoBtn.addEventListener('click', toggleAuto);
 toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
-toggleAutoSpendBtn.addEventListener('click', configureAutoSpendPercent);
 
 // ========== SAVE GAME FUNCTION ==========
 function buildSaveData(includeWorldData = true) {
@@ -2778,7 +2800,6 @@ function buildSaveData(includeWorldData = true) {
         compoundingLevel, compoundingMultiplier,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
-        autoSpendPercent,
         performanceMode
     };
 
@@ -2859,7 +2880,6 @@ function loadGame() {
         rpCompoundingLevel = finiteOr(data.rpCompoundingLevel, 0);
         rpCompoundingMultiplier = finiteOr(data.rpCompoundingMultiplier, 1.0);
         rpAutobuyEnabled = data.rpAutobuyEnabled || false;
-        autoSpendPercent = normalizeAutoSpendPercent(data.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(data.performanceMode, false);
 
         const savedBeeCount = getSafeBeeCount(data.beeCount, 1);
@@ -2903,7 +2923,6 @@ function loadGame() {
             toggleRPAutoBtn.classList.remove('rp-autobuy-active');
         }
 
-        updateAutoSpendButton();
         updateHireCostDisplay();
 
         recalcMultiplier();
@@ -2929,7 +2948,6 @@ function init() {
     }
     updatePerformanceButton();
     recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
-    updateAutoSpendButton();
     updateHireCostDisplay();
     saveGame();
 }
