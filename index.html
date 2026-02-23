@@ -3638,7 +3638,7 @@ async function init() {
         localStorage.removeItem('beeSwarmPlayerName');
         playerNameInput.value = '';
         nameModal.style.display = 'flex';
-        nameError.textContent = 'вќЊ Admin claim login required for that name.';
+        nameError.textContent = '❌ Admin claim login required for that name.';
         playerNameDisplay.textContent = 'Name: ';
         menuAdminSection.style.display = 'none';
     }
@@ -3730,7 +3730,7 @@ function draw() {
             ctx.beginPath(); ctx.ellipse(b.x-8, b.y-12, 6, 3, 0.2, 0, 2*Math.PI); ctx.fill();
             ctx.beginPath(); ctx.ellipse(b.x+4, b.y-12, 6, 3, -0.2, 0, 2*Math.PI); ctx.fill();
             ctx.globalAlpha = 1;
-            if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('вњЁ', b.x-12, b.y-25); }
+            if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('✨', b.x-12, b.y-25); }
         }
     }
     ctx.shadowBlur = 0;
