@@ -1734,9 +1734,9 @@ function resetAllGameDataState() {
         rpAutoBuyInterval = null;
     }
 
-    toggleAutoBtn.textContent = 'вЏЇпёЏ AUTO (OFF)';
+    toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
     toggleAutoBtn.classList.remove('auto-active');
-    toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (OFF)';
+    toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
     toggleRPAutoBtn.classList.remove('rp-autobuy-active');
 
     addBee();
@@ -2398,16 +2398,16 @@ function fetchLeaderboard() {
         }
         
         renderLeaderboard();
-        debugInfo.textContent = `вњ… Loaded ${leaderboard.length} unique players`;
+        debugInfo.textContent = `✅ Loaded ${leaderboard.length} unique players`;
         
         if (isAdminUser()) {
             updateMenuAdminSelect();
         }
     }, (error) => {
         console.error('Firebase error:', error);
-        debugInfo.innerHTML = `вќЊ Error: ${error.message}`;
+        debugInfo.innerHTML = `❌ Error: ${error.message}`;
         document.getElementById('leaderboardList').innerHTML = 
-            '<div class="leaderboard-entry">вљ пёЏ Firebase connection error. Check rules.</div>';
+            '<div class="leaderboard-entry">⚠️ Firebase connection error. Check rules.</div>';
     });
 }
 
@@ -2510,12 +2510,12 @@ function renderLeaderboard() {
     top10.forEach((entry, index) => {
         const isYou = entry.name === playerName ? 'you-row' : '';
         const rank = index + 1;
-        let rankSymbol = rank === 1 ? 'рџҐ‡' : rank === 2 ? 'рџҐ€' : rank === 3 ? 'рџҐ‰' : `${rank}.`;
+        let rankSymbol = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
         
         html += `<div class="leaderboard-entry ${isYou}">
             <span class="leaderboard-rank">${rankSymbol}</span>
             <span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
-            <span class="leaderboard-score">рџЌЇ ${formatNumber(entry.total)}</span>
+            <span class="leaderboard-score">🍯 ${formatNumber(entry.total)}</span>
         </div>`;
     });
     
@@ -2527,7 +2527,7 @@ function renderLeaderboard() {
             html += `<div class="leaderboard-entry you-row">
                 <span class="leaderboard-rank">${playerRank}.</span>
                 <span class="leaderboard-name">${escapeHtml(playerName)}</span>
-                <span class="leaderboard-score">рџЌЇ ${formatNumber(playerEntry.total)}</span>
+                <span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span>
             </div>`;
         }
     }
