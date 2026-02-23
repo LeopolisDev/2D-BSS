@@ -766,8 +766,8 @@
             <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED <span id="speedStatus">(1 RP)</span><span id="speedBoost" class="boost-value"></span></button>
             <button class="tool-btn" id="buyCapacity">📦 CAPACITY <span id="capacityStatus">(3 RP)</span><span id="capacityBoost" class="boost-value"></span></button>
             <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 <span id="honeyMultStatus">(2 RP)</span></button>
-            <button class="tool-btn" id="buyCompounding">📈 HONEY COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
             <button class="tool-btn" id="buyFlowerHP">🌸 FLOWER HP lv0/5 (50 RP) +0</button>
+            <button class="tool-btn" id="buyCompounding">📈 HONEY COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
@@ -2182,7 +2182,7 @@ function update() {
             if (f.timer <= 0) {
                 if (flowers.filter(fl => fl.active).length < MAX_FLOWERS) {
                     f.active = true;
-                    f.pollen = 8 + Math.floor(Math.random() * 12);
+                    f.pollen = 8 + Math.floor(Math.random() * 12) + (getSafeFlowerHpLevel() * FLOWER_HP_PER_LEVEL);
                     f.timer = 0;
                 }
             }
