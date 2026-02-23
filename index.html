@@ -2518,6 +2518,11 @@ async function isNameAvailable(name) {
     const normalizedName = normalizePlayerName(name);
     if (!normalizedName) return false;
 
+    // Check local leaderboard cache first for immediate feedback
+    if (Array.isArray(leaderboard)) {
+        if (leaderboard.some(entry => entry.name === normalizedName)) return false;
+    }
+
     // Check leaderboard and identity tables for the name's existence.
     const leaderboardQuery = leaderboardRef.orderByChild('name').equalTo(normalizedName).limitToFirst(1);
     const identityQuery = playerIdentityRef.orderByChild('name').equalTo(normalizedName).limitToFirst(1);
@@ -2697,11 +2702,11 @@ saveNameBtn.addEventListener('click', async () => {
         saveNameBtn.textContent = 'START HIVE';
     } catch (error) {
         console.error('Error checking name:', error);
-        if (forcedRenameFromName) {
-            nameError.textContent = '❌ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
-        } else {
-            nameError.textContent = `❌ Error: ${error.message || 'Unknown error'}`;
-        }
+        
+        let errorMsg = error.message || 'Unknown error';
+        if (errorMsg === 'Target name already exists') errorMsg = 'Name already taken';
+        nameError.textContent = `❌ Error: ${errorMsg}`;
+        
         saveNameBtn.disabled = false;
         saveNameBtn.textContent = getNameActionButtonLabel();
     }
