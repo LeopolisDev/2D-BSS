@@ -2340,14 +2340,8 @@ function updateRebirthUI() {
         buyFlowerHP.disabled = true;
     } else {
         const flowerHpCost = getFlowerHpCost();
-        const lockedByCompounding = compoundingLevel <= 0;
-        if (lockedByCompounding) {
-            buyFlowerHP.innerHTML = `🌸 FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus} 🔒`;
-            buyFlowerHP.disabled = true;
-        } else {
-            buyFlowerHP.innerHTML = `🌸 FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus}`;
-            buyFlowerHP.disabled = rebirthPoints < flowerHpCost;
-        }
+        buyFlowerHP.innerHTML = `🌸 FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus}`;
+        buyFlowerHP.disabled = rebirthPoints < flowerHpCost;
     }
 }
 
@@ -2451,7 +2445,7 @@ function setupRPAutoBuy() {
         rpAutoBuyInterval = setInterval(() => {
             if (rebirthPoints >= Math.pow(2, compoundingLevel)) {
                 buyCompounding.click();
-            } else if (compoundingLevel > 0 && flowerHpLevel < FLOWER_HP_MAX_LEVEL && rebirthPoints >= getFlowerHpCost()) {
+            } else if (flowerHpLevel < FLOWER_HP_MAX_LEVEL && rebirthPoints >= getFlowerHpCost()) {
                 buyFlowerHP.click();
             } else if (!autoUnlocked && rebirthPoints >= 2) {
                 buyAutoUpgrade.click();
@@ -2860,7 +2854,6 @@ buyCompounding.addEventListener('click', () => {
 buyFlowerHP.addEventListener('click', () => {
     flowerHpLevel = getSafeFlowerHpLevel(flowerHpLevel);
     if (flowerHpLevel >= FLOWER_HP_MAX_LEVEL) return;
-    if (compoundingLevel <= 0) return;
 
     const cost = getFlowerHpCost();
     if (rebirthPoints >= cost) {
