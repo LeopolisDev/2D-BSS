@@ -600,6 +600,7 @@
     </style>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
@@ -653,6 +654,9 @@
                     <option value="all">Reset ALL (Honey + RP + SP)</option>
                 </select>
                 <button class="menu-btn remove-btn" id="menuAdminResetBtn">RESET PLAYER STAT</button>
+            </div>
+            <div class="menu-row">
+                <button class="menu-btn remove-btn" id="menuAdminBanBtn">PERMA IP BAN + WIPE</button>
             </div>
             <div class="menu-row">
                 <button class="menu-btn" id="menuOpenAnnouncementBtn">📢 ANNOUNCE</button>
@@ -709,6 +713,7 @@
                     <option value="rp">Reset My RP</option>
                     <option value="sp">Reset My SP</option>
                     <option value="all">Reset My ALL (Honey + RP + SP)</option>
+                    <option value="full">Reset My FULL DATA (Unlock one-time codes)</option>
                 </select>
                 <button class="menu-btn remove-btn" id="menuResetSelectedBtn">RESET SELECTED</button>
             </div>
@@ -829,6 +834,8 @@
 </div>
 
 <script>
+(() => {
+'use strict';
 // ================== FIREBASE CONFIGURATION ==================
 const firebaseConfig = {
     apiKey: "AIzaSyCw-Ldw_t2XV5sV3FxBROtE72dPxuH3Z-I",
@@ -842,10 +849,14 @@ const firebaseConfig = {
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 const database = firebase.database();
 const leaderboardRef = database.ref('leaderboard');
 const announcementRef = database.ref('announcement');
 const adminGrantsRef = database.ref('adminGrants');
+const playerBansRef = database.ref('playerBans');
+const ipBansRef = database.ref('ipBans');
+const playerIdentityRef = database.ref('playerIdentity');
 
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
@@ -856,6 +867,16 @@ let currentAnnouncement = localStorage.getItem('globalAnnouncement') || '';
 let announcementClosed = localStorage.getItem('announcementClosed') === 'true';
 let lastAnnouncementId = localStorage.getItem('lastAnnouncementId') || null;
 let announcementListenerInitialized = false;
+let localIpHash = '';
+let localIpHashPromise = null;
+let playerBanWatchRef = null;
+let ipBanWatchRef = null;
+let banEnforcementInProgress = false;
+let gameplayBlocked = false;
+
+const ONE_TIME_REDEEM_CODES = new Set(['release']);
+let redeemedCodeKeys = new Set();
+let adminClaimVerified = false;
 
 // ========== CANVAS ELEMENTS (MUST BE BEFORE EVENT LISTENERS) ==========
 const canvas = document.getElementById('gameCanvas');
@@ -887,6 +908,7 @@ const menuAdminAmount = document.getElementById('menuAdminAmount');
 const menuAdminAddBtn = document.getElementById('menuAdminAddBtn');
 const menuAdminResetStatSelect = document.getElementById('menuAdminResetStatSelect');
 const menuAdminResetBtn = document.getElementById('menuAdminResetBtn');
+const menuAdminBanBtn = document.getElementById('menuAdminBanBtn');
 const menuOpenAnnouncementBtn = document.getElementById('menuOpenAnnouncementBtn');
 const menuRedeemCodeInput = document.getElementById('menuRedeemCodeInput');
 const menuRedeemCodeBtn = document.getElementById('menuRedeemCodeBtn');
@@ -1079,29 +1101,29 @@ const validCodes = {
     'release': { honey: 100000, rp: 5, sp: 0, message: 'Release code redeemed! +100k Honey, +5 RP' },
 };
 
+function normalizeRedeemCodeKey(code) {
+    return String(code || '').toLowerCase().trim();
+}
+
+function setRedeemedCodeKeys(rawCodes) {
+    redeemedCodeKeys = new Set();
+    if (!Array.isArray(rawCodes)) return;
+    for (const code of rawCodes) {
+        const normalized = normalizeRedeemCodeKey(code);
+        if (normalized) {
+            redeemedCodeKeys.add(normalized);
+        }
+    }
+}
+
+function clearRedeemedCodeUsage() {
+    redeemedCodeKeys.clear();
+}
+
 function redeemCode(code) {
-    const lowerCode = code.toLowerCase().trim();
-    
-    if (validCodes[lowerCode]) {
-        const reward = validCodes[lowerCode];
-        
-        honey += reward.honey;
-        totalHoneyEarned += reward.honey;
-        rebirthPoints += reward.rp;
-        sacrificePoints += reward.sp;
-        
-        updateRebirthUI();
-        saveGame();
-        
-        menuRedeemMessage.textContent = `✅ ${reward.message}`;
-        menuRedeemMessage.style.color = '#aaffaa';
-        menuRedeemMessage.style.display = 'inline-block';
-        setTimeout(() => {
-            menuRedeemMessage.style.display = 'none';
-        }, 3000);
-        
-        return true;
-    } else {
+    const lowerCode = normalizeRedeemCodeKey(code);
+
+    if (!validCodes[lowerCode]) {
         menuRedeemMessage.textContent = `❌ Unknown code "${code}"`;
         menuRedeemMessage.style.color = '#ffaaaa';
         menuRedeemMessage.style.display = 'inline-block';
@@ -1110,6 +1132,39 @@ function redeemCode(code) {
         }, 3000);
         return false;
     }
+
+    if (ONE_TIME_REDEEM_CODES.has(lowerCode) && redeemedCodeKeys.has(lowerCode)) {
+        menuRedeemMessage.textContent = `❌ Code "${code}" already used. Do a FULL DATA reset to use it again.`;
+        menuRedeemMessage.style.color = '#ffaaaa';
+        menuRedeemMessage.style.display = 'inline-block';
+        setTimeout(() => {
+            menuRedeemMessage.style.display = 'none';
+        }, 3500);
+        return false;
+    }
+
+    const reward = validCodes[lowerCode];
+
+    honey += reward.honey;
+    totalHoneyEarned += reward.honey;
+    rebirthPoints += reward.rp;
+    sacrificePoints += reward.sp;
+
+    if (ONE_TIME_REDEEM_CODES.has(lowerCode)) {
+        redeemedCodeKeys.add(lowerCode);
+    }
+
+    updateRebirthUI();
+    saveGame();
+
+    menuRedeemMessage.textContent = `✅ ${reward.message}`;
+    menuRedeemMessage.style.color = '#aaffaa';
+    menuRedeemMessage.style.display = 'inline-block';
+    setTimeout(() => {
+        menuRedeemMessage.style.display = 'none';
+    }, 3000);
+
+    return true;
 }
 
 menuRedeemCodeBtn.addEventListener('click', () => {
@@ -1158,7 +1213,8 @@ function generateSaveCode() {
         autoActive,
         autoSpendPercent,
         performanceMode,
-        popupsDisabled
+        popupsDisabled,
+        redeemedCodes: Array.from(redeemedCodeKeys)
     };
     
     const jsonStr = JSON.stringify(saveData);
@@ -1218,6 +1274,7 @@ function loadSaveCode(code) {
         autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(saveData.performanceMode, false);
         popupsDisabled = parseBoolean(saveData.popupsDisabled, false);
+        setRedeemedCodeKeys(saveData.redeemedCodes);
         applyPopupPreference();
         updatePerformanceButton();
         updatePopupBlockButton();
@@ -1284,12 +1341,20 @@ menuLoadSaveBtn.addEventListener('click', () => {
 });
 
 // ========== RESET BUTTONS ==========
-menuResetSelectedBtn.addEventListener('click', () => {
+menuResetSelectedBtn.addEventListener('click', async () => {
     const resetStat = menuResetStatSelect.value;
-    if (!['honey', 'rp', 'sp', 'all'].includes(resetStat)) {
+    if (!['honey', 'rp', 'sp', 'all', 'full'].includes(resetStat)) {
         alert('Invalid reset stat');
         return;
     }
+
+    if (resetStat === 'full') {
+        if (!confirm('FULL reset will wipe all your data, clear one-time code usage, and remove you from leaderboard. Continue?')) return;
+        await performFullDataReset({ clearRedeemedCodes: true, removeLeaderboardEntry: true });
+        alert('Full data reset completed. One-time codes are usable again.');
+        return;
+    }
+
     if (!confirm(`Reset your ${resetStat.toUpperCase()} stats?`)) return;
 
     applyLocalCurrencyReset(resetStat);
@@ -1339,25 +1404,23 @@ closeAnnouncementBtn.addEventListener('click', () => {
     localStorage.setItem('announcementClosed', 'true');
 });
 
-menuOpenAnnouncementBtn.addEventListener('click', () => {
-    if (isAdminUser()) {
-        announcementModal.style.display = 'block';
-        menuPanel.classList.remove('show');
-    }
+menuOpenAnnouncementBtn.addEventListener('click', async () => {
+    if (!await ensureAdminAccess()) return;
+    announcementModal.style.display = 'block';
+    menuPanel.classList.remove('show');
 });
 
 sendAnnouncementBtn.addEventListener('click', async () => {
-    if (isAdminUser()) {
-        const message = announcementInput.value.trim();
-        if (message) {
-            await announcementRef.set({ 
-                text: message,
-                timestamp: Date.now()
-            });
-            localStorage.removeItem('announcementClosed');
-            announcementModal.style.display = 'none';
-            announcementInput.value = '';
-        }
+    if (!isAdminUser()) return;
+    const message = announcementInput.value.trim();
+    if (message) {
+        await announcementRef.set({ 
+            text: message,
+            timestamp: Date.now()
+        });
+        localStorage.removeItem('announcementClosed');
+        announcementModal.style.display = 'none';
+        announcementInput.value = '';
     }
 });
 
@@ -1394,7 +1457,71 @@ function getNameActionButtonLabel() {
 }
 
 function isAdminUser(name = playerName) {
-    return normalizePlayerName(name) === 'Opleoni';
+    return adminClaimVerified;
+}
+
+function isProtectedAdminName(name) {
+    return normalizePlayerName(name).toLowerCase() === 'opleoni';
+}
+
+async function refreshAdminClaimState(forceTokenRefresh = false) {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+        adminClaimVerified = false;
+        return false;
+    }
+
+    try {
+        const tokenResult = await currentUser.getIdTokenResult(forceTokenRefresh);
+        adminClaimVerified = parseBoolean(tokenResult?.claims?.admin, false);
+    } catch (error) {
+        console.error('Failed to read admin claim from token:', error);
+        adminClaimVerified = false;
+    }
+
+    return adminClaimVerified;
+}
+
+async function signInAdminUserInteractively() {
+    const useGoogle = confirm('Admin sign-in: OK = Google popup, Cancel = email/password.');
+
+    if (useGoogle) {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await auth.signInWithPopup(provider);
+        return;
+    }
+
+    const emailInput = prompt('Admin email:');
+    if (!emailInput) {
+        throw new Error('Admin login cancelled');
+    }
+    const passwordInput = prompt('Admin password:');
+    if (!passwordInput) {
+        throw new Error('Admin login cancelled');
+    }
+
+    await auth.signInWithEmailAndPassword(emailInput.trim(), passwordInput);
+}
+
+async function ensureAdminSessionIfNeeded() {
+    if (await refreshAdminClaimState(false)) return true;
+
+    try {
+        await signInAdminUserInteractively();
+    } catch (error) {
+        console.error('Admin sign-in failed:', error);
+        adminClaimVerified = false;
+        return false;
+    }
+
+    const verified = await refreshAdminClaimState(true);
+    if (!verified) {
+        alert('This account is not an admin account in Firebase claims.');
+        await auth.signOut();
+        return false;
+    }
+
+    return true;
 }
 
 function getAllKnownPlayerNames() {
@@ -1435,7 +1562,14 @@ function resolveKnownPlayerName(inputName) {
 
 function getAdminTargetPlayer() {
     const rawInput = String(menuAdminPlayerInput.value || '').trim();
-    if (!rawInput) return 'Opleoni';
+    if (!rawInput) return normalizePlayerName(playerName) || 'Opleoni';
+    if (rawInput.toLowerCase() === 'all') return '__ALL__';
+    return resolveKnownPlayerName(rawInput);
+}
+
+function getAdminBanTargetPlayer() {
+    const rawInput = String(menuAdminPlayerInput.value || '').trim();
+    if (!rawInput) return '';
     if (rawInput.toLowerCase() === 'all') return '__ALL__';
     return resolveKnownPlayerName(rawInput);
 }
@@ -1540,6 +1674,311 @@ function applyLocalCurrencyReset(resetStat) {
     }
     if (resetStat === 'sp' || resetStat === 'all') {
         sacrificePoints = 0;
+    }
+}
+
+function resetAllGameDataState() {
+    honey = 0;
+    totalHoneyEarned = 0;
+
+    bees = [];
+    flowers = [];
+    nextHireCost = HIRE_COST_BASE;
+
+    hasClippers = false;
+    hasShears = false;
+    hasScythe = false;
+    hasOil = false;
+    hasHoneycomb = false;
+    hasBeeGun = false;
+    hasRoyalJelly = false;
+    hasStarTreat = false;
+    hasMoonCharm = false;
+    hasSunRelic = false;
+    hasStormTotem = false;
+    hasGalaxyCrown = false;
+
+    rebirthPoints = 0;
+    sacrificePoints = 0;
+
+    autoUnlocked = false;
+    beeSpeedMultiplier = 1.0;
+    capacityMultiplier = 1.0;
+    honeyMultUpgrade = 1.0;
+    compoundingLevel = 0;
+    compoundingMultiplier = 1.0;
+    flowerHpLevel = 0;
+
+    x10HoneyPurchased = false;
+    rpAutoBuyActive = false;
+    rpGeneratorLevel = 0;
+    rpCompoundingLevel = 0;
+    rpCompoundingMultiplier = 1.0;
+
+    autoActive = false;
+    rpAutobuyEnabled = false;
+    autoSpendPercent = DEFAULT_AUTO_SPEND_PERCENT;
+
+    if (autoInterval) {
+        clearInterval(autoInterval);
+        autoInterval = null;
+    }
+    if (rpGeneratorInterval) {
+        clearInterval(rpGeneratorInterval);
+        rpGeneratorInterval = null;
+    }
+    if (rpAutoBuyInterval) {
+        clearInterval(rpAutoBuyInterval);
+        rpAutoBuyInterval = null;
+    }
+
+    toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+    toggleAutoBtn.classList.remove('auto-active');
+    toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+    toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+
+    addBee();
+    for (let i = 0; i < 14; i++) {
+        spawnFlower();
+    }
+
+    setupRPGenerator();
+    setupRPAutoBuy();
+    updateAutoSpendButton();
+    updateHireCostDisplay();
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+}
+
+async function performFullDataReset(options = {}) {
+    const clearRedeemedCodes = parseBoolean(options.clearRedeemedCodes, false);
+    const removeLeaderboardEntry = parseBoolean(options.removeLeaderboardEntry, false);
+
+    resetAllGameDataState();
+    if (clearRedeemedCodes) {
+        clearRedeemedCodeUsage();
+    }
+
+    if (removeLeaderboardEntry && playerName) {
+        await removePlayerFromLeaderboard(playerName);
+    }
+
+    saveGame({ skipLeaderboardSubmit: removeLeaderboardEntry });
+}
+
+async function hashStringSha256(input) {
+    if (!window.crypto || !window.crypto.subtle) return '';
+    const data = new TextEncoder().encode(String(input || ''));
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function ensureLocalIpHash() {
+    if (localIpHash) return localIpHash;
+    if (localIpHashPromise) return localIpHashPromise;
+
+    localIpHashPromise = (async () => {
+        try {
+            const response = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+            if (!response.ok) return '';
+            const data = await response.json();
+            const ip = String(data && data.ip ? data.ip : '').trim();
+            if (!ip) return '';
+            localIpHash = await hashStringSha256(ip);
+            return localIpHash;
+        } catch (error) {
+            console.warn('Unable to resolve IP hash for ban checks:', error);
+            return '';
+        } finally {
+            localIpHashPromise = null;
+        }
+    })();
+
+    return localIpHashPromise;
+}
+
+async function registerPlayerIdentity(name = playerName) {
+    const normalizedName = normalizePlayerName(name);
+    if (!normalizedName || isProtectedAdminName(normalizedName)) return;
+
+    const ipHash = await ensureLocalIpHash();
+    if (!ipHash) return;
+
+    const key = sanitizeFirebaseKey(normalizedName);
+    if (!key) return;
+
+    await playerIdentityRef.child(key).set({
+        name: normalizedName,
+        ipHash,
+        updatedAt: Date.now()
+    });
+
+}
+
+function lockGameplayForBan(message) {
+    gameplayBlocked = true;
+
+    if (autoInterval) {
+        clearInterval(autoInterval);
+        autoInterval = null;
+    }
+    if (rpGeneratorInterval) {
+        clearInterval(rpGeneratorInterval);
+        rpGeneratorInterval = null;
+    }
+    if (rpAutoBuyInterval) {
+        clearInterval(rpAutoBuyInterval);
+        rpAutoBuyInterval = null;
+    }
+
+    menuPanel.classList.remove('show');
+    for (const el of document.querySelectorAll('button, input, select, textarea')) {
+        el.disabled = true;
+    }
+
+    nameModal.style.display = 'flex';
+    nameError.textContent = message;
+    playerNameDisplay.textContent = `Name: ${playerName || 'BANNED'}`;
+}
+
+async function getActiveBanForName(targetName) {
+    const normalizedName = normalizePlayerName(targetName);
+    if (!normalizedName || isProtectedAdminName(normalizedName)) return null;
+
+    const key = sanitizeFirebaseKey(normalizedName);
+    if (!key) return null;
+
+    const nameBanSnapshot = await playerBansRef.child(key).once('value');
+    const nameBanData = nameBanSnapshot.val();
+    if (nameBanData && parseBoolean(nameBanData.active, true)) {
+        return { source: 'name', data: nameBanData };
+    }
+
+    const ipHash = await ensureLocalIpHash();
+    if (!ipHash) return null;
+
+    const ipBanSnapshot = await ipBansRef.child(ipHash).once('value');
+    const ipBanData = ipBanSnapshot.val();
+    if (ipBanData && parseBoolean(ipBanData.active, true)) {
+        return { source: 'ip', data: ipBanData };
+    }
+
+    return null;
+}
+
+async function enforceBanForCurrentPlayer(targetName = playerName) {
+    const normalizedName = normalizePlayerName(targetName);
+    if (!normalizedName || isProtectedAdminName(normalizedName)) return false;
+    if (gameplayBlocked || banEnforcementInProgress) return gameplayBlocked;
+
+    banEnforcementInProgress = true;
+    try {
+        const activeBan = await getActiveBanForName(normalizedName);
+        if (!activeBan) return false;
+
+        const removeCurrentEntry = !!normalizePlayerName(playerName);
+        await performFullDataReset({ clearRedeemedCodes: true, removeLeaderboardEntry: removeCurrentEntry });
+        await removePlayerFromLeaderboard(normalizedName);
+
+        const key = sanitizeFirebaseKey(normalizedName);
+        if (key) {
+            await adminGrantsRef.child(key).remove();
+        }
+
+        lockGameplayForBan('⛔ Permanently banned (IP ban). Stats wiped and leaderboard entry removed.');
+        return true;
+    } catch (error) {
+        console.error('Failed to enforce ban state:', error);
+        return false;
+    } finally {
+        banEnforcementInProgress = false;
+    }
+}
+
+function stopBanWatchers() {
+    if (playerBanWatchRef) {
+        playerBanWatchRef.off();
+        playerBanWatchRef = null;
+    }
+    if (ipBanWatchRef) {
+        ipBanWatchRef.off();
+        ipBanWatchRef = null;
+    }
+}
+
+async function startBanWatchers() {
+    stopBanWatchers();
+    if (!playerName || isProtectedAdminName(playerName)) return;
+
+    const key = sanitizeFirebaseKey(playerName);
+    if (key) {
+        playerBanWatchRef = playerBansRef.child(key);
+        playerBanWatchRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data && parseBoolean(data.active, true)) {
+                enforceBanForCurrentPlayer(playerName);
+            }
+        });
+    }
+
+    const ipHash = await ensureLocalIpHash();
+    if (ipHash) {
+        ipBanWatchRef = ipBansRef.child(ipHash);
+        ipBanWatchRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data && parseBoolean(data.active, true)) {
+                enforceBanForCurrentPlayer(playerName);
+            }
+        });
+    }
+}
+
+async function banPlayerPermanently(targetPlayer) {
+    const normalizedName = normalizePlayerName(targetPlayer);
+    const key = sanitizeFirebaseKey(normalizedName);
+    if (!normalizedName || !key) {
+        throw new Error('Invalid target player');
+    }
+    if (isProtectedAdminName(normalizedName)) {
+        throw new Error('Cannot ban Opleoni');
+    }
+
+    let knownIpHash = '';
+    const identitySnapshot = await playerIdentityRef.child(key).once('value');
+    const identityData = identitySnapshot.val() || {};
+    if (typeof identityData.ipHash === 'string') {
+        knownIpHash = identityData.ipHash.trim();
+    }
+
+    const now = Date.now();
+
+    await queueAdminReset(normalizedName, 'all');
+    await removePlayerFromLeaderboard(normalizedName);
+
+    await playerBansRef.child(key).set({
+        name: normalizedName,
+        active: true,
+        permanent: true,
+        type: 'ip_permanent',
+        ipHash: knownIpHash || '',
+        bannedBy: playerName || 'Opleoni',
+        bannedAt: now,
+        updatedAt: now
+    });
+
+    if (knownIpHash) {
+        await ipBansRef.child(knownIpHash).set({
+            active: true,
+            permanent: true,
+            type: 'ip_permanent',
+            name: normalizedName,
+            bannedBy: playerName || 'Opleoni',
+            bannedAt: now,
+            updatedAt: now
+        });
     }
 }
 
@@ -1693,6 +2132,14 @@ function startAdminGrantWatcher() {
 }
 
 // ========== ADMIN PANEL (menu version) ==========
+async function ensureAdminAccess() {
+    if (isAdminUser()) return true;
+    const ok = await ensureAdminSessionIfNeeded();
+    if (!ok) return false;
+    updateMenuAdminSelect();
+    return true;
+}
+
 function updateMenuAdminSelect() {
     if (!isAdminUser()) {
         menuAdminSection.style.display = 'none';
@@ -1702,7 +2149,7 @@ function updateMenuAdminSelect() {
 }
 
 menuAdminAddBtn.addEventListener('click', async () => {
-    if (!isAdminUser()) return;
+    if (!await ensureAdminAccess()) return;
 
     let leaderboardHoneyUpdated = false;
 
@@ -1789,7 +2236,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
 });
 
 menuAdminResetBtn.addEventListener('click', async () => {
-    if (!isAdminUser()) return;
+    if (!await ensureAdminAccess()) return;
 
     let leaderboardResetDone = false;
 
@@ -1876,6 +2323,48 @@ menuAdminResetBtn.addEventListener('click', async () => {
             return;
         }
         alert('Failed to reset stats for target player. Check Firebase permissions/rules.');
+    }
+});
+
+menuAdminBanBtn.addEventListener('click', async () => {
+    if (!await ensureAdminAccess()) return;
+
+    try {
+        let targetPlayer = getAdminBanTargetPlayer();
+        if (!targetPlayer) {
+            alert('Type a player name or ALL first.');
+            return;
+        }
+
+        if (targetPlayer === '__ALL__') {
+            const allPlayers = getAllKnownPlayerNames().filter(name => !isProtectedAdminName(name));
+            if (allPlayers.length === 0) {
+                alert('No non-admin players found to ban.');
+                return;
+            }
+
+            if (!confirm(`PERMANENT IP BAN + FULL WIPE for ALL ${allPlayers.length} non-admin players?`)) return;
+
+            for (const name of allPlayers) {
+                await banPlayerPermanently(name);
+            }
+
+            alert(`Permanent IP ban + wipe completed for ALL (${allPlayers.length}) players. Opleoni was skipped.`);
+            return;
+        }
+
+        if (isProtectedAdminName(targetPlayer)) {
+            alert('Banning Opleoni is blocked.');
+            return;
+        }
+
+        if (!confirm(`PERMANENT IP BAN + FULL WIPE for ${targetPlayer}? This cannot be undone in-game.`)) return;
+
+        await banPlayerPermanently(targetPlayer);
+        alert(`Permanent IP ban + wipe completed for ${targetPlayer}.`);
+    } catch (error) {
+        console.error('Admin ban failed:', error);
+        alert('Failed to ban player. Check Firebase permissions/rules and make sure the name is valid.');
     }
 });
 
@@ -2069,6 +2558,14 @@ saveNameBtn.addEventListener('click', async () => {
             return;
         }
 
+        if (!isProtectedAdminName(name)) {
+            const bannedBeforeJoin = await enforceBanForCurrentPlayer(name);
+            if (bannedBeforeJoin) {
+                saveNameBtn.textContent = getNameActionButtonLabel();
+                return;
+            }
+        }
+
         const available = await isNameAvailable(name);
         
         if (!available) {
@@ -2090,11 +2587,34 @@ saveNameBtn.addEventListener('click', async () => {
         playerName = name;
         forcedRenameFromName = '';
         localStorage.setItem('beeSwarmPlayerName', playerName);
+
+        if (isProtectedAdminName(playerName)) {
+            const adminSessionOk = await ensureAdminSessionIfNeeded();
+            if (!adminSessionOk) {
+                localStorage.removeItem('beeSwarmPlayerName');
+                playerName = '';
+                playerNameInput.value = '';
+                nameModal.style.display = 'flex';
+                nameError.textContent = '❌ Admin claim login required for that name.';
+                saveNameBtn.disabled = false;
+                saveNameBtn.textContent = getNameActionButtonLabel();
+                return;
+            }
+        }
+
+        await registerPlayerIdentity(playerName);
+        const bannedAfterJoin = await enforceBanForCurrentPlayer(playerName);
+        if (bannedAfterJoin) {
+            saveNameBtn.textContent = getNameActionButtonLabel();
+            return;
+        }
+
         nameModal.style.display = 'none';
         playerNameDisplay.textContent = `Name: ${playerName}`;
         
         await submitScore(totalHoneyEarned);
         startAdminGrantWatcher();
+        startBanWatchers();
         await claimAdminGrants();
         
         if (isAdminUser()) {
@@ -2225,6 +2745,8 @@ let popupsDisabled = false;
 
 // ========== GAME MECHANICS ==========
 function update() {
+    if (gameplayBlocked) return;
+
     for (let i = flowers.length - 1; i >= 0; i--) {
         const f = flowers[i];
         if (!f.active) {
@@ -2955,7 +3477,8 @@ function buildSaveData(includeWorldData = true) {
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
         autoSpendPercent,
         performanceMode,
-        popupsDisabled
+        popupsDisabled,
+        redeemedCodes: Array.from(redeemedCodeKeys)
     };
 
     if (includeWorldData) {
@@ -2974,7 +3497,9 @@ function buildSaveData(includeWorldData = true) {
     return saveData;
 }
 
-function saveGame() {
+function saveGame(options = {}) {
+    const skipLeaderboardSubmit = parseBoolean(options.skipLeaderboardSubmit, false);
+
     try {
         localStorage.setItem(SAVE_KEY, JSON.stringify(buildSaveData(true)));
         saveIndicator.textContent = 'Saved ' + new Date().toLocaleTimeString();
@@ -2990,7 +3515,9 @@ function saveGame() {
         }
     }
     
-    submitScore(totalHoneyEarned);
+    if (!skipLeaderboardSubmit) {
+        submitScore(totalHoneyEarned);
+    }
 }
 
 function loadGame() {
@@ -3039,6 +3566,7 @@ function loadGame() {
         autoSpendPercent = normalizeAutoSpendPercent(data.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(data.performanceMode, false);
         popupsDisabled = parseBoolean(data.popupsDisabled, false);
+        setRedeemedCodeKeys(data.redeemedCodes);
         applyPopupPreference();
 
         const savedBeeCount = getSafeBeeCount(data.beeCount, 1);
@@ -3098,14 +3626,31 @@ function loadGame() {
 }
 
 // ========== INIT ==========
-function init() {
+async function init() {
     if (!loadGame()) {
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
     }
+
+    await refreshAdminClaimState(true);
+    if (playerName && isProtectedAdminName(playerName) && !isAdminUser()) {
+        playerName = '';
+        localStorage.removeItem('beeSwarmPlayerName');
+        playerNameInput.value = '';
+        nameModal.style.display = 'flex';
+        nameError.textContent = '❌ Admin claim login required for that name.';
+        playerNameDisplay.textContent = 'Name: ';
+        menuAdminSection.style.display = 'none';
+    }
+
     if (playerName) {
-        startAdminGrantWatcher();
-        claimAdminGrants();
+        await registerPlayerIdentity(playerName);
+        const bannedOnInit = await enforceBanForCurrentPlayer(playerName);
+        if (!bannedOnInit) {
+            startAdminGrantWatcher();
+            startBanWatchers();
+            claimAdminGrants();
+        }
     }
     applyPopupPreference();
     updatePerformanceButton();
@@ -3113,12 +3658,27 @@ function init() {
     recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
     updateAutoSpendButton();
     updateHireCostDisplay();
-    saveGame();
+    if (!gameplayBlocked) {
+        saveGame();
+    }
 }
 init();
 
 // ========== DRAWING ==========
 function draw() {
+    if (gameplayBlocked) {
+        ctx.clearRect(0, 0, 800, 400);
+        ctx.fillStyle = '#1b1b1b';
+        ctx.fillRect(0, 0, 800, 400);
+        ctx.fillStyle = '#ff6b6b';
+        ctx.font = 'bold 30px monospace';
+        ctx.fillText('PERMANENTLY BANNED', 205, 190);
+        ctx.fillStyle = '#f2e9c9';
+        ctx.font = '16px monospace';
+        ctx.fillText('Your data has been wiped and leaderboard entry removed.', 130, 225);
+        return;
+    }
+
     ctx.clearRect(0, 0, 800, 400);
     const grad = ctx.createLinearGradient(0, 0, 0, 400);
     grad.addColorStop(0, '#9ccc7c'); grad.addColorStop(1, '#5f8b4b');
@@ -3182,6 +3742,7 @@ function gameLoop() {
     requestAnimationFrame(gameLoop); 
 }
 gameLoop();
+})();
 </script>
 </body>
 </html>
