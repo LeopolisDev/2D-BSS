@@ -1159,7 +1159,7 @@ function redeemCode(code) {
     updateRebirthUI();
     saveGame();
 
-    menuRedeemMessage.textContent = `вњ… ${reward.message}`;
+    menuRedeemMessage.textContent = `✅ ${reward.message}`;
     menuRedeemMessage.style.color = '#aaffaa';
     menuRedeemMessage.style.display = 'inline-block';
     setTimeout(() => {
@@ -1291,20 +1291,20 @@ function loadSaveCode(code) {
         for (let i = 0; i < 14; i++) spawnFlower();
         
         if (autoActive && autoUnlocked) {
-            toggleAutoBtn.textContent = 'вЏёпёЏ AUTO (ON)';
+            toggleAutoBtn.textContent = '▶️ AUTO (ON)';
             toggleAutoBtn.classList.add('auto-active');
             if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
         } else {
             autoActive = false;
-            toggleAutoBtn.textContent = 'вЏЇпёЏ AUTO (OFF)';
+            toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
             toggleAutoBtn.classList.remove('auto-active');
         }
         
         if (rpAutobuyEnabled && rpAutoBuyActive) {
-            toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (ON)';
+            toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
             toggleRPAutoBtn.classList.add('rp-autobuy-active');
         } else {
-            toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (OFF)';
+            toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
             toggleRPAutoBtn.classList.remove('rp-autobuy-active');
         }
         updateAutoSpendButton();
@@ -1316,7 +1316,7 @@ function loadSaveCode(code) {
         updateSPUI();
         saveGame();
         
-        alert('вњ… Save loaded successfully!');
+        alert('✅ Save loaded successfully!');
         return true;
     } catch (e) {
         console.error('Failed to load save:', e);
@@ -1335,10 +1335,10 @@ menuLoadSaveBtn.addEventListener('click', () => {
         if (success) {
             menuLoadCodeInput.value = '';
         } else {
-            alert('вќЊ Invalid save code!');
+            alert('❌ Invalid save code!');
         }
     } else {
-        alert('вќЊ Please enter a save code');
+        alert('❌ Please enter a save code');
     }
 });
 
@@ -1890,7 +1890,7 @@ async function enforceBanForCurrentPlayer(targetName = playerName) {
             await adminGrantsRef.child(key).remove();
         }
 
-        lockGameplayForBan('в›” Permanently banned (IP ban). Stats wiped and leaderboard entry removed.');
+        lockGameplayForBan('⛔ Permanently banned (IP ban). Stats wiped and leaderboard entry removed.');
         return true;
     } catch (error) {
         console.error('Failed to enforce ban state:', error);
@@ -1994,8 +1994,12 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
         throw new Error('Invalid target player');
     }
 
+    console.log(`Queueing ${stat} ${amount} for ${sanitizedTarget}`);
+
     await adminGrantsRef.child(key).transaction((current) => {
         const safeCurrent = current && typeof current === 'object' ? current : {};
+        
+        // Initialize all fields if they don't exist
         const next = {
             name: sanitizedTarget,
             honey: toSafeAmount(safeCurrent.honey),
@@ -2008,10 +2012,25 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
             updatedAt: Date.now()
         };
 
-        if (stat === 'honey') next.honey += amount;
-        if (stat === 'rp') next.rp += amount;
-        if (stat === 'sp') next.sp += amount;
+        // Add the amount to the correct stat
+        if (stat === 'honey') {
+            next.honey += amount;
+            console.log(`Added ${amount} honey, new total: ${next.honey}`);
+        }
+        if (stat === 'rp') {
+            next.rp += amount;
+            console.log(`Added ${amount} RP, new total: ${next.rp}`);
+        }
+        if (stat === 'sp') {
+            next.sp += amount;
+            console.log(`Added ${amount} SP, new total: ${next.sp}`);
+        }
+        
         return next;
+    }).then(() => {
+        console.log(`Successfully queued ${stat} for ${sanitizedTarget}`);
+    }).catch((error) => {
+        console.error(`Failed to queue ${stat} for ${sanitizedTarget}:`, error);
     });
 }
 
@@ -2054,14 +2073,22 @@ async function claimAdminGrants() {
     if (!playerName) return;
     const key = sanitizeFirebaseKey(playerName);
     if (!key) return;
+    
     claimingAdminGrant = true;
+    console.log('Checking for admin grants...');
 
     try {
         const grantRef = adminGrantsRef.child(key);
         const snapshot = await grantRef.once('value');
-        if (!snapshot.exists()) return;
+        
+        if (!snapshot.exists()) {
+            console.log('No grants found');
+            return;
+        }
 
         const data = snapshot.val() || {};
+        console.log('Found grants:', data);
+        
         const honeyGrant = toSafeAmount(data.honey);
         const rpGrant = toSafeAmount(data.rp);
         const spGrant = toSafeAmount(data.sp);
@@ -2069,37 +2096,63 @@ async function claimAdminGrants() {
         const resetHoney = parseBoolean(data.resetHoney, false);
         const resetRp = parseBoolean(data.resetRp, false);
         const resetSp = parseBoolean(data.resetSp, false);
+        
         const totalGrant = honeyGrant + rpGrant + spGrant;
 
+        // If nothing to do, just remove the grant
         if (totalGrant <= 0 && !resetAll && !resetHoney && !resetRp && !resetSp) {
+            console.log('No grants to apply, removing empty grant');
             await grantRef.remove();
             return;
         }
 
+        // Apply resets
         if (resetAll || resetHoney) {
+            console.log('Resetting honey');
             honey = 0;
             totalHoneyEarned = 0;
         }
         if (resetAll || resetRp) {
+            console.log('Resetting RP');
             rebirthPoints = 0;
         }
         if (resetAll || resetSp) {
+            console.log('Resetting SP');
             sacrificePoints = 0;
         }
 
-        honey += honeyGrant;
-        totalHoneyEarned += honeyGrant;
-        rebirthPoints += rpGrant;
-        sacrificePoints += spGrant;
+        // Apply grants
+        if (honeyGrant > 0) {
+            console.log(`Adding ${honeyGrant} honey`);
+            honey += honeyGrant;
+            totalHoneyEarned += honeyGrant;
+        }
+        if (rpGrant > 0) {
+            console.log(`Adding ${rpGrant} RP`);
+            rebirthPoints += rpGrant;
+        }
+        if (spGrant > 0) {
+            console.log(`Adding ${spGrant} SP`);
+            sacrificePoints += spGrant;
+        }
 
+        // Remove the grant BEFORE updating UI to prevent double-processing
         await grantRef.remove();
+        console.log('Grants removed from database');
 
+        // Update UI
         recalcMultiplier();
         updateRebirthUI();
         updateToolButtons();
         updateSPUI();
         saveGame();
+        
+        // Submit score if honey was added
+        if (honeyGrant > 0) {
+            await submitScore(totalHoneyEarned);
+        }
 
+        // Show summary
         const grantParts = [];
         if (resetAll) grantParts.push('Reset ALL');
         if (!resetAll && resetHoney) grantParts.push('Reset Honey');
@@ -2108,7 +2161,11 @@ async function claimAdminGrants() {
         if (honeyGrant > 0) grantParts.push(`${formatNumber(honeyGrant)} Honey`);
         if (rpGrant > 0) grantParts.push(`${formatNumber(rpGrant)} RP`);
         if (spGrant > 0) grantParts.push(`${formatNumber(spGrant)} SP`);
-        alert(`Admin update claimed: ${grantParts.join(', ')}`);
+        
+        if (grantParts.length > 0) {
+            alert(`✨ Admin update claimed: ${grantParts.join(', ')}`);
+        }
+        
     } catch (error) {
         console.error('Failed to claim admin grants:', error);
     } finally {
@@ -2176,34 +2233,15 @@ menuAdminAddBtn.addEventListener('click', async () => {
         }
     
         if (targetPlayer === '__ALL__') {
-            const allPlayers = getAllKnownPlayerNames();
-            if (allPlayers.length === 0) {
-                alert('No players found to update.');
-                return;
-            }
+    const allPlayers = getAllKnownPlayerNames();
+    if (allPlayers.length === 0) {
+        alert('No players found to update.');
+        return;
+    }
 
-            for (const name of allPlayers) {
-                if (isSamePlayerName(name, playerName)) {
-                    if (stat === 'honey') {
-                        honey += amount;
-                        totalHoneyEarned += amount;
-                        await submitScore(totalHoneyEarned);
-                    } else if (stat === 'rp') {
-                        rebirthPoints += amount;
-                    } else if (stat === 'sp') {
-                        sacrificePoints += amount;
-                    }
-                    continue;
-                }
-
-                if (stat === 'honey') {
-                    await addHoneyToPlayerScore(name, amount);
-                    leaderboardHoneyUpdated = true;
-                }
-                await queueAdminGrant(name, stat, amount);
-            }
-            targetPlayer = `ALL (${allPlayers.length})`;
-        } else if (isSamePlayerName(targetPlayer, playerName)) {
+    for (const name of allPlayers) {
+        if (isSamePlayerName(name, playerName)) {
+            // Handle current player immediately
             if (stat === 'honey') {
                 honey += amount;
                 totalHoneyEarned += amount;
@@ -2214,28 +2252,26 @@ menuAdminAddBtn.addEventListener('click', async () => {
                 sacrificePoints += amount;
             }
         } else {
+            // Queue for other players - ALL stats work now!
+            await queueAdminGrant(name, stat, amount);
+            
+            // Also update leaderboard if it's honey
             if (stat === 'honey') {
-                await addHoneyToPlayerScore(targetPlayer, amount);
+                await addHoneyToPlayerScore(name, amount);
                 leaderboardHoneyUpdated = true;
             }
-            await queueAdminGrant(targetPlayer, stat, amount);
         }
-    
-        recalcMultiplier();
-        updateRebirthUI();
-        updateToolButtons();
-        updateSPUI();
-        saveGame();
-        alert(`Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
-    } catch (error) {
-        console.error('Admin add failed:', error);
-        if (leaderboardHoneyUpdated) {
-            alert('Honey score was updated, but gift delivery failed. Check Firebase rules for adminGrants.');
-            return;
-        }
-        alert('Failed to add currency to target player. Check Firebase permissions/rules.');
     }
-});
+    
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+    saveGame();
+    
+    alert(`✅ Added ${amount} ${stat.toUpperCase()} to ALL (${allPlayers.length}) players`);
+    return;
+}
 
 menuAdminResetBtn.addEventListener('click', async () => {
     if (!await ensureAdminAccess()) return;
@@ -2627,7 +2663,7 @@ saveNameBtn.addEventListener('click', async () => {
         saveNameBtn.textContent = 'START HIVE';
     } catch (error) {
         console.error('Error checking name:', error);
-        nameError.textContent = '❌ Error checking or changing name. Please try again.';
+        nameError.textContent = '❌ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
         saveNameBtn.disabled = false;
         saveNameBtn.textContent = getNameActionButtonLabel();
     }
@@ -2645,7 +2681,7 @@ if (playerName && isBlockedPlayerName(playerName)) {
     playerNameInput.value = '';
     nameModal.style.display = 'flex';
     saveNameBtn.textContent = getNameActionButtonLabel();
-    nameError.textContent = 'вќЊ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
+    nameError.textContent = '❌ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
 } else if (playerName) {
     nameModal.style.display = 'none';
     saveNameBtn.textContent = getNameActionButtonLabel();
@@ -3179,7 +3215,7 @@ function autoBuy() {
 function toggleAuto() {
     if (!autoUnlocked) { alert('Buy AUTO upgrade first!'); return; }
     autoActive = !autoActive;
-    toggleAutoBtn.textContent = autoActive ? 'вЏёпёЏ AUTO (ON)' : 'вЏЇпёЏ AUTO (OFF)';
+    toggleAutoBtn.textContent = autoActive ? '▶️ AUTO (ON)' : '⏸️ AUTO (OFF)';
     toggleAutoBtn.classList.toggle('auto-active', autoActive);
     if (autoActive) { if (!autoInterval) autoInterval = setInterval(autoBuy, 1000); }
     else { if (autoInterval) { clearInterval(autoInterval); autoInterval = null; } }
@@ -3192,7 +3228,7 @@ function toggleRPAuto() {
         return;
     }
     rpAutobuyEnabled = !rpAutobuyEnabled;
-    toggleRPAutoBtn.textContent = rpAutobuyEnabled ? 'рџ¤– RP AUTO (ON)' : 'рџ¤– RP AUTO (OFF)';
+    toggleRPAutoBtn.textContent = rpAutobuyEnabled ? '🤖 RP AUTO (ON)' : '🤖 RP AUTO (OFF)';
     toggleRPAutoBtn.classList.toggle('rp-autobuy-active', rpAutobuyEnabled);
     
     if (rpAutobuyEnabled) {
@@ -3262,9 +3298,8 @@ rebirthBtn.addEventListener('click', () => {
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
         updateHireCostDisplay();
         saveGame();
-        alert(`вњЁ Purchased ${maxRP} RP (multiplied to ${rpGain} RP) for ${formatNumber(cost)} honey! Honey reset to 0.`);
-    } else {
-        alert(`вќЊ Need at least 10,000 honey for 1 RP!`);
+        alert(`✨ Purchased ${maxRP} RP (multiplied to ${rpGain} RP) for ${formatNumber(cost)} honey! Honey reset to 0.`);
+alert(`❌ Need at least 10,000 honey for 1 RP!`);
     }
 });
 
@@ -3297,7 +3332,7 @@ sacrificeBtn.addEventListener('click', () => {
         
         autoActive = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-        toggleAutoBtn.textContent = 'вЏЇпёЏ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
+        toggleAutoBtn.textContent = '⏸️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
 
         // Prevent RP autobuy from immediately buying RP upgrades after sacrifice.
         rpAutobuyEnabled = false;
@@ -3316,9 +3351,8 @@ sacrificeBtn.addEventListener('click', () => {
         updateHireCostDisplay();
         saveGame();
         
-        alert(`рџ”Ґ Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped. RP Compounding preserved at level ${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
-    } else {
-        alert(`вќЊ Need at least 100M honey and 10 RP for 1 SP!`);
+        alert(`🔥 Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped. RP Compounding preserved at level ${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
+alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
     }
 });
 
@@ -3591,12 +3625,12 @@ function loadGame() {
         updatePopupBlockButton();
 
         if (autoActive && autoUnlocked) {
-            toggleAutoBtn.textContent = 'вЏёпёЏ AUTO (ON)';
+            toggleAutoBtn.textContent = '▶️ AUTO (ON)';
             toggleAutoBtn.classList.add('auto-active');
             if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
         } else {
             autoActive = false;
-            toggleAutoBtn.textContent = 'вЏЇпёЏ AUTO (OFF)';
+            toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
             toggleAutoBtn.classList.remove('auto-active');
         }
 
@@ -3604,12 +3638,12 @@ function loadGame() {
         setupRPAutoBuy();
 
         if (rpAutobuyEnabled && rpAutoBuyActive) {
-            toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (ON)';
-            toggleRPAutoBtn.classList.add('rp-autobuy-active');
-        } else {
-            toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (OFF)';
-            toggleRPAutoBtn.classList.remove('rp-autobuy-active');
-        }
+    toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
+    toggleRPAutoBtn.classList.add('rp-autobuy-active');
+} else {
+    toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+    toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+}
 
         updateAutoSpendButton();
         updateHireCostDisplay();
