@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>рџђќ BEE SWARM В· working menu version</title>
+    <title>🐝 BEE SWARM INCREMENTAL</title>
     <style>
         * {
             box-sizing: border-box;
@@ -607,7 +607,7 @@
     <!-- Name modal (shown once) -->
     <div id="nameModal" class="name-modal">
         <div class="modal-content">
-            <h2 style="color:#2a4820;">рџђќ ENTER YOUR NAME</h2>
+            <h2 style="color:#2a4820;">🐝 ENTER YOUR NAME</h2>
             <input type="text" id="playerNameInput" maxlength="20" placeholder="BEE KEEPER" value="">
             <br>
             <button id="saveNameBtn">START HIVE</button>
@@ -617,7 +617,7 @@
 
     <!-- Announcement Popup -->
     <div id="announcementPopup" class="announcement-popup" style="display: none;">
-        <h2 style="color:#2a4820;">рџ“ў ANNOUNCEMENT</h2>
+        <h2 style="color:#2a4820;">📢 ANNOUNCEMENT</h2>
         <p id="announcementMessage"></p>
         <button id="closeAnnouncementBtn">CLOSE</button>
     </div>
@@ -625,24 +625,24 @@
 <div class="game-wrapper">
     <a class="discord-button" href="https://discord.gg/tYawMKj9vC" target="_blank" rel="noopener noreferrer">Discord</a>
     <!-- Menu Button (top right) -->
-    <button class="menu-button" id="menuToggleBtn">в° MENU</button>
+    <button class="menu-button" id="menuToggleBtn">☰ MENU</button>
     
     <!-- Menu Panel (hidden by default) -->
     <div class="menu-panel" id="menuPanel">
         <!-- Admin Section (only visible for Opleoni) -->
         <div class="menu-section" id="menuAdminSection" style="display: none;">
-            <div class="menu-section-title">рџ‘‘ ADMIN</div>
+            <div class="menu-section-title">👑 ADMIN</div>
             <div class="menu-row">
                 <input type="text" id="menuAdminPlayerInput" class="menu-input" maxlength="20" style="width:100%;" placeholder="Player name (blank = myself, ALL = everyone)">
             </div>
             <div class="menu-row">
                 <select id="menuAdminStatSelect" class="admin-select" style="width:100%;">
-                    <option value="honey">рџЌЇ Honey</option>
-                    <option value="rp">рџ”Ѓ RP</option>
-                    <option value="sp">рџ”ґ SP</option>
+                    <option value="honey">🍯 Honey</option>
+                    <option value="rp">🔥 RP</option>
+                    <option value="sp">💥 SP</option>
                 </select>
                 <input type="text" id="menuAdminAmount" class="adder-input" value="1000" inputmode="decimal" style="width:110px;" placeholder="1000 / 1e9">
-                <button class="menu-btn" id="menuAdminAddBtn">вћ• ADD</button>
+                <button class="menu-btn" id="menuAdminAddBtn">➕ ADD</button>
             </div>
             
             <div class="menu-row" style="border-top: 2px solid #ffd966; padding-top: 10px; margin-top: 10px;">
@@ -659,16 +659,16 @@
                 <button class="menu-btn remove-btn" id="menuAdminBanBtn">PERMA IP BAN + WIPE</button>
             </div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuOpenAnnouncementBtn">рџ“ў ANNOUNCE</button>
+                <button class="menu-btn" id="menuOpenAnnouncementBtn">📢 ANNOUNCE</button>
             </div>
         </div>
 
         <!-- Redeem Code Section -->
-        <div class="menu-section">
-            <div class="menu-section-title">рџЋЃ REDEEM CODE</div>
+       <div class="menu-section">
+            <div class="menu-section-title">🎁 REDEEM CODE</div>
             <div class="menu-row">
                 <input type="text" id="menuRedeemCodeInput" class="menu-input" placeholder="Enter code here">
-                <button class="menu-btn" id="menuRedeemCodeBtn">вњ… REDEEM</button>
+                <button class="menu-btn" id="menuRedeemCodeBtn">✅ REDEEM</button>
             </div>
             <div class="menu-row">
                 <span id="menuRedeemMessage" class="code-error" style="display: none;">Invalid code</span>
@@ -678,35 +678,35 @@
 
         <!-- Save/Load Section -->
         <div class="menu-section">
-            <div class="menu-section-title">рџ’ѕ SAVE / LOAD</div>
+            <div class="menu-section-title">💾 SAVE / LOAD</div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuGenerateSaveBtn">рџ“‹ GENERATE CODE</button>
+                <button class="menu-btn" id="menuGenerateSaveBtn">📋 GENERATE CODE</button>
             </div>
             <div class="menu-code-display" id="menuSaveCodeDisplay">
                 <span style="flex:1; text-align:center;">Click generate</span>
-                <button class="copy-btn" id="menuCopySaveBtn" style="display:none;">рџ“‹ COPY</button>
+                <button class="copy-btn" id="menuCopySaveBtn" style="display:none;">📋 COPY</button>
             </div>
             <div class="menu-row">
                 <input type="text" id="menuLoadCodeInput" class="menu-input" placeholder="Paste save code here">
-                <button class="menu-btn" id="menuLoadSaveBtn">рџ“‚ LOAD</button>
+                <button class="menu-btn" id="menuLoadSaveBtn">📂 LOAD</button>
             </div>
         </div>
 
         <!-- Performance Section -->
         <div class="menu-section">
-            <div class="menu-section-title">вљЎ PERFORMANCE</div>
+            <div class="menu-section-title">⚡ PERFORMANCE</div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuPerformanceBtn">вљЎ PERFORMANCE (OFF)</button>
+                <button class="menu-btn" id="menuPerformanceBtn">⚡ PERFORMANCE (OFF)</button>
             </div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuPopupBlockBtn">рџ”• POPUPS (ON)</button>
+                <button class="menu-btn" id="menuPopupBlockBtn">🔔 POPUPS (ON)</button>
             </div>
             <div style="font-size:0.8rem; color:#ffd966; text-align:center;">Hides bees and heavy effects for smoother gameplay.</div>
         </div>
 
         <!-- Reset Buttons -->
         <div class="menu-section">
-            <div class="menu-section-title">рџ”„ RESET</div>
+            <div class="menu-section-title">🔄 RESET</div>
             <div class="menu-row">
                 <select id="menuResetStatSelect" class="admin-select" style="width:100%;">
                     <option value="honey">Reset My Honey</option>
@@ -1077,12 +1077,12 @@ function applyPopupPreference() {
 }
 
 function updatePerformanceButton() {
-    menuPerformanceBtn.textContent = performanceMode ? 'вљЎ PERFORMANCE (ON)' : 'вљЎ PERFORMANCE (OFF)';
+    menuPerformanceBtn.textContent = performanceMode ? '⚡ PERFORMANCE (ON)' : '⚡ PERFORMANCE (OFF)';
     menuPerformanceBtn.classList.toggle('performance-active', performanceMode);
 }
 
 function updatePopupBlockButton() {
-    menuPopupBlockBtn.textContent = popupsDisabled ? 'рџ”• POPUPS (OFF)' : 'рџ”” POPUPS (ON)';
+    menuPopupBlockBtn.textContent = popupsDisabled ? '🔕 POPUPS (OFF)' : '🔔 POPUPS (ON)';
 }
 
 function togglePerformanceMode() {
@@ -1126,7 +1126,7 @@ function redeemCode(code) {
     const lowerCode = normalizeRedeemCodeKey(code);
 
     if (!validCodes[lowerCode]) {
-        menuRedeemMessage.textContent = `вќЊ Unknown code "${code}"`;
+        menuRedeemMessage.textContent = `❌ Unknown code "${code}"`;
         menuRedeemMessage.style.color = '#ffaaaa';
         menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
@@ -1135,8 +1135,8 @@ function redeemCode(code) {
         return false;
     }
 
-    if (ONE_TIME_REDEEM_CODES.has(lowerCode) && redeemedCodeKeys.has(lowerCode)) {
-        menuRedeemMessage.textContent = `вќЊ Code "${code}" already used. Do a FULL DATA reset to use it again.`;
+        if (ONE_TIME_REDEEM_CODES.has(lowerCode) && redeemedCodeKeys.has(lowerCode)) {
+        menuRedeemMessage.textContent = `❌ Code "${code}" already used. Do a FULL DATA reset to use it again.`;
         menuRedeemMessage.style.color = '#ffaaaa';
         menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
@@ -1175,7 +1175,7 @@ menuRedeemCodeBtn.addEventListener('click', () => {
         redeemCode(code);
         menuRedeemCodeInput.value = '';
     } else {
-        menuRedeemMessage.textContent = 'вќЊ Please enter a code';
+        menuRedeemMessage.textContent = '❌ Please enter a code';
         menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
             menuRedeemMessage.style.display = 'none';
@@ -1222,13 +1222,13 @@ function generateSaveCode() {
     const jsonStr = JSON.stringify(saveData);
     const base64 = btoa(encodeURIComponent(jsonStr));
     
-    menuSaveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${base64}</span><button class="copy-btn" id="menuCopySaveBtn">рџ“‹ COPY</button>`;
+    menuSaveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${base64}</span><button class="copy-btn" id="menuCopySaveBtn">📋 COPY</button>`;
     
     document.getElementById('menuCopySaveBtn').addEventListener('click', () => {
         navigator.clipboard.writeText(base64).then(() => {
-            alert('вњ… Save code copied to clipboard!');
+            alert('✅ Save code copied to clipboard!');
         }).catch(() => {
-            alert('вќЊ Failed to copy');
+            alert('❌ Failed to copy');
         });
     });
     
