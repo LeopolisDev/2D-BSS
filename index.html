@@ -3716,7 +3716,7 @@ async function init() {
         if (!bannedOnInit) {
             startAdminGrantWatcher();
             startBanWatchers();
-            claimAdminGrants();
+            await claimAdminGrants();
         }
     }
     applyPopupPreference();
