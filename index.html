@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐝 BEE SWARM · working menu version</title>
+    <title>рџђќ BEE SWARM В· working menu version</title>
     <style>
         * {
             box-sizing: border-box;
@@ -607,7 +607,7 @@
     <!-- Name modal (shown once) -->
     <div id="nameModal" class="name-modal">
         <div class="modal-content">
-            <h2 style="color:#2a4820;">🐝 ENTER YOUR NAME</h2>
+            <h2 style="color:#2a4820;">рџђќ ENTER YOUR NAME</h2>
             <input type="text" id="playerNameInput" maxlength="20" placeholder="BEE KEEPER" value="">
             <br>
             <button id="saveNameBtn">START HIVE</button>
@@ -617,7 +617,7 @@
 
     <!-- Announcement Popup -->
     <div id="announcementPopup" class="announcement-popup" style="display: none;">
-        <h2 style="color:#2a4820;">📢 ANNOUNCEMENT</h2>
+        <h2 style="color:#2a4820;">рџ“ў ANNOUNCEMENT</h2>
         <p id="announcementMessage"></p>
         <button id="closeAnnouncementBtn">CLOSE</button>
     </div>
@@ -625,24 +625,24 @@
 <div class="game-wrapper">
     <a class="discord-button" href="https://discord.gg/tYawMKj9vC" target="_blank" rel="noopener noreferrer">Discord</a>
     <!-- Menu Button (top right) -->
-    <button class="menu-button" id="menuToggleBtn">☰ MENU</button>
+    <button class="menu-button" id="menuToggleBtn">в° MENU</button>
     
     <!-- Menu Panel (hidden by default) -->
     <div class="menu-panel" id="menuPanel">
         <!-- Admin Section (only visible for Opleoni) -->
         <div class="menu-section" id="menuAdminSection" style="display: none;">
-            <div class="menu-section-title">👑 ADMIN</div>
+            <div class="menu-section-title">рџ‘‘ ADMIN</div>
             <div class="menu-row">
                 <input type="text" id="menuAdminPlayerInput" class="menu-input" maxlength="20" style="width:100%;" placeholder="Player name (blank = myself, ALL = everyone)">
             </div>
             <div class="menu-row">
                 <select id="menuAdminStatSelect" class="admin-select" style="width:100%;">
-                    <option value="honey">🍯 Honey</option>
-                    <option value="rp">🔁 RP</option>
-                    <option value="sp">🔴 SP</option>
+                    <option value="honey">рџЌЇ Honey</option>
+                    <option value="rp">рџ”Ѓ RP</option>
+                    <option value="sp">рџ”ґ SP</option>
                 </select>
                 <input type="text" id="menuAdminAmount" class="adder-input" value="1000" inputmode="decimal" style="width:110px;" placeholder="1000 / 1e9">
-                <button class="menu-btn" id="menuAdminAddBtn">➕ ADD</button>
+                <button class="menu-btn" id="menuAdminAddBtn">вћ• ADD</button>
             </div>
             
             <div class="menu-row" style="border-top: 2px solid #ffd966; padding-top: 10px; margin-top: 10px;">
@@ -659,16 +659,16 @@
                 <button class="menu-btn remove-btn" id="menuAdminBanBtn">PERMA IP BAN + WIPE</button>
             </div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuOpenAnnouncementBtn">📢 ANNOUNCE</button>
+                <button class="menu-btn" id="menuOpenAnnouncementBtn">рџ“ў ANNOUNCE</button>
             </div>
         </div>
 
         <!-- Redeem Code Section -->
         <div class="menu-section">
-            <div class="menu-section-title">🎁 REDEEM CODE</div>
+            <div class="menu-section-title">рџЋЃ REDEEM CODE</div>
             <div class="menu-row">
                 <input type="text" id="menuRedeemCodeInput" class="menu-input" placeholder="Enter code here">
-                <button class="menu-btn" id="menuRedeemCodeBtn">✅ REDEEM</button>
+                <button class="menu-btn" id="menuRedeemCodeBtn">вњ… REDEEM</button>
             </div>
             <div class="menu-row">
                 <span id="menuRedeemMessage" class="code-error" style="display: none;">Invalid code</span>
@@ -678,35 +678,35 @@
 
         <!-- Save/Load Section -->
         <div class="menu-section">
-            <div class="menu-section-title">💾 SAVE / LOAD</div>
+            <div class="menu-section-title">рџ’ѕ SAVE / LOAD</div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuGenerateSaveBtn">📋 GENERATE CODE</button>
+                <button class="menu-btn" id="menuGenerateSaveBtn">рџ“‹ GENERATE CODE</button>
             </div>
             <div class="menu-code-display" id="menuSaveCodeDisplay">
                 <span style="flex:1; text-align:center;">Click generate</span>
-                <button class="copy-btn" id="menuCopySaveBtn" style="display:none;">📋 COPY</button>
+                <button class="copy-btn" id="menuCopySaveBtn" style="display:none;">рџ“‹ COPY</button>
             </div>
             <div class="menu-row">
                 <input type="text" id="menuLoadCodeInput" class="menu-input" placeholder="Paste save code here">
-                <button class="menu-btn" id="menuLoadSaveBtn">📂 LOAD</button>
+                <button class="menu-btn" id="menuLoadSaveBtn">рџ“‚ LOAD</button>
             </div>
         </div>
 
         <!-- Performance Section -->
         <div class="menu-section">
-            <div class="menu-section-title">⚡ PERFORMANCE</div>
+            <div class="menu-section-title">вљЎ PERFORMANCE</div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuPerformanceBtn">⚡ PERFORMANCE (OFF)</button>
+                <button class="menu-btn" id="menuPerformanceBtn">вљЎ PERFORMANCE (OFF)</button>
             </div>
             <div class="menu-row">
-                <button class="menu-btn" id="menuPopupBlockBtn">🔕 POPUPS (ON)</button>
+                <button class="menu-btn" id="menuPopupBlockBtn">рџ”• POPUPS (ON)</button>
             </div>
             <div style="font-size:0.8rem; color:#ffd966; text-align:center;">Hides bees and heavy effects for smoother gameplay.</div>
         </div>
 
         <!-- Reset Buttons -->
         <div class="menu-section">
-            <div class="menu-section-title">🔄 RESET</div>
+            <div class="menu-section-title">рџ”„ RESET</div>
             <div class="menu-row">
                 <select id="menuResetStatSelect" class="admin-select" style="width:100%;">
                     <option value="honey">Reset My Honey</option>
@@ -726,23 +726,23 @@
         <!-- Main stats panel -->
         <div class="hive-panel">
             <div class="stats">
-                <div class="stat-item">🍯 <span id="honeyDisplay">0</span></div>
-                <div class="stat-item">🐝 <span id="beeCountDisplay">1</span></div>
-                <div class="stat-item">🏆 <span id="totalEarnedDisplay">0</span></div>
-                <div class="stat-item">🔁 <span id="rpDisplay">0</span> RP</div>
-                <div class="stat-item">🔴 <span id="spDisplay">0</span> SP</div>
+                <div class="stat-item">рџЌЇ <span id="honeyDisplay">0</span></div>
+                <div class="stat-item">рџђќ <span id="beeCountDisplay">1</span></div>
+                <div class="stat-item">рџЏ† <span id="totalEarnedDisplay">0</span></div>
+                <div class="stat-item">рџ”Ѓ <span id="rpDisplay">0</span> RP</div>
+                <div class="stat-item">рџ”ґ <span id="spDisplay">0</span> SP</div>
             </div>
             <div class="button-group">
-                <button class="bee-btn" id="hireBtn">🐝 HIRE <span id="hireCostSpan">20</span>🍯</button>
+                <button class="bee-btn" id="hireBtn">рџђќ HIRE <span id="hireCostSpan">20</span>рџЌЇ</button>
             </div>
-            <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
+            <div class="field-info" id="fieldInfo">рџЊё 0 flowers</div>
         </div>
 
         <!-- Leaderboard Panel -->
         <div class="leaderboard-panel">
             <div class="leaderboard-title">
-                🌍 GLOBAL TOP 10
-                <span class="refresh-btn" id="refreshLeaderboard">↻</span>
+                рџЊЌ GLOBAL TOP 10
+                <span class="refresh-btn" id="refreshLeaderboard">в†»</span>
             </div>
             <div id="leaderboardList">
                 <div class="loading">Loading leaderboard...</div>
@@ -752,71 +752,71 @@
 
         <!-- Rebirth Row -->
         <div class="rebirth-row">
-            <span style="color:#fff4c2; font-weight:bold;">🌀 REBIRTH:</span>
-            <button class="tool-btn" id="rebirthBtn">🔁 REBIRTH</button>
+            <span style="color:#fff4c2; font-weight:bold;">рџЊЂ REBIRTH:</span>
+            <button class="tool-btn" id="rebirthBtn">рџ”Ѓ REBIRTH</button>
             <span class="multiplier-badge" id="rebirthInfo">1 RP = 10k</span>
             <span class="multiplier-badge" id="rpBadge">RP: 0</span>
         </div>
 
         <!-- SACRIFICE Row -->
         <div class="sacrifice-row">
-            <span style="color:#ffcccc; font-weight:bold;">🔴 SACRIFICE (WIPES EVERYTHING):</span>
-            <button class="tool-btn sacrifice-btn" id="sacrificeBtn">🔥 SACRIFICE</button>
+            <span style="color:#ffcccc; font-weight:bold;">рџ”ґ SACRIFICE (WIPES EVERYTHING):</span>
+            <button class="tool-btn sacrifice-btn" id="sacrificeBtn">рџ”Ґ SACRIFICE</button>
             <span class="multiplier-badge" id="sacrificeInfo">1 SP = 100M + 10 RP</span>
             <span class="multiplier-badge" id="spBadge">SP: 0</span>
         </div>
 
         <!-- Rebirth Shop -->
         <div class="rebirth-shop-row">
-            <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
-            <button class="tool-btn" id="buyAutoUpgrade">🤖 AUTO <span id="autoStatus">(2 RP)</span></button>
-            <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED <span id="speedStatus">(1 RP)</span><span id="speedBoost" class="boost-value"></span></button>
-            <button class="tool-btn" id="buyCapacity">📦 CAPACITY <span id="capacityStatus">(3 RP)</span><span id="capacityBoost" class="boost-value"></span></button>
-            <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 <span id="honeyMultStatus">(2 RP)</span></button>
-            <button class="tool-btn" id="buyFlowerHP">🌸 FLOWER HP lv0/5 (50 RP) +0</button>
-            <button class="tool-btn" id="buyCompounding">📈 HONEY COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
+            <span style="color:#f2dcff; font-weight:bold;">рџЊЂ REBIRTH SHOP:</span>
+            <button class="tool-btn" id="buyAutoUpgrade">рџ¤– AUTO <span id="autoStatus">(2 RP)</span></button>
+            <button class="tool-btn" id="buyBeeSpeed">вљЎ SPEED <span id="speedStatus">(1 RP)</span><span id="speedBoost" class="boost-value"></span></button>
+            <button class="tool-btn" id="buyCapacity">рџ“¦ CAPACITY <span id="capacityStatus">(3 RP)</span><span id="capacityBoost" class="boost-value"></span></button>
+            <button class="tool-btn" id="buyHoneyMult">рџЌЇ HONEY x5 <span id="honeyMultStatus">(2 RP)</span></button>
+            <button class="tool-btn" id="buyFlowerHP">рџЊё FLOWER HP lv0/5 (50 RP) +0</button>
+            <button class="tool-btn" id="buyCompounding">рџ“€ HONEY COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
         <!-- SP SHOP -->
         <div class="sp-shop-row">
-            <span style="color:#ffb3b3; font-weight:bold;">💰 SP SHOP:</span>
-            <button class="tool-btn" id="buyX10Honey">🍯 x10 HONEY (5 SP)</button>
-            <button class="tool-btn" id="buyRPAuto">🤖 RP AUTOBUY (10 SP)</button>
-            <button class="tool-btn" id="buyRPGen">⏱️ RP GENERATOR lv<span id="rpGenLevel">0</span> (<span id="rpGenCost">1</span> SP) <span id="rpGenTime">5s</span> <span id="rpGenPreview" class="preview-text"></span></button>
-            <button class="tool-btn" id="buyRPCompounding">📈 RP COMPOUNDING lv<span id="rpCompLevel">0</span> (<span id="rpCompCost">1</span> SP) x<span id="rpCompMult">1.00</span></button>
+            <span style="color:#ffb3b3; font-weight:bold;">рџ’° SP SHOP:</span>
+            <button class="tool-btn" id="buyX10Honey">рџЌЇ x10 HONEY (5 SP)</button>
+            <button class="tool-btn" id="buyRPAuto">рџ¤– RP AUTOBUY (10 SP)</button>
+            <button class="tool-btn" id="buyRPGen">вЏ±пёЏ RP GENERATOR lv<span id="rpGenLevel">0</span> (<span id="rpGenCost">1</span> SP) <span id="rpGenTime">5s</span> <span id="rpGenPreview" class="preview-text"></span></button>
+            <button class="tool-btn" id="buyRPCompounding">рџ“€ RP COMPOUNDING lv<span id="rpCompLevel">0</span> (<span id="rpCompCost">1</span> SP) x<span id="rpCompMult">1.00</span></button>
             <span class="multiplier-badge" id="spShopDisplay">SP: 0</span>
         </div>
 
         <!-- Tool shop -->
         <div class="shop-row">
-            <span style="color:#fff4c2; font-weight:bold;">🛒 TOOLS:</span>
-            <button class="tool-btn" id="buyClippers">✂️ 1.2x (50)</button>
-            <button class="tool-btn" id="buyShears">⚙️ 1.5x (150)</button>
-            <button class="tool-btn" id="buyScythe">🌾 2.0x (400)</button>
-            <button class="tool-btn" id="buyOil">🛢️ 3.0x (900)</button>
-            <button class="tool-btn" id="buyHoneycomb">🍯 1.5x (25k)</button>
-            <button class="tool-btn" id="buyBeeGun">🔫 2.0x (50k)</button>
-            <button class="tool-btn" id="buyRoyalJelly">👑 3.0x (100k)</button>
-            <button class="tool-btn" id="buyStarTreat">⭐ 5.0x (250k)</button>
+            <span style="color:#fff4c2; font-weight:bold;">рџ›’ TOOLS:</span>
+            <button class="tool-btn" id="buyClippers">вњ‚пёЏ 1.2x (50)</button>
+            <button class="tool-btn" id="buyShears">вљ™пёЏ 1.5x (150)</button>
+            <button class="tool-btn" id="buyScythe">рџЊѕ 2.0x (400)</button>
+            <button class="tool-btn" id="buyOil">рџ›ўпёЏ 3.0x (900)</button>
+            <button class="tool-btn" id="buyHoneycomb">рџЌЇ 1.5x (25k)</button>
+            <button class="tool-btn" id="buyBeeGun">рџ”« 2.0x (50k)</button>
+            <button class="tool-btn" id="buyRoyalJelly">рџ‘‘ 3.0x (100k)</button>
+            <button class="tool-btn" id="buyStarTreat">в­ђ 5.0x (250k)</button>
             <button class="tool-btn" id="buyMoonCharm">&#127769; MOON CHARM 1.5x (5B)</button>
             <button class="tool-btn" id="buySunRelic">&#9728;&#65039; SUN RELIC 2.0x (25B)</button>
             <button class="tool-btn" id="buyStormTotem">&#9889; STORM TOTEM 3.0x (100B)</button>
             <button class="tool-btn" id="buyGalaxyCrown">&#127756; GALAXY CROWN 5.0x (250B)</button>
-            <span class="multiplier-badge" id="totalMultDisplay">✖️ 1.00</span>
+            <span class="multiplier-badge" id="totalMultDisplay">вњ–пёЏ 1.00</span>
         </div>
 
         <!-- Controls row -->
         <div class="shop-row" style="background:#8f6d3c;">
-            <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
-            <button class="tool-btn rp-autobuy-toggle" id="toggleRPAutoBtn">🤖 RP AUTO (OFF)</button>
+            <button class="tool-btn" id="toggleAutoBtn">вЏЇпёЏ AUTO (OFF)</button>
+            <button class="tool-btn rp-autobuy-toggle" id="toggleRPAutoBtn">рџ¤– RP AUTO (OFF)</button>
             <button class="tool-btn" id="toggleAutoSpendBtn">AUTO % (10%)</button>
             <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
         </div>
 
         <!-- Announcement Modal for Opleoni -->
         <div id="announcementModal" class="announcement-popup" style="display: none;">
-            <h2 style="color:#2a4820;">📢 SEND ANNOUNCEMENT</h2>
+            <h2 style="color:#2a4820;">рџ“ў SEND ANNOUNCEMENT</h2>
             <input type="text" id="announcementInput" placeholder="Enter your message..." maxlength="100" style="width: 90%; padding: 10px; border-radius: 40px; border: none; margin: 20px 0;">
             <br>
             <button id="sendAnnouncementBtn">SEND</button>
@@ -826,8 +826,8 @@
         <!-- Footer with save indicator only -->
         <footer>
             <div class="footer-row">
-                <span>🌸 Click flowers to boost them</span>
-                <span class="save-indicator" id="saveIndicator">💾 Auto-saved</span>
+                <span>рџЊё Click flowers to boost them</span>
+                <span class="save-indicator" id="saveIndicator">рџ’ѕ Auto-saved</span>
             </div>
         </footer>
     </div>
@@ -1075,12 +1075,12 @@ function applyPopupPreference() {
 }
 
 function updatePerformanceButton() {
-    menuPerformanceBtn.textContent = performanceMode ? '⚡ PERFORMANCE (ON)' : '⚡ PERFORMANCE (OFF)';
+    menuPerformanceBtn.textContent = performanceMode ? 'вљЎ PERFORMANCE (ON)' : 'вљЎ PERFORMANCE (OFF)';
     menuPerformanceBtn.classList.toggle('performance-active', performanceMode);
 }
 
 function updatePopupBlockButton() {
-    menuPopupBlockBtn.textContent = popupsDisabled ? '🔕 POPUPS (OFF)' : '🔔 POPUPS (ON)';
+    menuPopupBlockBtn.textContent = popupsDisabled ? 'рџ”• POPUPS (OFF)' : 'рџ”” POPUPS (ON)';
 }
 
 function togglePerformanceMode() {
@@ -1124,7 +1124,7 @@ function redeemCode(code) {
     const lowerCode = normalizeRedeemCodeKey(code);
 
     if (!validCodes[lowerCode]) {
-        menuRedeemMessage.textContent = `❌ Unknown code "${code}"`;
+        menuRedeemMessage.textContent = `вќЊ Unknown code "${code}"`;
         menuRedeemMessage.style.color = '#ffaaaa';
         menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
@@ -1134,7 +1134,7 @@ function redeemCode(code) {
     }
 
     if (ONE_TIME_REDEEM_CODES.has(lowerCode) && redeemedCodeKeys.has(lowerCode)) {
-        menuRedeemMessage.textContent = `❌ Code "${code}" already used. Do a FULL DATA reset to use it again.`;
+        menuRedeemMessage.textContent = `вќЊ Code "${code}" already used. Do a FULL DATA reset to use it again.`;
         menuRedeemMessage.style.color = '#ffaaaa';
         menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
@@ -1157,7 +1157,7 @@ function redeemCode(code) {
     updateRebirthUI();
     saveGame();
 
-    menuRedeemMessage.textContent = `✅ ${reward.message}`;
+    menuRedeemMessage.textContent = `вњ… ${reward.message}`;
     menuRedeemMessage.style.color = '#aaffaa';
     menuRedeemMessage.style.display = 'inline-block';
     setTimeout(() => {
@@ -1173,7 +1173,7 @@ menuRedeemCodeBtn.addEventListener('click', () => {
         redeemCode(code);
         menuRedeemCodeInput.value = '';
     } else {
-        menuRedeemMessage.textContent = '❌ Please enter a code';
+        menuRedeemMessage.textContent = 'вќЊ Please enter a code';
         menuRedeemMessage.style.display = 'inline-block';
         setTimeout(() => {
             menuRedeemMessage.style.display = 'none';
@@ -1220,13 +1220,13 @@ function generateSaveCode() {
     const jsonStr = JSON.stringify(saveData);
     const base64 = btoa(encodeURIComponent(jsonStr));
     
-    menuSaveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${base64}</span><button class="copy-btn" id="menuCopySaveBtn">📋 COPY</button>`;
+    menuSaveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${base64}</span><button class="copy-btn" id="menuCopySaveBtn">рџ“‹ COPY</button>`;
     
     document.getElementById('menuCopySaveBtn').addEventListener('click', () => {
         navigator.clipboard.writeText(base64).then(() => {
-            alert('✅ Save code copied to clipboard!');
+            alert('вњ… Save code copied to clipboard!');
         }).catch(() => {
-            alert('❌ Failed to copy');
+            alert('вќЊ Failed to copy');
         });
     });
     
@@ -1289,20 +1289,20 @@ function loadSaveCode(code) {
         for (let i = 0; i < 14; i++) spawnFlower();
         
         if (autoActive && autoUnlocked) {
-            toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
+            toggleAutoBtn.textContent = 'вЏёпёЏ AUTO (ON)';
             toggleAutoBtn.classList.add('auto-active');
             if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
         } else {
             autoActive = false;
-            toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+            toggleAutoBtn.textContent = 'вЏЇпёЏ AUTO (OFF)';
             toggleAutoBtn.classList.remove('auto-active');
         }
         
         if (rpAutobuyEnabled && rpAutoBuyActive) {
-            toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
+            toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (ON)';
             toggleRPAutoBtn.classList.add('rp-autobuy-active');
         } else {
-            toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+            toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (OFF)';
             toggleRPAutoBtn.classList.remove('rp-autobuy-active');
         }
         updateAutoSpendButton();
@@ -1314,7 +1314,7 @@ function loadSaveCode(code) {
         updateSPUI();
         saveGame();
         
-        alert('✅ Save loaded successfully!');
+        alert('вњ… Save loaded successfully!');
         return true;
     } catch (e) {
         console.error('Failed to load save:', e);
@@ -1333,10 +1333,10 @@ menuLoadSaveBtn.addEventListener('click', () => {
         if (success) {
             menuLoadCodeInput.value = '';
         } else {
-            alert('❌ Invalid save code!');
+            alert('вќЊ Invalid save code!');
         }
     } else {
-        alert('❌ Please enter a save code');
+        alert('вќЊ Please enter a save code');
     }
 });
 
@@ -1732,9 +1732,9 @@ function resetAllGameDataState() {
         rpAutoBuyInterval = null;
     }
 
-    toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+    toggleAutoBtn.textContent = 'вЏЇпёЏ AUTO (OFF)';
     toggleAutoBtn.classList.remove('auto-active');
-    toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+    toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (OFF)';
     toggleRPAutoBtn.classList.remove('rp-autobuy-active');
 
     addBee();
@@ -1888,7 +1888,7 @@ async function enforceBanForCurrentPlayer(targetName = playerName) {
             await adminGrantsRef.child(key).remove();
         }
 
-        lockGameplayForBan('⛔ Permanently banned (IP ban). Stats wiped and leaderboard entry removed.');
+        lockGameplayForBan('в›” Permanently banned (IP ban). Stats wiped and leaderboard entry removed.');
         return true;
     } catch (error) {
         console.error('Failed to enforce ban state:', error);
@@ -2396,16 +2396,16 @@ function fetchLeaderboard() {
         }
         
         renderLeaderboard();
-        debugInfo.textContent = `✅ Loaded ${leaderboard.length} unique players`;
+        debugInfo.textContent = `вњ… Loaded ${leaderboard.length} unique players`;
         
         if (isAdminUser()) {
             updateMenuAdminSelect();
         }
     }, (error) => {
         console.error('Firebase error:', error);
-        debugInfo.innerHTML = `❌ Error: ${error.message}`;
+        debugInfo.innerHTML = `вќЊ Error: ${error.message}`;
         document.getElementById('leaderboardList').innerHTML = 
-            '<div class="leaderboard-entry">⚠️ Firebase connection error. Check rules.</div>';
+            '<div class="leaderboard-entry">вљ пёЏ Firebase connection error. Check rules.</div>';
     });
 }
 
@@ -2508,12 +2508,12 @@ function renderLeaderboard() {
     top10.forEach((entry, index) => {
         const isYou = entry.name === playerName ? 'you-row' : '';
         const rank = index + 1;
-        let rankSymbol = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+        let rankSymbol = rank === 1 ? 'рџҐ‡' : rank === 2 ? 'рџҐ€' : rank === 3 ? 'рџҐ‰' : `${rank}.`;
         
         html += `<div class="leaderboard-entry ${isYou}">
             <span class="leaderboard-rank">${rankSymbol}</span>
             <span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
-            <span class="leaderboard-score">🍯 ${formatNumber(entry.total)}</span>
+            <span class="leaderboard-score">рџЌЇ ${formatNumber(entry.total)}</span>
         </div>`;
     });
     
@@ -2525,7 +2525,7 @@ function renderLeaderboard() {
             html += `<div class="leaderboard-entry you-row">
                 <span class="leaderboard-rank">${playerRank}.</span>
                 <span class="leaderboard-name">${escapeHtml(playerName)}</span>
-                <span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span>
+                <span class="leaderboard-score">рџЌЇ ${formatNumber(playerEntry.total)}</span>
             </div>`;
         }
     }
@@ -2544,12 +2544,12 @@ function escapeHtml(unsafe) {
 saveNameBtn.addEventListener('click', async () => {
     let name = normalizePlayerName(playerNameInput.value);
     if (name === '') name = 'BeeKeeper';
-    
+
     // Add loading state
     saveNameBtn.disabled = true;
     saveNameBtn.textContent = 'CHECKING...';
     nameError.textContent = '';
-    
+
     try {
         if (isBlockedPlayerName(name)) {
             nameError.textContent = '❌ That name is not allowed. Choose a different one.';
@@ -2558,37 +2558,8 @@ saveNameBtn.addEventListener('click', async () => {
             return;
         }
 
-        if (!isProtectedAdminName(name)) {
-            const bannedBeforeJoin = await enforceBanForCurrentPlayer(name);
-            if (bannedBeforeJoin) {
-                saveNameBtn.textContent = getNameActionButtonLabel();
-                return;
-            }
-        }
-
-        const available = await isNameAvailable(name);
-        
-        if (!available) {
-            nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
-            saveNameBtn.disabled = false;
-            saveNameBtn.textContent = getNameActionButtonLabel();
-            return;
-        }
-
-        const oldNameForRename = forcedRenameFromName;
-        let migratedTotal = null;
-        if (oldNameForRename) {
-            migratedTotal = await renameLeaderboardPlayer(oldNameForRename, name);
-        }
-        if (Number.isFinite(migratedTotal)) {
-            totalHoneyEarned = Math.max(totalHoneyEarned, migratedTotal);
-        }
-        
-        playerName = name;
-        forcedRenameFromName = '';
-        localStorage.setItem('beeSwarmPlayerName', playerName);
-
-        if (isProtectedAdminName(playerName)) {
+        const isProtectedName = isProtectedAdminName(name);
+        if (isProtectedName) {
             const adminSessionOk = await ensureAdminSessionIfNeeded();
             if (!adminSessionOk) {
                 localStorage.removeItem('beeSwarmPlayerName');
@@ -2600,7 +2571,34 @@ saveNameBtn.addEventListener('click', async () => {
                 saveNameBtn.textContent = getNameActionButtonLabel();
                 return;
             }
+        } else {
+            const bannedBeforeJoin = await enforceBanForCurrentPlayer(name);
+            if (bannedBeforeJoin) {
+                saveNameBtn.textContent = getNameActionButtonLabel();
+                return;
+            }
+
+            const available = await isNameAvailable(name);
+            if (!available) {
+                nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
+                saveNameBtn.disabled = false;
+                saveNameBtn.textContent = getNameActionButtonLabel();
+                return;
+            }
         }
+
+        const oldNameForRename = forcedRenameFromName;
+        let migratedTotal = null;
+        if (oldNameForRename) {
+            migratedTotal = await renameLeaderboardPlayer(oldNameForRename, name);
+        }
+        if (Number.isFinite(migratedTotal)) {
+            totalHoneyEarned = Math.max(totalHoneyEarned, migratedTotal);
+        }
+
+        playerName = name;
+        forcedRenameFromName = '';
+        localStorage.setItem('beeSwarmPlayerName', playerName);
 
         await registerPlayerIdentity(playerName);
         const bannedAfterJoin = await enforceBanForCurrentPlayer(playerName);
@@ -2611,18 +2609,18 @@ saveNameBtn.addEventListener('click', async () => {
 
         nameModal.style.display = 'none';
         playerNameDisplay.textContent = `Name: ${playerName}`;
-        
+
         await submitScore(totalHoneyEarned);
         startAdminGrantWatcher();
         startBanWatchers();
         await claimAdminGrants();
-        
+
         if (isAdminUser()) {
             updateMenuAdminSelect();
         } else {
             menuAdminSection.style.display = 'none';
         }
-        
+
         saveNameBtn.disabled = false;
         saveNameBtn.textContent = 'START HIVE';
     } catch (error) {
@@ -2645,7 +2643,7 @@ if (playerName && isBlockedPlayerName(playerName)) {
     playerNameInput.value = '';
     nameModal.style.display = 'flex';
     saveNameBtn.textContent = getNameActionButtonLabel();
-    nameError.textContent = '❌ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
+    nameError.textContent = 'вќЊ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
 } else if (playerName) {
     nameModal.style.display = 'none';
     saveNameBtn.textContent = getNameActionButtonLabel();
@@ -2829,7 +2827,7 @@ function update() {
 
     beeCountSpan.textContent = bees.length;
     const activeFlowers = flowers.filter(f => f.active).length;
-    fieldInfo.textContent = `🌸 ${activeFlowers} flowers`;
+    fieldInfo.textContent = `рџЊё ${activeFlowers} flowers`;
     updateHireCostDisplay();
     updateRebirthUI();
     updateSPUI();
@@ -2849,7 +2847,7 @@ function updateRebirthUI() {
     if (maxRP > 0) {
         const rawRP = maxRP;
         const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier);
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (${rpCompoundingMultiplier.toFixed(2)}x)`;
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}рџЌЇ (${rpCompoundingMultiplier.toFixed(2)}x)`;
     } else {
         rebirthInfo.textContent = `1 RP = 10k (${rpCompoundingMultiplier.toFixed(2)}x)`;
     }
@@ -2857,9 +2855,9 @@ function updateRebirthUI() {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP`;
+        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}рџЌЇ + ${cost.rp} RP`;
     } else {
-        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
+        sacrificeInfo.textContent = `1 SP = 100MрџЌЇ + 10 RP`;
     }
 
     if (autoUnlocked) {
@@ -2902,35 +2900,35 @@ function updateRebirthUI() {
     compoundingLevelSpan.textContent = compoundingLevel;
     compoundingCostSpan.textContent = compoundingCost;
     const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
-    buyCompounding.innerHTML = `📈 HONEY COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
+    buyCompounding.innerHTML = `рџ“€ HONEY COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
     buyCompounding.disabled = rebirthPoints < compoundingCost;
 
     flowerHpLevel = getSafeFlowerHpLevel(flowerHpLevel);
     const flowerHpBonus = flowerHpLevel * FLOWER_HP_PER_LEVEL;
     if (flowerHpLevel >= FLOWER_HP_MAX_LEVEL) {
-        buyFlowerHP.innerHTML = `🌸 FLOWER HP MAXED <span class="maxed-badge">MAX</span> (5/5)`;
+        buyFlowerHP.innerHTML = `рџЊё FLOWER HP MAXED <span class="maxed-badge">MAX</span> (5/5)`;
         buyFlowerHP.disabled = true;
     } else {
         const flowerHpCost = getFlowerHpCost();
-        buyFlowerHP.innerHTML = `🌸 FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus}`;
+        buyFlowerHP.innerHTML = `рџЊё FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus}`;
         buyFlowerHP.disabled = rebirthPoints < flowerHpCost;
     }
 }
 
 function updateSPUI() {
     if (x10HoneyPurchased) {
-        buyX10Honey.innerHTML = '🍯 x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
+        buyX10Honey.innerHTML = 'рџЌЇ x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
         buyX10Honey.disabled = true;
     } else {
-        buyX10Honey.innerHTML = '🍯 x10 HONEY (5 SP)';
+        buyX10Honey.innerHTML = 'рџЌЇ x10 HONEY (5 SP)';
         buyX10Honey.disabled = sacrificePoints < 5;
     }
     
     if (rpAutoBuyActive) {
-        buyRPAuto.innerHTML = '🤖 RP AUTOBUY MAXED <span class="maxed-badge">MAX</span>';
+        buyRPAuto.innerHTML = 'рџ¤– RP AUTOBUY MAXED <span class="maxed-badge">MAX</span>';
         buyRPAuto.disabled = true;
     } else {
-        buyRPAuto.innerHTML = '🤖 RP AUTOBUY (10 SP)';
+        buyRPAuto.innerHTML = 'рџ¤– RP AUTOBUY (10 SP)';
         buyRPAuto.disabled = sacrificePoints < 10;
     }
     
@@ -2948,10 +2946,10 @@ function updateSPUI() {
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
     
     if (rpGeneratorLevel >= 5) {
-        buyRPGen.innerHTML = `⏱️ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
+        buyRPGen.innerHTML = `вЏ±пёЏ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
         buyRPGen.disabled = true;
     } else {
-        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s next)</span>`;
+        buyRPGen.innerHTML = `вЏ±пёЏ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s next)</span>`;
         buyRPGen.disabled = sacrificePoints < genCost;
     }
 
@@ -2980,7 +2978,7 @@ function recalcMultiplier() {
     
     let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
     if (x10HoneyPurchased) totalMult *= 10;
-    totalMultDisplay.textContent = `✖️ ${formatMultiplierValue(totalMult)}`;
+    totalMultDisplay.textContent = `вњ–пёЏ ${formatMultiplierValue(totalMult)}`;
 }
 
 function updateToolButtons() {
@@ -3179,7 +3177,7 @@ function autoBuy() {
 function toggleAuto() {
     if (!autoUnlocked) { alert('Buy AUTO upgrade first!'); return; }
     autoActive = !autoActive;
-    toggleAutoBtn.textContent = autoActive ? '⏸️ AUTO (ON)' : '⏯️ AUTO (OFF)';
+    toggleAutoBtn.textContent = autoActive ? 'вЏёпёЏ AUTO (ON)' : 'вЏЇпёЏ AUTO (OFF)';
     toggleAutoBtn.classList.toggle('auto-active', autoActive);
     if (autoActive) { if (!autoInterval) autoInterval = setInterval(autoBuy, 1000); }
     else { if (autoInterval) { clearInterval(autoInterval); autoInterval = null; } }
@@ -3192,7 +3190,7 @@ function toggleRPAuto() {
         return;
     }
     rpAutobuyEnabled = !rpAutobuyEnabled;
-    toggleRPAutoBtn.textContent = rpAutobuyEnabled ? '🤖 RP AUTO (ON)' : '🤖 RP AUTO (OFF)';
+    toggleRPAutoBtn.textContent = rpAutobuyEnabled ? 'рџ¤– RP AUTO (ON)' : 'рџ¤– RP AUTO (OFF)';
     toggleRPAutoBtn.classList.toggle('rp-autobuy-active', rpAutobuyEnabled);
     
     if (rpAutobuyEnabled) {
@@ -3262,9 +3260,9 @@ rebirthBtn.addEventListener('click', () => {
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
         updateHireCostDisplay();
         saveGame();
-        alert(`✨ Purchased ${maxRP} RP (multiplied to ${rpGain} RP) for ${formatNumber(cost)} honey! Honey reset to 0.`);
+        alert(`вњЁ Purchased ${maxRP} RP (multiplied to ${rpGain} RP) for ${formatNumber(cost)} honey! Honey reset to 0.`);
     } else {
-        alert(`❌ Need at least 10,000 honey for 1 RP!`);
+        alert(`вќЊ Need at least 10,000 honey for 1 RP!`);
     }
 });
 
@@ -3292,12 +3290,12 @@ sacrificeBtn.addEventListener('click', () => {
         flowerHpLevel = 0;
         
         // DO NOT reset RP compounding - it's an SP shop upgrade!
-        // rpCompoundingLevel = 0;  ← REMOVE THIS LINE
-        // rpCompoundingMultiplier = 1.0; ← REMOVE THIS LINE
+        // rpCompoundingLevel = 0;  в†ђ REMOVE THIS LINE
+        // rpCompoundingMultiplier = 1.0; в†ђ REMOVE THIS LINE
         
         autoActive = false;
         if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
-        toggleAutoBtn.textContent = '⏯️ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
+        toggleAutoBtn.textContent = 'вЏЇпёЏ AUTO (OFF)'; toggleAutoBtn.classList.remove('auto-active');
 
         // Prevent RP autobuy from immediately buying RP upgrades after sacrifice.
         rpAutobuyEnabled = false;
@@ -3316,9 +3314,9 @@ sacrificeBtn.addEventListener('click', () => {
         updateHireCostDisplay();
         saveGame();
         
-        alert(`🔥 Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped. RP Compounding preserved at level ${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
+        alert(`рџ”Ґ Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped. RP Compounding preserved at level ${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
     } else {
-        alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
+        alert(`вќЊ Need at least 100M honey and 10 RP for 1 SP!`);
     }
 });
 
@@ -3591,12 +3589,12 @@ function loadGame() {
         updatePopupBlockButton();
 
         if (autoActive && autoUnlocked) {
-            toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
+            toggleAutoBtn.textContent = 'вЏёпёЏ AUTO (ON)';
             toggleAutoBtn.classList.add('auto-active');
             if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
         } else {
             autoActive = false;
-            toggleAutoBtn.textContent = '⏯️ AUTO (OFF)';
+            toggleAutoBtn.textContent = 'вЏЇпёЏ AUTO (OFF)';
             toggleAutoBtn.classList.remove('auto-active');
         }
 
@@ -3604,10 +3602,10 @@ function loadGame() {
         setupRPAutoBuy();
 
         if (rpAutobuyEnabled && rpAutoBuyActive) {
-            toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
+            toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (ON)';
             toggleRPAutoBtn.classList.add('rp-autobuy-active');
         } else {
-            toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+            toggleRPAutoBtn.textContent = 'рџ¤– RP AUTO (OFF)';
             toggleRPAutoBtn.classList.remove('rp-autobuy-active');
         }
 
@@ -3638,7 +3636,7 @@ async function init() {
         localStorage.removeItem('beeSwarmPlayerName');
         playerNameInput.value = '';
         nameModal.style.display = 'flex';
-        nameError.textContent = '❌ Admin claim login required for that name.';
+        nameError.textContent = 'вќЊ Admin claim login required for that name.';
         playerNameDisplay.textContent = 'Name: ';
         menuAdminSection.style.display = 'none';
     }
@@ -3691,7 +3689,7 @@ function draw() {
     ctx.fillStyle = '#e3b15a'; ctx.beginPath(); ctx.ellipse(HIVE_X-5, HIVE_Y-5, 30, 22, 0, 0, Math.PI*2); ctx.fill();
     ctx.shadowBlur = 0;
     if (!performanceMode) {
-        ctx.font = '30px "Segoe UI"'; ctx.fillStyle = '#f5d742'; ctx.fillText('🏠', HIVE_X-30, HIVE_Y+10);
+        ctx.font = '30px "Segoe UI"'; ctx.fillStyle = '#f5d742'; ctx.fillText('рџЏ ', HIVE_X-30, HIVE_Y+10);
     }
 
     for (let f of flowers) {
@@ -3730,7 +3728,7 @@ function draw() {
             ctx.beginPath(); ctx.ellipse(b.x-8, b.y-12, 6, 3, 0.2, 0, 2*Math.PI); ctx.fill();
             ctx.beginPath(); ctx.ellipse(b.x+4, b.y-12, 6, 3, -0.2, 0, 2*Math.PI); ctx.fill();
             ctx.globalAlpha = 1;
-            if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('✨', b.x-12, b.y-25); }
+            if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('вњЁ', b.x-12, b.y-25); }
         }
     }
     ctx.shadowBlur = 0;
@@ -3746,5 +3744,6 @@ gameLoop();
 </script>
 </body>
 </html>
+
 
 
