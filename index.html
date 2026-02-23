@@ -2513,18 +2513,21 @@ async function submitScore(score) {
 }
 
 async function isNameAvailable(name) {
-    const snapshot = await leaderboardRef.once('value');
-    const data = snapshot.val();
-    
-    if (!data) return true;
-    
-    // Check if any entry has this exact name
-    for (const key in data) {
-        if (data[key] && data[key].name === name) {
-            return false;
-        }
-    }
-    return true;
+    // NOTE: This requires Firebase Realtime Database rules to have an index on 'name'.
+    // e.g. { "rules": { "leaderboard": { ".indexOn": "name" }, "playerIdentity": { ".indexOn": "name" } } }
+    const normalizedName = normalizePlayerName(name);
+    if (!normalizedName) return false;
+
+    // Check leaderboard and identity tables for the name's existence.
+    const leaderboardQuery = leaderboardRef.orderByChild('name').equalTo(normalizedName).limitToFirst(1);
+    const identityQuery = playerIdentityRef.orderByChild('name').equalTo(normalizedName).limitToFirst(1);
+
+    const [leaderboardSnapshot, identitySnapshot] = await Promise.all([
+        leaderboardQuery.once('value'),
+        identityQuery.once('value')
+    ]);
+
+    return !leaderboardSnapshot.exists() && !identitySnapshot.exists();
 }
 
 async function renameLeaderboardPlayer(oldName, newName) {
