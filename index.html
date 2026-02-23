@@ -1438,22 +1438,6 @@ function normalizePlayerName(name) {
     return String(name || '').trim().slice(0, 20);
 }
 
-const BLOCKED_NAME_TERMS = [
-    'fuck',
-    'gay',
-    'epstein',
-    'nigger',
-    'bitch'
-];
-
-function isBlockedPlayerName(name) {
-    const normalized = normalizePlayerName(name)
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '');
-    if (!normalized) return false;
-    return BLOCKED_NAME_TERMS.some(term => normalized.includes(term));
-}
-
 function getNameActionButtonLabel() {
     return forcedRenameFromName ? 'CHANGE NAME' : 'START HIVE';
 }
@@ -2633,13 +2617,6 @@ saveNameBtn.addEventListener('click', async () => {
             await auth.signInAnonymously();
         }
 
-        if (isBlockedPlayerName(name)) {
-            nameError.textContent = '❌ That name is not allowed. Choose a different one.';
-            saveNameBtn.disabled = false;
-            saveNameBtn.textContent = getNameActionButtonLabel();
-            return;
-        }
-
         const isProtectedName = isProtectedAdminName(name);
         if (isProtectedName) {
             const adminSessionOk = await ensureAdminSessionIfNeeded();
@@ -2654,12 +2631,6 @@ saveNameBtn.addEventListener('click', async () => {
                 return;
             }
         } else {
-            const bannedBeforeJoin = await enforceBanForCurrentPlayer(name);
-            if (bannedBeforeJoin) {
-                saveNameBtn.textContent = getNameActionButtonLabel();
-                return;
-            }
-
             const available = await isNameAvailable(name);
             if (!available) {
                 nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
@@ -2722,15 +2693,7 @@ refreshBtn.addEventListener('click', () => {
 });
 
 // Initial load
-if (playerName && isBlockedPlayerName(playerName)) {
-    forcedRenameFromName = playerName;
-    playerName = '';
-    localStorage.removeItem('beeSwarmPlayerName');
-    playerNameInput.value = '';
-    nameModal.style.display = 'flex';
-    saveNameBtn.textContent = getNameActionButtonLabel();
-    nameError.textContent = '❌ Your previous name is no longer allowed. Choose a new one. Stats are kept.';
-} else if (playerName) {
+if (playerName) {
     nameModal.style.display = 'none';
     saveNameBtn.textContent = getNameActionButtonLabel();
     playerNameDisplay.textContent = `Name: ${playerName}`;
