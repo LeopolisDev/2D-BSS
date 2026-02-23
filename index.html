@@ -695,6 +695,9 @@
             <div class="menu-row">
                 <button class="menu-btn" id="menuPerformanceBtn">⚡ PERFORMANCE (OFF)</button>
             </div>
+            <div class="menu-row">
+                <button class="menu-btn" id="menuPopupBlockBtn">🔕 POPUPS (ON)</button>
+            </div>
             <div style="font-size:0.8rem; color:#ffd966; text-align:center;">Hides bees and heavy effects for smoother gameplay.</div>
         </div>
 
@@ -895,6 +898,7 @@ const menuCopySaveBtn = document.getElementById('menuCopySaveBtn');
 const menuLoadCodeInput = document.getElementById('menuLoadCodeInput');
 const menuLoadSaveBtn = document.getElementById('menuLoadSaveBtn');
 const menuPerformanceBtn = document.getElementById('menuPerformanceBtn');
+const menuPopupBlockBtn = document.getElementById('menuPopupBlockBtn');
 const menuResetStatSelect = document.getElementById('menuResetStatSelect');
 const menuResetSelectedBtn = document.getElementById('menuResetSelectedBtn');
 
@@ -966,6 +970,7 @@ menuToggleBtn.addEventListener('click', () => {
 });
 
 document.addEventListener('click', (e) => {
+    if (!e.isTrusted) return;
     if (!menuPanel.contains(e.target) && !menuToggleBtn.contains(e.target) && menuPanel.classList.contains('show')) {
         menuPanel.classList.remove('show');
     }
@@ -1032,14 +1037,41 @@ function parseBoolean(value, fallback = false) {
     return typeof value === 'boolean' ? value : fallback;
 }
 
+const nativeAlert = window.alert.bind(window);
+const nativeConfirm = window.confirm.bind(window);
+const nativePrompt = window.prompt.bind(window);
+
+function applyPopupPreference() {
+    if (popupsDisabled) {
+        window.alert = () => {};
+        window.confirm = () => false;
+        window.prompt = () => null;
+    } else {
+        window.alert = nativeAlert;
+        window.confirm = nativeConfirm;
+        window.prompt = nativePrompt;
+    }
+}
+
 function updatePerformanceButton() {
     menuPerformanceBtn.textContent = performanceMode ? '⚡ PERFORMANCE (ON)' : '⚡ PERFORMANCE (OFF)';
     menuPerformanceBtn.classList.toggle('performance-active', performanceMode);
 }
 
+function updatePopupBlockButton() {
+    menuPopupBlockBtn.textContent = popupsDisabled ? '🔕 POPUPS (OFF)' : '🔔 POPUPS (ON)';
+}
+
 function togglePerformanceMode() {
     performanceMode = !performanceMode;
     updatePerformanceButton();
+    saveGame();
+}
+
+function togglePopupBlockMode() {
+    popupsDisabled = !popupsDisabled;
+    applyPopupPreference();
+    updatePopupBlockButton();
     saveGame();
 }
 
@@ -1126,7 +1158,8 @@ function generateSaveCode() {
         rpAutobuyEnabled,
         autoActive,
         autoSpendPercent,
-        performanceMode
+        performanceMode,
+        popupsDisabled
     };
     
     const jsonStr = JSON.stringify(saveData);
@@ -1185,7 +1218,10 @@ function loadSaveCode(code) {
         autoActive = saveData.autoActive || false;
         autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(saveData.performanceMode, false);
+        popupsDisabled = parseBoolean(saveData.popupsDisabled, false);
+        applyPopupPreference();
         updatePerformanceButton();
+        updatePopupBlockButton();
 
         const loadedBeeCount = Number.isFinite(saveData.beeCount) && saveData.beeCount > 0
             ? Math.floor(saveData.beeCount)
@@ -1232,6 +1268,7 @@ function loadSaveCode(code) {
 
 menuGenerateSaveBtn.addEventListener('click', generateSaveCode);
 menuPerformanceBtn.addEventListener('click', togglePerformanceMode);
+menuPopupBlockBtn.addEventListener('click', togglePopupBlockMode);
 
 menuLoadSaveBtn.addEventListener('click', () => {
     const code = menuLoadCodeInput.value.trim();
@@ -2172,6 +2209,7 @@ let autoInterval = null;
 let rpAutobuyEnabled = false;
 let autoSpendPercent = DEFAULT_AUTO_SPEND_PERCENT;
 let performanceMode = false;
+let popupsDisabled = false;
 
 // ========== GAME MECHANICS ==========
 function update() {
@@ -2904,7 +2942,8 @@ function buildSaveData(includeWorldData = true) {
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
         autoSpendPercent,
-        performanceMode
+        performanceMode,
+        popupsDisabled
     };
 
     if (includeWorldData) {
@@ -2987,6 +3026,8 @@ function loadGame() {
         rpAutobuyEnabled = data.rpAutobuyEnabled || false;
         autoSpendPercent = normalizeAutoSpendPercent(data.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(data.performanceMode, false);
+        popupsDisabled = parseBoolean(data.popupsDisabled, false);
+        applyPopupPreference();
 
         const savedBeeCount = getSafeBeeCount(data.beeCount, 1);
         if (Array.isArray(data.bees) && data.bees.length > 0) {
@@ -3007,6 +3048,7 @@ function loadGame() {
         nextHireCost = computeNextHireCostFromBeeCount(bees.length);
 
         updatePerformanceButton();
+        updatePopupBlockButton();
 
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '⏸️ AUTO (ON)';
@@ -3053,7 +3095,9 @@ function init() {
         startAdminGrantWatcher();
         claimAdminGrants();
     }
+    applyPopupPreference();
     updatePerformanceButton();
+    updatePopupBlockButton();
     recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
     updateAutoSpendButton();
     updateHireCostDisplay();
