@@ -2628,6 +2628,11 @@ saveNameBtn.addEventListener('click', async () => {
     nameError.textContent = '';
 
     try {
+        // Ensure we are connected/authenticated before checking database
+        if (!auth.currentUser) {
+            await auth.signInAnonymously();
+        }
+
         if (isBlockedPlayerName(name)) {
             nameError.textContent = '❌ That name is not allowed. Choose a different one.';
             saveNameBtn.disabled = false;
@@ -3706,6 +3711,19 @@ function loadGame() {
 
 // ========== INIT ==========
 async function init() {
+    // 1. Wait for auth state to settle
+    await new Promise(resolve => {
+        const unsubscribe = auth.onAuthStateChanged(() => {
+            unsubscribe();
+            resolve();
+        });
+    });
+
+    // 2. Sign in anonymously if not logged in
+    if (!auth.currentUser) {
+        await auth.signInAnonymously().catch(console.error);
+    }
+
     if (!loadGame()) {
         addBee();
         for (let i = 0; i < 14; i++) spawnFlower();
