@@ -2758,7 +2758,6 @@ buyX10Honey.addEventListener('click', () => {
         recalcMultiplier();
         updateSPUI();
         saveGame();
-        alert('🍯 x10 Honey multiplier purchased!');
     }
 });
 
@@ -2771,7 +2770,6 @@ buyRPAuto.addEventListener('click', () => {
         }
         updateSPUI();
         saveGame();
-        alert('🤖 RP Autobuy unlocked! Toggle the button to enable.');
     }
 });
 
@@ -2783,7 +2781,6 @@ buyRPGen.addEventListener('click', () => {
         setupRPGenerator();
         updateSPUI();
         saveGame();
-        alert(`⏱️ RP Generator upgraded to level ${rpGeneratorLevel}! Now generating ${Math.floor(1 * rpCompoundingMultiplier)} RP every ${Math.max(1, 5 - (rpGeneratorLevel - 1))}s.`);
     }
 });
 
@@ -2797,7 +2794,6 @@ buyRPCompounding.addEventListener('click', () => {
         updateSPUI();
         updateRebirthUI();
         saveGame();
-        alert(`📈 RP Compounding upgraded to level ${rpCompoundingLevel}! (${rpCompoundingMultiplier.toFixed(2)}x RP gain)`);
     }
 });
 
