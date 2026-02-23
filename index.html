@@ -733,7 +733,7 @@
     <div class="stat-item">💥 <span id="spDisplay">0</span> SP</div>
 </div>
             <div class="button-group">
-                <button class="bee-btn" id="hireBtn">рџђќ HIRE <span id="hireCostSpan">20</span>рџЌЇ</button>
+                <button class="bee-btn" id="hireBtn">🐝 HIRE <span id="hireCostSpan">20</span>🍯</button>
             </div>
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
@@ -2849,7 +2849,7 @@ function updateRebirthUI() {
     if (maxRP > 0) {
         const rawRP = maxRP;
         const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier);
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}рџЌЇ (${rpCompoundingMultiplier.toFixed(2)}x)`;
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (${rpCompoundingMultiplier.toFixed(2)}x)`;
     } else {
         rebirthInfo.textContent = `1 RP = 10k (${rpCompoundingMultiplier.toFixed(2)}x)`;
     }
@@ -2857,9 +2857,9 @@ function updateRebirthUI() {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}рџЌЇ + ${cost.rp} RP`;
+        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP`;
     } else {
-        sacrificeInfo.textContent = `1 SP = 100MрџЌЇ + 10 RP`;
+        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
     }
 
     if (autoUnlocked) {
@@ -2902,35 +2902,35 @@ function updateRebirthUI() {
     compoundingLevelSpan.textContent = compoundingLevel;
     compoundingCostSpan.textContent = compoundingCost;
     const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
-    buyCompounding.innerHTML = `рџ“€ HONEY COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
+    buyCompounding.innerHTML = `📈 HONEY COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
     buyCompounding.disabled = rebirthPoints < compoundingCost;
 
     flowerHpLevel = getSafeFlowerHpLevel(flowerHpLevel);
     const flowerHpBonus = flowerHpLevel * FLOWER_HP_PER_LEVEL;
     if (flowerHpLevel >= FLOWER_HP_MAX_LEVEL) {
-        buyFlowerHP.innerHTML = `рџЊё FLOWER HP MAXED <span class="maxed-badge">MAX</span> (5/5)`;
+        buyFlowerHP.innerHTML = `🌸 FLOWER HP MAXED <span class="maxed-badge">MAX</span> (5/5)`;
         buyFlowerHP.disabled = true;
     } else {
         const flowerHpCost = getFlowerHpCost();
-        buyFlowerHP.innerHTML = `рџЊё FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus}`;
+        buyFlowerHP.innerHTML = `🌸 FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus}`;
         buyFlowerHP.disabled = rebirthPoints < flowerHpCost;
     }
 }
 
 function updateSPUI() {
     if (x10HoneyPurchased) {
-        buyX10Honey.innerHTML = 'рџЌЇ x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
+        buyX10Honey.innerHTML = '🍯 x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
         buyX10Honey.disabled = true;
     } else {
-        buyX10Honey.innerHTML = 'рџЌЇ x10 HONEY (5 SP)';
+        buyX10Honey.innerHTML = '🍯 x10 HONEY (5 SP)';
         buyX10Honey.disabled = sacrificePoints < 5;
     }
     
     if (rpAutoBuyActive) {
-        buyRPAuto.innerHTML = 'рџ¤– RP AUTOBUY MAXED <span class="maxed-badge">MAX</span>';
+        buyRPAuto.innerHTML = '🤖 RP AUTOBUY MAXED <span class="maxed-badge">MAX</span>';
         buyRPAuto.disabled = true;
     } else {
-        buyRPAuto.innerHTML = 'рџ¤– RP AUTOBUY (10 SP)';
+        buyRPAuto.innerHTML = '🤖 RP AUTOBUY (10 SP)';
         buyRPAuto.disabled = sacrificePoints < 10;
     }
     
@@ -2948,10 +2948,10 @@ function updateSPUI() {
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
     
     if (rpGeneratorLevel >= 5) {
-        buyRPGen.innerHTML = `вЏ±пёЏ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
         buyRPGen.disabled = true;
     } else {
-        buyRPGen.innerHTML = `вЏ±пёЏ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s next)</span>`;
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s next)</span>`;
         buyRPGen.disabled = sacrificePoints < genCost;
     }
 
@@ -2980,7 +2980,7 @@ function recalcMultiplier() {
     
     let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
     if (x10HoneyPurchased) totalMult *= 10;
-    totalMultDisplay.textContent = `вњ–пёЏ ${formatMultiplierValue(totalMult)}`;
+   totalMultDisplay.textContent = `✖️ ${formatMultiplierValue(totalMult)}`;
 }
 
 function updateToolButtons() {
