@@ -766,7 +766,8 @@
             <button class="tool-btn" id="buyBeeSpeed">⚡ SPEED <span id="speedStatus">(1 RP)</span><span id="speedBoost" class="boost-value"></span></button>
             <button class="tool-btn" id="buyCapacity">📦 CAPACITY <span id="capacityStatus">(3 RP)</span><span id="capacityBoost" class="boost-value"></span></button>
             <button class="tool-btn" id="buyHoneyMult">🍯 HONEY x5 <span id="honeyMultStatus">(2 RP)</span></button>
-            <button class="tool-btn" id="buyCompounding">📈 COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
+            <button class="tool-btn" id="buyCompounding">📈 HONEY COMPOUNDING lv<span id="compoundingLevel">0</span> (<span id="compoundingCost">1</span> RP) +0%</button>
+            <button class="tool-btn" id="buyFlowerHP">🌸 FLOWER HP lv0/5 (50 RP) +0</button>
             <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
         </div>
 
@@ -910,6 +911,7 @@ const buyBeeSpeed = document.getElementById('buyBeeSpeed');
 const buyCapacity = document.getElementById('buyCapacity');
 const buyHoneyMult = document.getElementById('buyHoneyMult');
 const buyCompounding = document.getElementById('buyCompounding');
+const buyFlowerHP = document.getElementById('buyFlowerHP');
 const buyX10Honey = document.getElementById('buyX10Honey');
 const buyRPAuto = document.getElementById('buyRPAuto');
 const buyRPGen = document.getElementById('buyRPGen');
@@ -1116,6 +1118,7 @@ function generateSaveCode() {
         capacityMultiplier,
         honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
+        flowerHpLevel,
         x10HoneyPurchased,
         rpAutoBuyActive,
         rpGeneratorLevel,
@@ -1171,6 +1174,7 @@ function loadSaveCode(code) {
         honeyMultUpgrade = saveData.honeyMultUpgrade || 1.0;
         compoundingLevel = saveData.compoundingLevel || 0;
         compoundingMultiplier = saveData.compoundingMultiplier || 1.0;
+        flowerHpLevel = getSafeFlowerHpLevel(saveData.flowerHpLevel || 0);
         
         x10HoneyPurchased = saveData.x10HoneyPurchased || false;
         rpAutoBuyActive = saveData.rpAutoBuyActive || false;
@@ -2091,6 +2095,9 @@ const MAX_FLOWERS = 22;
 const BEE_SPEED_BASE = 1.1;
 const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
+const FLOWER_HP_COST_BASE = 50;
+const FLOWER_HP_MAX_LEVEL = 5;
+const FLOWER_HP_PER_LEVEL = 25;
 const DEFAULT_AUTO_SPEND_PERCENT = 10;
 const AUTO_SPEND_OPTIONS = [5, 10, 25, 50, 100];
 const SAVE_KEY = 'beeSwarmSave';
@@ -2148,6 +2155,7 @@ let capacityMultiplier = 1.0;
 let honeyMultUpgrade = 1.0;
 let compoundingLevel = 0;
 let compoundingMultiplier = 1.0;
+let flowerHpLevel = 0;
 
 // SP Upgrades
 let x10HoneyPurchased = false;
@@ -2322,8 +2330,25 @@ function updateRebirthUI() {
     compoundingLevelSpan.textContent = compoundingLevel;
     compoundingCostSpan.textContent = compoundingCost;
     const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
-    buyCompounding.innerHTML = `📈 COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
+    buyCompounding.innerHTML = `📈 HONEY COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
     buyCompounding.disabled = rebirthPoints < compoundingCost;
+
+    flowerHpLevel = getSafeFlowerHpLevel(flowerHpLevel);
+    const flowerHpBonus = flowerHpLevel * FLOWER_HP_PER_LEVEL;
+    if (flowerHpLevel >= FLOWER_HP_MAX_LEVEL) {
+        buyFlowerHP.innerHTML = `🌸 FLOWER HP MAXED <span class="maxed-badge">MAX</span> (5/5)`;
+        buyFlowerHP.disabled = true;
+    } else {
+        const flowerHpCost = getFlowerHpCost();
+        const lockedByCompounding = compoundingLevel <= 0;
+        if (lockedByCompounding) {
+            buyFlowerHP.innerHTML = `🌸 FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus} 🔒`;
+            buyFlowerHP.disabled = true;
+        } else {
+            buyFlowerHP.innerHTML = `🌸 FLOWER HP lv${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL} (${formatNumber(flowerHpCost)} RP) +${flowerHpBonus}`;
+            buyFlowerHP.disabled = rebirthPoints < flowerHpCost;
+        }
+    }
 }
 
 function updateSPUI() {
@@ -2426,6 +2451,8 @@ function setupRPAutoBuy() {
         rpAutoBuyInterval = setInterval(() => {
             if (rebirthPoints >= Math.pow(2, compoundingLevel)) {
                 buyCompounding.click();
+            } else if (compoundingLevel > 0 && flowerHpLevel < FLOWER_HP_MAX_LEVEL && rebirthPoints >= getFlowerHpCost()) {
+                buyFlowerHP.click();
             } else if (!autoUnlocked && rebirthPoints >= 2) {
                 buyAutoUpgrade.click();
             } else if (beeSpeedMultiplier === 1.0 && rebirthPoints >= 1) {
@@ -2455,7 +2482,7 @@ function spawnFlower() {
             }
         }
         if (!overlap) {
-            let basePollen = 8 + Math.floor(Math.random() * 12);
+            let basePollen = 8 + Math.floor(Math.random() * 12) + (getSafeFlowerHpLevel() * FLOWER_HP_PER_LEVEL);
             flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
             return true;
         }
@@ -2489,6 +2516,17 @@ function computeNextHireCostFromBeeCount(beeCount) {
         cost = Math.floor(cost * 1.5);
     }
     return cost;
+}
+
+function getSafeFlowerHpLevel(level = flowerHpLevel) {
+    const parsed = Number(level);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.min(FLOWER_HP_MAX_LEVEL, Math.floor(parsed)));
+}
+
+function getFlowerHpCost(level = flowerHpLevel) {
+    const safeLevel = getSafeFlowerHpLevel(level);
+    return Math.floor(FLOWER_HP_COST_BASE * Math.pow(2, safeLevel));
 }
 
 function updateHireCostDisplay() {
@@ -2627,7 +2665,7 @@ canvas.addEventListener('click', (e) => {
             return;
         }
     }
-    if (flowers.length < 30) flowers.push({ x, y, pollen: 8, active: true, timer: 0 });
+    if (flowers.length < 30) flowers.push({ x, y, pollen: 8 + (getSafeFlowerHpLevel() * FLOWER_HP_PER_LEVEL), active: true, timer: 0 });
 });
 
 hireBtn.addEventListener('click', () => {
@@ -2685,6 +2723,7 @@ sacrificeBtn.addEventListener('click', () => {
         honeyMultUpgrade = 1.0;
         compoundingLevel = 0;
         compoundingMultiplier = 1.0;
+        flowerHpLevel = 0;
         
         // DO NOT reset RP compounding - it's an SP shop upgrade!
         // rpCompoundingLevel = 0;  ← REMOVE THIS LINE
@@ -2818,6 +2857,24 @@ buyCompounding.addEventListener('click', () => {
     }
 });
 
+buyFlowerHP.addEventListener('click', () => {
+    flowerHpLevel = getSafeFlowerHpLevel(flowerHpLevel);
+    if (flowerHpLevel >= FLOWER_HP_MAX_LEVEL) return;
+    if (compoundingLevel <= 0) {
+        alert('Unlock HONEY COMPOUNDING first.');
+        return;
+    }
+
+    const cost = getFlowerHpCost();
+    if (rebirthPoints >= cost) {
+        rebirthPoints -= cost;
+        flowerHpLevel++;
+        updateRebirthUI();
+        saveGame();
+        alert(`🌸 Flower HP upgraded to level ${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL}! New flowers now spawn with +${flowerHpLevel * FLOWER_HP_PER_LEVEL} HP.`);
+    }
+});
+
 // Tool purchases
 buyClippers.addEventListener('click', () => { if (!hasClippers && honey>=50) { honey-=50; hasClippers=true; recalcMultiplier(); buyClippers.disabled=true; saveGame(); } });
 buyShears.addEventListener('click', () => { if (!hasShears && honey>=150) { honey-=150; hasShears=true; recalcMultiplier(); buyShears.disabled=true; saveGame(); } });
@@ -2853,6 +2910,7 @@ function buildSaveData(includeWorldData = true) {
         rebirthPoints, sacrificePoints,
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
+        flowerHpLevel,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
         autoSpendPercent,
@@ -2929,6 +2987,7 @@ function loadGame() {
         honeyMultUpgrade = finiteOr(data.honeyMultUpgrade, 1.0);
         compoundingLevel = finiteOr(data.compoundingLevel, 0);
         compoundingMultiplier = finiteOr(data.compoundingMultiplier, 1.0);
+        flowerHpLevel = getSafeFlowerHpLevel(finiteOr(data.flowerHpLevel, 0));
         autoActive = data.autoActive || false;
         x10HoneyPurchased = data.x10HoneyPurchased || false;
         rpAutoBuyActive = data.rpAutoBuyActive || false;
