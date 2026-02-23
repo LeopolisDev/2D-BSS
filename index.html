@@ -2097,7 +2097,7 @@ const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
 const FLOWER_HP_COST_BASE = 50;
 const FLOWER_HP_MAX_LEVEL = 5;
-const FLOWER_HP_PER_LEVEL = 25;
+const FLOWER_HP_PER_LEVEL = 5;
 const DEFAULT_AUTO_SPEND_PERCENT = 10;
 const AUTO_SPEND_OPTIONS = [5, 10, 25, 50, 100];
 const SAVE_KEY = 'beeSwarmSave';
@@ -2860,18 +2860,19 @@ buyCompounding.addEventListener('click', () => {
 buyFlowerHP.addEventListener('click', () => {
     flowerHpLevel = getSafeFlowerHpLevel(flowerHpLevel);
     if (flowerHpLevel >= FLOWER_HP_MAX_LEVEL) return;
-    if (compoundingLevel <= 0) {
-        alert('Unlock HONEY COMPOUNDING first.');
-        return;
-    }
+    if (compoundingLevel <= 0) return;
 
     const cost = getFlowerHpCost();
     if (rebirthPoints >= cost) {
         rebirthPoints -= cost;
         flowerHpLevel++;
+        for (const flower of flowers) {
+            if (flower && flower.active) {
+                flower.pollen += FLOWER_HP_PER_LEVEL;
+            }
+        }
         updateRebirthUI();
         saveGame();
-        alert(`🌸 Flower HP upgraded to level ${flowerHpLevel}/${FLOWER_HP_MAX_LEVEL}! New flowers now spawn with +${flowerHpLevel * FLOWER_HP_PER_LEVEL} HP.`);
     }
 });
 
