@@ -3665,6 +3665,7 @@ async function init() {
 init();
 
 // ========== DRAWING ==========
+// ========== DRAWING ==========
 function draw() {
     if (gameplayBlocked) {
         ctx.clearRect(0, 0, 800, 400);
@@ -3691,7 +3692,9 @@ function draw() {
     ctx.fillStyle = '#e3b15a'; ctx.beginPath(); ctx.ellipse(HIVE_X-5, HIVE_Y-5, 30, 22, 0, 0, Math.PI*2); ctx.fill();
     ctx.shadowBlur = 0;
     if (!performanceMode) {
-        ctx.font = '30px "Segoe UI"'; ctx.fillStyle = '#f5d742'; ctx.fillText('рџЏ ', HIVE_X-30, HIVE_Y+10);
+        ctx.font = '30px "Segoe UI"'; 
+        ctx.fillStyle = '#f5d742'; 
+        ctx.fillText('🏠', HIVE_X-30, HIVE_Y+10);
     }
 
     for (let f of flowers) {
@@ -3716,7 +3719,10 @@ function draw() {
         ctx.fillStyle = '#f5a3c7'; ctx.beginPath(); ctx.arc(f.x-4, f.y-4, 7,0,2*Math.PI); ctx.fill();
         ctx.fillStyle = '#ffea9f'; ctx.beginPath(); ctx.arc(f.x+4, f.y+2, 7,0,2*Math.PI); ctx.fill();
         ctx.fillStyle = '#e6d358'; ctx.beginPath(); ctx.arc(f.x, f.y, 9,0,2*Math.PI); ctx.fill();
-        ctx.shadowBlur = 4; ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#422b0e'; ctx.fillText(f.pollen, f.x-12, f.y-15);
+        ctx.shadowBlur = 4; 
+        ctx.font = 'bold 14px monospace'; 
+        ctx.fillStyle = '#422b0e'; 
+        ctx.fillText(f.pollen, f.x-12, f.y-15);
     }
 
     if (!performanceMode) {
@@ -3730,7 +3736,11 @@ function draw() {
             ctx.beginPath(); ctx.ellipse(b.x-8, b.y-12, 6, 3, 0.2, 0, 2*Math.PI); ctx.fill();
             ctx.beginPath(); ctx.ellipse(b.x+4, b.y-12, 6, 3, -0.2, 0, 2*Math.PI); ctx.fill();
             ctx.globalAlpha = 1;
-            if (b.carrying > 0) { ctx.font = '16px sans-serif'; ctx.fillStyle = '#fcdb6a'; ctx.fillText('✨', b.x-12, b.y-25); }
+            if (b.carrying > 0) { 
+                ctx.font = 'bold 14px monospace'; 
+                ctx.fillStyle = '#fcdb6a'; 
+                ctx.fillText(b.carrying, b.x-12, b.y-25); 
+            }
         }
     }
     ctx.shadowBlur = 0;
