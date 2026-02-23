@@ -632,9 +632,7 @@
         <div class="menu-section" id="menuAdminSection" style="display: none;">
             <div class="menu-section-title">👑 ADMIN</div>
             <div class="menu-row">
-                <select id="menuAdminPlayerSelect" class="admin-select" style="width:100%;">
-                    <option value="">Myself (Opleoni)</option>
-                </select>
+                <input type="text" id="menuAdminPlayerInput" class="menu-input" maxlength="20" style="width:100%;" placeholder="Player name (blank = myself, ALL = everyone)">
             </div>
             <div class="menu-row">
                 <select id="menuAdminStatSelect" class="admin-select" style="width:100%;">
@@ -649,6 +647,7 @@
             <div class="menu-row" style="border-top: 2px solid #ffd966; padding-top: 10px; margin-top: 10px;">
                 <select id="menuAdminResetStatSelect" class="admin-select" style="width:100%;">
                     <option value="honey">Reset Honey</option>
+                    <option value="leaderboard_honey">Reset LEADERBOARD HONEY Only</option>
                     <option value="rp">Reset RP</option>
                     <option value="sp">Reset SP</option>
                     <option value="all">Reset ALL (Honey + RP + SP)</option>
@@ -882,7 +881,7 @@ const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
 const menuToggleBtn = document.getElementById('menuToggleBtn');
 const menuPanel = document.getElementById('menuPanel');
 const menuAdminSection = document.getElementById('menuAdminSection');
-const menuAdminPlayerSelect = document.getElementById('menuAdminPlayerSelect');
+const menuAdminPlayerInput = document.getElementById('menuAdminPlayerInput');
 const menuAdminStatSelect = document.getElementById('menuAdminStatSelect');
 const menuAdminAmount = document.getElementById('menuAdminAmount');
 const menuAdminAddBtn = document.getElementById('menuAdminAddBtn');
@@ -1410,6 +1409,42 @@ function getAllKnownPlayerNames() {
     return Array.from(names);
 }
 
+function isSamePlayerName(left, right) {
+    const leftName = normalizePlayerName(left).toLowerCase();
+    const rightName = normalizePlayerName(right).toLowerCase();
+    return !!leftName && !!rightName && leftName === rightName;
+}
+
+function resolveKnownPlayerName(inputName) {
+    const normalizedInput = normalizePlayerName(inputName);
+    if (!normalizedInput) return '';
+
+    if (isSamePlayerName(normalizedInput, playerName)) {
+        return playerName;
+    }
+
+    for (const entry of leaderboard) {
+        if (!entry || !entry.name) continue;
+        if (isSamePlayerName(entry.name, normalizedInput)) {
+            return normalizePlayerName(entry.name);
+        }
+    }
+
+    return normalizedInput;
+}
+
+function getAdminTargetPlayer() {
+    const rawInput = String(menuAdminPlayerInput.value || '').trim();
+    if (!rawInput) return 'Opleoni';
+    if (rawInput.toLowerCase() === 'all') return '__ALL__';
+    return resolveKnownPlayerName(rawInput);
+}
+
+function getResetStatDisplayName(resetStat) {
+    if (resetStat === 'leaderboard_honey') return 'LEADERBOARD HONEY';
+    return resetStat.toUpperCase();
+}
+
 function toSafeAmount(value) {
     const parsed = Number(String(value ?? '').replace(/,/g, '').trim());
     if (!Number.isFinite(parsed) || parsed < 0) return 0;
@@ -1470,6 +1505,29 @@ async function resetPlayerHoneyScore(targetPlayer) {
         name: normalizedName,
         total: 0
     });
+}
+
+async function removePlayerFromLeaderboard(targetPlayer) {
+    const normalizedName = normalizePlayerName(targetPlayer);
+    const sanitizedName = sanitizeFirebaseKey(normalizedName);
+    if (!normalizedName || !sanitizedName) {
+        throw new Error('Invalid target player');
+    }
+
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val();
+    let keyToUse = sanitizedName;
+
+    if (data) {
+        for (const [key, value] of Object.entries(data)) {
+            if (value && value.name === normalizedName) {
+                keyToUse = key;
+                break;
+            }
+        }
+    }
+
+    await leaderboardRef.child(keyToUse).remove();
 }
 
 function applyLocalCurrencyReset(resetStat) {
@@ -1641,30 +1699,6 @@ function updateMenuAdminSelect() {
         return;
     }
     menuAdminSection.style.display = 'block';
-    const select = menuAdminPlayerSelect;
-    const previousSelection = select.value;
-    select.innerHTML = '<option value="">Myself (Opleoni)</option>';
-    const allOption = document.createElement('option');
-    allOption.value = '__ALL__';
-    allOption.textContent = 'ALL players';
-    select.appendChild(allOption);
-    
-    leaderboard.forEach(entry => {
-        if (entry && entry.name && entry.name !== 'Opleoni') {
-            const option = document.createElement('option');
-            option.value = entry.name;
-            option.textContent = entry.name;
-            select.appendChild(option);
-        }
-    });
-    
-    const newOption = document.createElement('option');
-    newOption.value = '__NEW__';
-    newOption.textContent = 'Create New Player...';
-    select.appendChild(newOption);
-
-    const canRestoreSelection = Array.from(select.options).some(option => option.value === previousSelection);
-    select.value = canRestoreSelection ? previousSelection : '';
 }
 
 menuAdminAddBtn.addEventListener('click', async () => {
@@ -1673,7 +1707,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
     let leaderboardHoneyUpdated = false;
 
     try {
-        let targetPlayer = menuAdminPlayerSelect.value;
+        let targetPlayer = getAdminTargetPlayer();
         const stat = menuAdminStatSelect.value;
         const amount = toSafeAmount(menuAdminAmount.value);
     
@@ -1687,30 +1721,9 @@ menuAdminAddBtn.addEventListener('click', async () => {
             return;
         }
     
-        if (!targetPlayer || targetPlayer === '') {
-            targetPlayer = 'Opleoni';
-        }
-    
-        if (targetPlayer === '__NEW__') {
-            const newNameInput = prompt('Enter new player name:');
-            if (!newNameInput) return;
-            const newName = normalizePlayerName(newNameInput);
-            if (!newName) {
-                alert('Invalid name');
-                return;
-            }
-            if (isBlockedPlayerName(newName)) {
-                alert('That name is not allowed.');
-                return;
-            }
-        
-            const available = await isNameAvailable(newName);
-            if (!available) {
-                alert('That name already exists!');
-                return;
-            }
-        
-            targetPlayer = newName;
+        if (!targetPlayer) {
+            alert('Enter a valid player name');
+            return;
         }
     
         if (targetPlayer === '__ALL__') {
@@ -1721,7 +1734,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
             }
 
             for (const name of allPlayers) {
-                if (name === playerName) {
+                if (isSamePlayerName(name, playerName)) {
                     if (stat === 'honey') {
                         honey += amount;
                         totalHoneyEarned += amount;
@@ -1741,7 +1754,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
                 await queueAdminGrant(name, stat, amount);
             }
             targetPlayer = `ALL (${allPlayers.length})`;
-        } else if (targetPlayer === playerName) {
+        } else if (isSamePlayerName(targetPlayer, playerName)) {
             if (stat === 'honey') {
                 honey += amount;
                 totalHoneyEarned += amount;
@@ -1781,16 +1794,18 @@ menuAdminResetBtn.addEventListener('click', async () => {
     let leaderboardResetDone = false;
 
     try {
-        let targetPlayer = menuAdminPlayerSelect.value;
+        let targetPlayer = getAdminTargetPlayer();
         const resetStat = menuAdminResetStatSelect.value;
+        const resetStatName = getResetStatDisplayName(resetStat);
 
-        if (!['honey', 'rp', 'sp', 'all'].includes(resetStat)) {
+        if (!['honey', 'leaderboard_honey', 'rp', 'sp', 'all'].includes(resetStat)) {
             alert('Invalid reset stat');
             return;
         }
 
-        if (!targetPlayer || targetPlayer === '') {
-            targetPlayer = 'Opleoni';
+        if (!targetPlayer) {
+            alert('Enter a valid player name');
+            return;
         }
 
         if (targetPlayer === '__ALL__') {
@@ -1799,13 +1814,20 @@ menuAdminResetBtn.addEventListener('click', async () => {
                 alert('No players found to reset.');
                 return;
             }
-            if (!confirm(`Reset ${resetStat.toUpperCase()} for ALL ${allPlayers.length} players?`)) return;
+            if (!confirm(`Reset ${resetStatName} for ALL ${allPlayers.length} players?`)) return;
 
             for (const name of allPlayers) {
-                if (name === playerName) {
+                if (resetStat === 'leaderboard_honey') {
+                    await removePlayerFromLeaderboard(name);
+                    leaderboardResetDone = true;
+                    continue;
+                }
+
+                if (isSamePlayerName(name, playerName)) {
                     applyLocalCurrencyReset(resetStat);
                     continue;
                 }
+
                 if (resetStat === 'honey' || resetStat === 'all') {
                     await resetPlayerHoneyScore(name);
                     leaderboardResetDone = true;
@@ -1817,31 +1839,19 @@ menuAdminResetBtn.addEventListener('click', async () => {
             updateRebirthUI();
             updateToolButtons();
             updateSPUI();
-            saveGame();
-            alert(`Reset completed: ${resetStat.toUpperCase()} for ALL (${allPlayers.length}) players`);
+            if (resetStat !== 'leaderboard_honey') {
+                saveGame();
+            }
+            alert(`Reset completed: ${resetStatName} for ALL (${allPlayers.length}) players`);
             return;
         }
 
-        if (targetPlayer === '__NEW__') {
-            const newNameInput = prompt('Enter player name to reset:');
-            if (!newNameInput) return;
-            const newName = normalizePlayerName(newNameInput);
-            if (!newName) {
-                alert('Invalid name');
-                return;
-            }
+        if (!confirm(`Reset ${resetStatName} for ${targetPlayer}?`)) return;
 
-            const available = await isNameAvailable(newName);
-            if (available) {
-                alert('That player does not exist yet.');
-                return;
-            }
-            targetPlayer = newName;
-        }
-
-        if (!confirm(`Reset ${resetStat.toUpperCase()} for ${targetPlayer}?`)) return;
-
-        if (targetPlayer === playerName) {
+        if (resetStat === 'leaderboard_honey') {
+            await removePlayerFromLeaderboard(targetPlayer);
+            leaderboardResetDone = true;
+        } else if (isSamePlayerName(targetPlayer, playerName)) {
             applyLocalCurrencyReset(resetStat);
         } else {
             if (resetStat === 'honey' || resetStat === 'all') {
@@ -1855,8 +1865,10 @@ menuAdminResetBtn.addEventListener('click', async () => {
         updateRebirthUI();
         updateToolButtons();
         updateSPUI();
-        saveGame();
-        alert(`Reset completed: ${resetStat.toUpperCase()} for ${targetPlayer}`);
+        if (resetStat !== 'leaderboard_honey') {
+            saveGame();
+        }
+        alert(`Reset completed: ${resetStatName} for ${targetPlayer}`);
     } catch (error) {
         console.error('Admin reset failed:', error);
         if (leaderboardResetDone) {
