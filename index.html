@@ -1438,6 +1438,10 @@ function normalizePlayerName(name) {
     return String(name || '').trim().slice(0, 20);
 }
 
+function normalizePlayerNameKey(name) {
+    return normalizePlayerName(name).toLowerCase();
+}
+
 function getNameActionButtonLabel() {
     return forcedRenameFromName ? 'CHANGE NAME' : 'START HIVE';
 }
@@ -1511,15 +1515,63 @@ async function ensureAdminSessionIfNeeded() {
 }
 
 function getAllKnownPlayerNames() {
-    const names = new Set();
-    const selfName = normalizePlayerName(playerName);
-    if (selfName) names.add(selfName);
+    const namesByKey = new Map();
+    const addName = (candidate) => {
+        const normalized = normalizePlayerName(candidate);
+        const key = normalizePlayerNameKey(normalized);
+        if (!normalized || !key) return;
+        if (!namesByKey.has(key)) {
+            namesByKey.set(key, normalized);
+        }
+    };
+
+    addName(playerName);
     for (const entry of leaderboard) {
         if (!entry || !entry.name) continue;
-        const normalized = normalizePlayerName(entry.name);
-        if (normalized) names.add(normalized);
+        addName(entry.name);
     }
-    return Array.from(names);
+    return Array.from(namesByKey.values());
+}
+
+async function getAllKnownPlayerNamesForAdmin() {
+    const namesByKey = new Map();
+    const addName = (candidate) => {
+        const normalized = normalizePlayerName(candidate);
+        const key = normalizePlayerNameKey(normalized);
+        if (!normalized || !key) return;
+        if (!namesByKey.has(key)) {
+            namesByKey.set(key, normalized);
+        }
+    };
+
+    for (const name of getAllKnownPlayerNames()) {
+        addName(name);
+    }
+
+    try {
+        const [leaderboardSnapshot, identitySnapshot] = await Promise.all([
+            leaderboardRef.once('value'),
+            playerIdentityRef.once('value')
+        ]);
+
+        const leaderboardData = leaderboardSnapshot.val() || {};
+        for (const value of Object.values(leaderboardData)) {
+            if (value && typeof value === 'object') {
+                addName(value.name);
+            }
+        }
+
+        const identityData = identitySnapshot.val() || {};
+        for (const value of Object.values(identityData)) {
+            if (value && typeof value === 'object') {
+                addName(value.name);
+            }
+        }
+    } catch (error) {
+        console.warn('Unable to fully load ALL players from Firebase; using local list:', error);
+    }
+
+    return Array.from(namesByKey.values());
 }
 
 function isSamePlayerName(left, right) {
@@ -1796,11 +1848,15 @@ async function registerPlayerIdentity(name = playerName) {
     const key = sanitizeFirebaseKey(normalizedName);
     if (!key) return;
 
-    await playerIdentityRef.child(key).set({
-        name: normalizedName,
-        ipHash,
-        updatedAt: Date.now()
-    });
+    try {
+        await playerIdentityRef.child(key).set({
+            name: normalizedName,
+            ipHash,
+            updatedAt: Date.now()
+        });
+    } catch (error) {
+        console.warn('Player identity write failed (continuing without blocking join):', error);
+    }
 
 }
 
@@ -2011,11 +2067,8 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
         }
         
         return next;
-    }).then(() => {
-        console.log(`Successfully queued ${stat} for ${sanitizedTarget}`);
-    }).catch((error) => {
-        console.error(`Failed to queue ${stat} for ${sanitizedTarget}:`, error);
     });
+    console.log(`Successfully queued ${stat} for ${sanitizedTarget}`);
 }
 
 async function queueAdminReset(targetPlayer, resetStat) {
@@ -2217,7 +2270,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
         }
     
         if (targetPlayer === '__ALL__') {
-    const allPlayers = getAllKnownPlayerNames();
+    const allPlayers = await getAllKnownPlayerNamesForAdmin();
     if (allPlayers.length === 0) {
         alert('No players found to update.');
         return;
@@ -2309,7 +2362,7 @@ menuAdminResetBtn.addEventListener('click', async () => {
         }
 
         if (targetPlayer === '__ALL__') {
-            const allPlayers = getAllKnownPlayerNames();
+            const allPlayers = await getAllKnownPlayerNamesForAdmin();
             if (allPlayers.length === 0) {
                 alert('No players found to reset.');
                 return;
@@ -2390,7 +2443,7 @@ menuAdminBanBtn.addEventListener('click', async () => {
         }
 
         if (targetPlayer === '__ALL__') {
-            const allPlayers = getAllKnownPlayerNames().filter(name => !isProtectedAdminName(name));
+            const allPlayers = (await getAllKnownPlayerNamesForAdmin()).filter(name => !isProtectedAdminName(name));
             if (allPlayers.length === 0) {
                 alert('No non-admin players found to ban.');
                 return;
@@ -2427,26 +2480,28 @@ function fetchLeaderboard() {
     
     leaderboardRef.on('value', (snapshot) => {
         const data = snapshot.val();
-        leaderboard = [];
-        const nameMap = new Map(); // Track unique names
+        const leaderboardByName = new Map();
         
         if (data) {
             Object.keys(data).forEach(key => {
                 if (data[key] && data[key].name && typeof data[key].total === 'number') {
-                    const name = data[key].name;
-                    const total = data[key].total;
-                    
-                    // Only add if we haven't seen this name before
-                    if (!nameMap.has(name)) {
-                        nameMap.set(name, total);
-                        leaderboard.push({
-                            name: name,
-                            total: total
+                    const name = normalizePlayerName(data[key].name);
+                    const total = toSafeAmount(data[key].total);
+                    const nameKey = normalizePlayerNameKey(name);
+                    if (!nameKey) return;
+
+                    const current = leaderboardByName.get(nameKey);
+                    if (!current || total > current.total) {
+                        leaderboardByName.set(nameKey, {
+                            name,
+                            total
                         });
                     }
                 }
             });
         }
+
+        leaderboard = Array.from(leaderboardByName.values());
         
         renderLeaderboard();
         debugInfo.textContent = `✅ Loaded ${leaderboard.length} unique players`;
@@ -2466,8 +2521,9 @@ async function submitScore(score) {
     if (!playerName) return;
     
     try {
-        // Use a sanitized key but also store the name field
-        const sanitizedName = playerName.replace(/[.#$\[\]]/g, '_');
+        const normalizedName = normalizePlayerName(playerName);
+        const sanitizedName = sanitizeFirebaseKey(normalizedName);
+        if (!normalizedName || !sanitizedName) return;
         
         // First, check if this name already exists under any key
         const snapshot = await leaderboardRef.once('value');
@@ -2477,7 +2533,7 @@ async function submitScore(score) {
         if (data) {
             // Find if this name already exists in the database
             for (const [key, value] of Object.entries(data)) {
-                if (value && value.name === playerName) {
+                if (value && isSamePlayerName(value.name, normalizedName)) {
                     existingKey = key;
                     break;
                 }
@@ -2488,8 +2544,8 @@ async function submitScore(score) {
         const keyToUse = existingKey || sanitizedName;
         
         await leaderboardRef.child(keyToUse).set({
-            name: playerName,
-            total: score
+            name: normalizedName,
+            total: toSafeAmount(score)
         });
     } catch (error) {
         console.error('Failed to submit score:', error);
@@ -2612,11 +2668,6 @@ saveNameBtn.addEventListener('click', async () => {
     nameError.textContent = '';
 
     try {
-        // Ensure we are connected/authenticated before checking database
-        if (!auth.currentUser) {
-            await auth.signInAnonymously();
-        }
-
         const isProtectedName = isProtectedAdminName(name);
         if (isProtectedName) {
             const adminSessionOk = await ensureAdminSessionIfNeeded();
@@ -2626,14 +2677,6 @@ saveNameBtn.addEventListener('click', async () => {
                 playerNameInput.value = '';
                 nameModal.style.display = 'flex';
                 nameError.textContent = '❌ Admin claim login required for that name.';
-                saveNameBtn.disabled = false;
-                saveNameBtn.textContent = getNameActionButtonLabel();
-                return;
-            }
-        } else {
-            const available = await isNameAvailable(name);
-            if (!available) {
-                nameError.textContent = `❌ Name "${name}" is already taken! Choose another.`;
                 saveNameBtn.disabled = false;
                 saveNameBtn.textContent = getNameActionButtonLabel();
                 return;
@@ -3678,11 +3721,6 @@ async function init() {
             resolve();
         });
     });
-
-    // 2. Sign in anonymously if not logged in
-    if (!auth.currentUser) {
-        await auth.signInAnonymously().catch(console.error);
-    }
 
     if (!loadGame()) {
         addBee();
