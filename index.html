@@ -2654,12 +2654,9 @@ saveNameBtn.addEventListener('click', async () => {
         localStorage.setItem('beeSwarmPlayerName', playerName);
 
         await registerPlayerIdentity(playerName);
-        const bannedAfterJoin = await enforceBanForCurrentPlayer(playerName);
-        if (bannedAfterJoin) {
-            saveNameBtn.textContent = getNameActionButtonLabel();
-            return;
-        }
-
+        // The ban check is now handled by startBanWatchers() which runs after login,
+        // preventing a permissions error for new users trying to read the ban list.
+        // A returning player who is banned will be caught by the watcher on load.
         nameModal.style.display = 'none';
         playerNameDisplay.textContent = `Name: ${playerName}`;
 
@@ -3705,12 +3702,10 @@ async function init() {
 
     if (playerName) {
         await registerPlayerIdentity(playerName);
-        const bannedOnInit = await enforceBanForCurrentPlayer(playerName);
-        if (!bannedOnInit) {
-            startAdminGrantWatcher();
-            startBanWatchers();
-            await claimAdminGrants();
-        }
+        // Ban check is handled by the watcher to prevent permission errors on load for non-admins.
+        startAdminGrantWatcher();
+        startBanWatchers();
+        await claimAdminGrants();
     }
     applyPopupPreference();
     updatePerformanceButton();
