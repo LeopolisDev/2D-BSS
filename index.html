@@ -659,6 +659,12 @@
                 <button class="menu-btn remove-btn" id="menuAdminBanBtn">PERMA IP BAN + WIPE</button>
             </div>
             <div class="menu-row">
+                <select id="menuAdminUnbanSelect" class="admin-select" style="width:100%;">
+                    <option value="">No active bans</option>
+                </select>
+                <button class="menu-btn" id="menuAdminUnbanBtn">UNBAN SELECTED</button>
+            </div>
+            <div class="menu-row">
                 <button class="menu-btn" id="menuOpenAnnouncementBtn">📢 ANNOUNCE</button>
             </div>
         </div>
@@ -882,6 +888,7 @@ let adminClaimVerified = false;
 let adminAddInProgress = false;
 let adminResetInProgress = false;
 let adminBanInProgress = false;
+let adminUnbanInProgress = false;
 
 // ========== CANVAS ELEMENTS (MUST BE BEFORE EVENT LISTENERS) ==========
 const canvas = document.getElementById('gameCanvas');
@@ -914,6 +921,8 @@ const menuAdminAddBtn = document.getElementById('menuAdminAddBtn');
 const menuAdminResetStatSelect = document.getElementById('menuAdminResetStatSelect');
 const menuAdminResetBtn = document.getElementById('menuAdminResetBtn');
 const menuAdminBanBtn = document.getElementById('menuAdminBanBtn');
+const menuAdminUnbanSelect = document.getElementById('menuAdminUnbanSelect');
+const menuAdminUnbanBtn = document.getElementById('menuAdminUnbanBtn');
 const menuOpenAnnouncementBtn = document.getElementById('menuOpenAnnouncementBtn');
 const menuRedeemCodeInput = document.getElementById('menuRedeemCodeInput');
 const menuRedeemCodeBtn = document.getElementById('menuRedeemCodeBtn');
@@ -1193,132 +1202,280 @@ menuRedeemCodeInput.addEventListener('keypress', (e) => {
 });
 
 // ========== SAVE/LOAD FUNCTIONS ==========
-function generateSaveCode() {
-    const saveData = {
-        honey,
-        totalHoneyEarned,
-        nextHireCost,
-        beeCount: Array.isArray(bees) ? bees.length : 0,
-        rebirthPoints,
-        sacrificePoints,
-        hasClippers, hasShears, hasScythe, hasOil,
-        hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
-        hasMoonCharm, hasSunRelic, hasStormTotem, hasGalaxyCrown,
-        autoUnlocked,
-        beeSpeedMultiplier,
-        capacityMultiplier,
-        honeyMultUpgrade,
-        compoundingLevel, compoundingMultiplier,
-        flowerHpLevel,
-        x10HoneyPurchased,
-        rpAutoBuyActive,
-        rpGeneratorLevel,
-        rpCompoundingLevel, rpCompoundingMultiplier,
-        rpAutobuyEnabled,
-        autoActive,
-        autoSpendPercent,
-        performanceMode,
-        popupsDisabled,
-        redeemedCodes: Array.from(redeemedCodeKeys)
+const SAVE_CODE_PREFIX = 'BSS2.';
+const SAVE_CODE_VERSION = 2;
+const SAVE_CODE_SECRET = 'BeeSwarm_Save_v2_Signed_2026';
+
+function getSaveCodeOwnerKey() {
+    const ownerKey = normalizePlayerNameKey(playerName);
+    return ownerKey || '';
+}
+
+function bytesToBase64Url(bytes) {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function base64UrlToBytes(base64Url) {
+    const normalized = String(base64Url || '').replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+}
+
+function textToBase64Url(text) {
+    return bytesToBase64Url(new TextEncoder().encode(String(text || '')));
+}
+
+function base64UrlToText(base64Url) {
+    const bytes = base64UrlToBytes(base64Url);
+    return new TextDecoder().decode(bytes);
+}
+
+function createSaveCodeSalt() {
+    const bytes = new Uint8Array(12);
+    if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(bytes);
+    } else {
+        for (let i = 0; i < bytes.length; i++) {
+            bytes[i] = Math.floor(Math.random() * 256);
+        }
+    }
+    return bytesToBase64Url(bytes);
+}
+
+function fnv1a32(input) {
+    let hash = 0x811c9dc5;
+    const value = String(input || '');
+    for (let i = 0; i < value.length; i++) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return hash >>> 0;
+}
+
+function xorBytesWithSeed(bytes, seed) {
+    const input = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const output = new Uint8Array(input.length);
+    let state = (seed >>> 0) || 0x9e3779b9;
+
+    for (let i = 0; i < input.length; i++) {
+        state ^= state << 13;
+        state >>>= 0;
+        state ^= state >>> 17;
+        state >>>= 0;
+        state ^= state << 5;
+        state >>>= 0;
+        output[i] = input[i] ^ (state & 0xff);
+    }
+
+    return output;
+}
+
+function constantTimeEquals(left, right) {
+    const a = String(left || '');
+    const b = String(right || '');
+    if (a.length !== b.length) return false;
+    let mismatch = 0;
+    for (let i = 0; i < a.length; i++) {
+        mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    return mismatch === 0;
+}
+
+async function computeSaveCodeTag(ownerKey, salt, payload) {
+    const material = `${SAVE_CODE_SECRET}|${ownerKey}|${salt}|${payload}|${SAVE_CODE_VERSION}`;
+    if (!window.crypto || !window.crypto.subtle) {
+        const quick = fnv1a32(material).toString(16).padStart(8, '0');
+        const quick2 = fnv1a32(`${material}|fallback`).toString(16).padStart(8, '0');
+        return `${quick}${quick2}`;
+    }
+
+    const bytes = new TextEncoder().encode(material);
+    const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+async function encodeSecureSaveCode(saveData, ownerKey) {
+    const plainJson = JSON.stringify(saveData);
+    const plainBytes = new TextEncoder().encode(plainJson);
+    const salt = createSaveCodeSalt();
+    const seed = fnv1a32(`${SAVE_CODE_SECRET}|${ownerKey}|${salt}|${plainBytes.length}|${SAVE_CODE_VERSION}`);
+    const encryptedBytes = xorBytesWithSeed(plainBytes, seed);
+    const payload = bytesToBase64Url(encryptedBytes);
+    const tag = await computeSaveCodeTag(ownerKey, salt, payload);
+
+    const envelope = {
+        v: SAVE_CODE_VERSION,
+        o: ownerKey,
+        s: salt,
+        p: payload,
+        t: tag
     };
-    
-    const jsonStr = JSON.stringify(saveData);
-    const base64 = btoa(encodeURIComponent(jsonStr));
-    
-    menuSaveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${base64}</span><button class="copy-btn" id="menuCopySaveBtn">📋 COPY</button>`;
-    
+    return `${SAVE_CODE_PREFIX}${textToBase64Url(JSON.stringify(envelope))}`;
+}
+
+async function decodeSecureSaveCode(code, ownerKey) {
+    const raw = String(code || '').trim();
+    if (!raw.startsWith(SAVE_CODE_PREFIX)) {
+        throw new Error('Unsupported save code format');
+    }
+
+    const envelopeJson = base64UrlToText(raw.slice(SAVE_CODE_PREFIX.length));
+    const envelope = JSON.parse(envelopeJson);
+    if (!envelope || typeof envelope !== 'object') {
+        throw new Error('Invalid save envelope');
+    }
+    if (Number(envelope.v) !== SAVE_CODE_VERSION) {
+        throw new Error('Unsupported save version');
+    }
+    if (String(envelope.o || '') !== ownerKey) {
+        throw new Error('This save code belongs to a different player name');
+    }
+
+    const salt = String(envelope.s || '');
+    const payload = String(envelope.p || '');
+    const tag = String(envelope.t || '');
+    if (!salt || !payload || !tag) {
+        throw new Error('Corrupted save code');
+    }
+
+    const expectedTag = await computeSaveCodeTag(ownerKey, salt, payload);
+    if (!constantTimeEquals(expectedTag, tag)) {
+        throw new Error('Save code tampered or invalid');
+    }
+
+    const encryptedBytes = base64UrlToBytes(payload);
+    const seed = fnv1a32(`${SAVE_CODE_SECRET}|${ownerKey}|${salt}|${encryptedBytes.length}|${SAVE_CODE_VERSION}`);
+    const plainBytes = xorBytesWithSeed(encryptedBytes, seed);
+    const plainJson = new TextDecoder().decode(plainBytes);
+    const saveData = JSON.parse(plainJson);
+    if (!saveData || typeof saveData !== 'object') {
+        throw new Error('Invalid save payload');
+    }
+    return saveData;
+}
+
+function applyLoadedSaveData(saveData) {
+    const finiteOr = (value, fallback) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+    };
+
+    honey = finiteOr(saveData.honey, 0);
+    totalHoneyEarned = finiteOr(saveData.totalHoneyEarned, 0);
+    rebirthPoints = finiteOr(saveData.rebirthPoints, 0);
+    sacrificePoints = finiteOr(saveData.sacrificePoints, 0);
+
+    hasClippers = parseBoolean(saveData.hasClippers, false);
+    hasShears = parseBoolean(saveData.hasShears, false);
+    hasScythe = parseBoolean(saveData.hasScythe, false);
+    hasOil = parseBoolean(saveData.hasOil, false);
+    hasHoneycomb = parseBoolean(saveData.hasHoneycomb, false);
+    hasBeeGun = parseBoolean(saveData.hasBeeGun, false);
+    hasRoyalJelly = parseBoolean(saveData.hasRoyalJelly, false);
+    hasStarTreat = parseBoolean(saveData.hasStarTreat, false);
+    hasMoonCharm = parseBoolean(saveData.hasMoonCharm, false);
+    hasSunRelic = parseBoolean(saveData.hasSunRelic, false);
+    hasStormTotem = parseBoolean(saveData.hasStormTotem, false);
+    hasGalaxyCrown = parseBoolean(saveData.hasGalaxyCrown, false);
+
+    autoUnlocked = parseBoolean(saveData.autoUnlocked, false);
+    beeSpeedMultiplier = finiteOr(saveData.beeSpeedMultiplier, 1.0);
+    capacityMultiplier = finiteOr(saveData.capacityMultiplier, 1.0);
+    honeyMultUpgrade = finiteOr(saveData.honeyMultUpgrade, 1.0);
+    compoundingLevel = finiteOr(saveData.compoundingLevel, 0);
+    compoundingMultiplier = finiteOr(saveData.compoundingMultiplier, 1.0);
+    flowerHpLevel = getSafeFlowerHpLevel(finiteOr(saveData.flowerHpLevel, 0));
+
+    x10HoneyPurchased = parseBoolean(saveData.x10HoneyPurchased, false);
+    rpAutoBuyActive = parseBoolean(saveData.rpAutoBuyActive, false);
+    rpGeneratorLevel = finiteOr(saveData.rpGeneratorLevel, 0);
+    rpCompoundingLevel = finiteOr(saveData.rpCompoundingLevel, 0);
+    rpCompoundingMultiplier = finiteOr(saveData.rpCompoundingMultiplier, 1.0);
+    rpAutobuyEnabled = parseBoolean(saveData.rpAutobuyEnabled, false);
+    autoActive = parseBoolean(saveData.autoActive, false);
+    autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
+    performanceMode = parseBoolean(saveData.performanceMode, false);
+    popupsDisabled = parseBoolean(saveData.popupsDisabled, false);
+    setRedeemedCodeKeys(saveData.redeemedCodes);
+    applyPopupPreference();
+    updatePerformanceButton();
+    updatePopupBlockButton();
+
+    const rawBeeCount = finiteOr(saveData.beeCount, 1);
+    const loadedBeeCount = Math.max(1, Math.min(500, Math.floor(rawBeeCount)));
+    nextHireCost = computeNextHireCostFromBeeCount(loadedBeeCount);
+    bees = [];
+    for (let i = 0; i < loadedBeeCount; i++) addBee();
+    flowers = [];
+    for (let i = 0; i < 14; i++) spawnFlower();
+
+    if (autoActive && autoUnlocked) {
+        toggleAutoBtn.textContent = '▶️ AUTO (ON)';
+        toggleAutoBtn.classList.add('auto-active');
+        if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
+    } else {
+        autoActive = false;
+        toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
+        toggleAutoBtn.classList.remove('auto-active');
+    }
+
+    if (rpAutobuyEnabled && rpAutoBuyActive) {
+        toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
+        toggleRPAutoBtn.classList.add('rp-autobuy-active');
+    } else {
+        toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+        toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+    }
+    updateAutoSpendButton();
+    updateHireCostDisplay();
+
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+    saveGame();
+}
+
+async function generateSaveCode() {
+    const ownerKey = getSaveCodeOwnerKey();
+    if (!ownerKey) {
+        alert('Set your name first before generating a save code.');
+        return '';
+    }
+
+    const saveData = buildSaveData(false);
+    const secureCode = await encodeSecureSaveCode(saveData, ownerKey);
+
+    menuSaveCodeDisplay.innerHTML = `<span style="flex:1; text-align:center; word-break:break-all;">${secureCode}</span><button class="copy-btn" id="menuCopySaveBtn">📋 COPY</button>`;
     document.getElementById('menuCopySaveBtn').addEventListener('click', () => {
-        navigator.clipboard.writeText(base64).then(() => {
+        navigator.clipboard.writeText(secureCode).then(() => {
             alert('✅ Save code copied to clipboard!');
         }).catch(() => {
             alert('❌ Failed to copy');
         });
     });
-    
-    return base64;
+
+    return secureCode;
 }
 
-function loadSaveCode(code) {
+async function loadSaveCode(code) {
     try {
-        const jsonStr = decodeURIComponent(atob(code));
-        const saveData = JSON.parse(jsonStr);
-        
-        honey = saveData.honey || 0;
-        totalHoneyEarned = saveData.totalHoneyEarned || 0;
-        rebirthPoints = saveData.rebirthPoints || 0;
-        sacrificePoints = saveData.sacrificePoints || 0;
-        
-        hasClippers = saveData.hasClippers || false;
-        hasShears = saveData.hasShears || false;
-        hasScythe = saveData.hasScythe || false;
-        hasOil = saveData.hasOil || false;
-        hasHoneycomb = saveData.hasHoneycomb || false;
-        hasBeeGun = saveData.hasBeeGun || false;
-        hasRoyalJelly = saveData.hasRoyalJelly || false;
-        hasStarTreat = saveData.hasStarTreat || false;
-        hasMoonCharm = saveData.hasMoonCharm || false;
-        hasSunRelic = saveData.hasSunRelic || false;
-        hasStormTotem = saveData.hasStormTotem || false;
-        hasGalaxyCrown = saveData.hasGalaxyCrown || false;
-        
-        autoUnlocked = saveData.autoUnlocked || false;
-        beeSpeedMultiplier = saveData.beeSpeedMultiplier || 1.0;
-        capacityMultiplier = saveData.capacityMultiplier || 1.0;
-        honeyMultUpgrade = saveData.honeyMultUpgrade || 1.0;
-        compoundingLevel = saveData.compoundingLevel || 0;
-        compoundingMultiplier = saveData.compoundingMultiplier || 1.0;
-        flowerHpLevel = getSafeFlowerHpLevel(saveData.flowerHpLevel || 0);
-        
-        x10HoneyPurchased = saveData.x10HoneyPurchased || false;
-        rpAutoBuyActive = saveData.rpAutoBuyActive || false;
-        rpGeneratorLevel = saveData.rpGeneratorLevel || 0;
-        rpCompoundingLevel = saveData.rpCompoundingLevel || 0;
-        rpCompoundingMultiplier = saveData.rpCompoundingMultiplier || 1.0;
-        rpAutobuyEnabled = saveData.rpAutobuyEnabled || false;
-        autoActive = saveData.autoActive || false;
-        autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
-        performanceMode = parseBoolean(saveData.performanceMode, false);
-        popupsDisabled = parseBoolean(saveData.popupsDisabled, false);
-        setRedeemedCodeKeys(saveData.redeemedCodes);
-        applyPopupPreference();
-        updatePerformanceButton();
-        updatePopupBlockButton();
+        const ownerKey = getSaveCodeOwnerKey();
+        if (!ownerKey) {
+            throw new Error('Set your name first');
+        }
 
-        const loadedBeeCount = Number.isFinite(saveData.beeCount) && saveData.beeCount > 0
-            ? Math.floor(saveData.beeCount)
-            : 1;
-        nextHireCost = computeNextHireCostFromBeeCount(loadedBeeCount);
-        bees = [];
-        for (let i = 0; i < loadedBeeCount; i++) addBee();
-        flowers = [];
-        for (let i = 0; i < 14; i++) spawnFlower();
-        
-        if (autoActive && autoUnlocked) {
-            toggleAutoBtn.textContent = '▶️ AUTO (ON)';
-            toggleAutoBtn.classList.add('auto-active');
-            if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
-        } else {
-            autoActive = false;
-            toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
-            toggleAutoBtn.classList.remove('auto-active');
-        }
-        
-        if (rpAutobuyEnabled && rpAutoBuyActive) {
-            toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
-            toggleRPAutoBtn.classList.add('rp-autobuy-active');
-        } else {
-            toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
-            toggleRPAutoBtn.classList.remove('rp-autobuy-active');
-        }
-        updateAutoSpendButton();
-        updateHireCostDisplay();
-        
-        recalcMultiplier();
-        updateRebirthUI();
-        updateToolButtons();
-        updateSPUI();
-        saveGame();
-        
+        const saveData = await decodeSecureSaveCode(code, ownerKey);
+        applyLoadedSaveData(saveData);
         alert('✅ Save loaded successfully!');
         return true;
     } catch (e) {
@@ -1327,14 +1484,21 @@ function loadSaveCode(code) {
     }
 }
 
-menuGenerateSaveBtn.addEventListener('click', generateSaveCode);
+menuGenerateSaveBtn.addEventListener('click', async () => {
+    try {
+        await generateSaveCode();
+    } catch (error) {
+        console.error('Failed to generate save code:', error);
+        alert('❌ Failed to generate save code');
+    }
+});
 menuPerformanceBtn.addEventListener('click', togglePerformanceMode);
 menuPopupBlockBtn.addEventListener('click', togglePopupBlockMode);
 
-menuLoadSaveBtn.addEventListener('click', () => {
+menuLoadSaveBtn.addEventListener('click', async () => {
     const code = menuLoadCodeInput.value.trim();
     if (code) {
-        const success = loadSaveCode(code);
+        const success = await loadSaveCode(code);
         if (success) {
             menuLoadCodeInput.value = '';
         } else {
@@ -2492,6 +2656,123 @@ function updateMenuAdminSelect() {
         return;
     }
     menuAdminSection.style.display = 'block';
+    refreshAdminUnbanList().catch((error) => {
+        console.error('Failed to refresh admin unban list:', error);
+    });
+}
+
+function formatAdminTimestamp(timestamp) {
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
+    try {
+        return new Date(timestamp).toLocaleString();
+    } catch (error) {
+        return '';
+    }
+}
+
+function setAdminUnbanOptions(bannedPlayers) {
+    if (!menuAdminUnbanSelect) return;
+
+    menuAdminUnbanSelect.innerHTML = '';
+    const list = Array.isArray(bannedPlayers) ? bannedPlayers : [];
+    if (list.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No active bans';
+        menuAdminUnbanSelect.appendChild(option);
+        menuAdminUnbanSelect.disabled = true;
+        return;
+    }
+
+    for (const player of list) {
+        const name = normalizePlayerName(player?.name);
+        if (!name) continue;
+        const option = document.createElement('option');
+        option.value = name;
+        const stamp = formatAdminTimestamp(Number(player?.updatedAt || 0));
+        option.textContent = stamp ? `${name} (${stamp})` : name;
+        menuAdminUnbanSelect.appendChild(option);
+    }
+
+    menuAdminUnbanSelect.disabled = menuAdminUnbanSelect.options.length === 0;
+}
+
+async function refreshAdminUnbanList() {
+    if (!menuAdminUnbanSelect) return;
+    if (!isAdminUser()) {
+        setAdminUnbanOptions([]);
+        return;
+    }
+
+    menuAdminUnbanSelect.disabled = true;
+    menuAdminUnbanSelect.innerHTML = '';
+    const loadingOption = document.createElement('option');
+    loadingOption.value = '';
+    loadingOption.textContent = 'Loading banned players...';
+    menuAdminUnbanSelect.appendChild(loadingOption);
+
+    try {
+        const snapshot = await playerBansRef.once('value');
+        const data = snapshot.val() || {};
+        const bansByName = new Map();
+
+        for (const [key, value] of Object.entries(data)) {
+            if (!value || typeof value !== 'object') continue;
+            if (!parseBoolean(value.active, true)) continue;
+            const normalizedName = normalizePlayerName(value.name || key);
+            const nameKey = normalizePlayerNameKey(normalizedName);
+            if (!nameKey || isProtectedAdminName(normalizedName)) continue;
+
+            const updatedAt = Number(value.updatedAt || value.bannedAt || 0);
+            const current = bansByName.get(nameKey);
+            if (!current || updatedAt > current.updatedAt) {
+                bansByName.set(nameKey, {
+                    name: normalizedName,
+                    updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0
+                });
+            }
+        }
+
+        const bannedPlayers = Array.from(bansByName.values()).sort((a, b) => {
+            return a.name.localeCompare(b.name);
+        });
+        setAdminUnbanOptions(bannedPlayers);
+    } catch (error) {
+        console.error('Failed loading banned players:', error);
+        setAdminUnbanOptions([]);
+    }
+}
+
+async function unbanPlayerPermanently(targetPlayer) {
+    const normalizedName = normalizePlayerName(targetPlayer);
+    const key = sanitizeFirebaseKey(normalizedName);
+    if (!normalizedName || !key) {
+        throw new Error('Invalid target player');
+    }
+
+    const banSnapshot = await playerBansRef.child(key).once('value');
+    const banData = banSnapshot.val();
+    if (!banData || !parseBoolean(banData.active, true)) {
+        throw new Error('Player is not currently banned');
+    }
+
+    const ipHash = typeof banData.ipHash === 'string' ? banData.ipHash.trim() : '';
+    const now = Date.now();
+    const updates = {
+        [`playerBans/${key}/active`]: false,
+        [`playerBans/${key}/updatedAt`]: now,
+        [`playerBans/${key}/unbannedAt`]: now,
+        [`playerBans/${key}/unbannedBy`]: playerName || 'Opleoni'
+    };
+
+    if (ipHash) {
+        updates[`ipBans/${ipHash}/active`] = false;
+        updates[`ipBans/${ipHash}/updatedAt`] = now;
+        updates[`ipBans/${ipHash}/unbannedAt`] = now;
+        updates[`ipBans/${ipHash}/unbannedBy`] = playerName || 'Opleoni';
+    }
+
+    await database.ref().update(updates);
 }
 
 function setButtonBusyState(button, busy, busyLabel = 'WORKING...') {
@@ -2735,6 +3016,7 @@ menuAdminBanBtn.addEventListener('click', async () => {
             if (!confirm(`PERMANENT IP BAN + FULL WIPE for ALL ${allPlayers.length} non-admin players?`)) return;
 
             await banPlayersPermanentlyBulk(allPlayers);
+            await refreshAdminUnbanList();
 
             alert(`Permanent IP ban + wipe completed for ALL (${allPlayers.length}) players. Opleoni was skipped.`);
             return;
@@ -2748,6 +3030,7 @@ menuAdminBanBtn.addEventListener('click', async () => {
         if (!confirm(`PERMANENT IP BAN + FULL WIPE for ${targetPlayer}? This cannot be undone in-game.`)) return;
 
         await banPlayerPermanently(targetPlayer);
+        await refreshAdminUnbanList();
         alert(`Permanent IP ban + wipe completed for ${targetPlayer}.`);
     } catch (error) {
         console.error('Admin ban failed:', error);
@@ -2755,6 +3038,32 @@ menuAdminBanBtn.addEventListener('click', async () => {
     } finally {
         adminBanInProgress = false;
         setButtonBusyState(menuAdminBanBtn, false);
+    }
+});
+
+menuAdminUnbanBtn.addEventListener('click', async () => {
+    if (adminUnbanInProgress) return;
+    if (!await ensureAdminAccess()) return;
+
+    const selectedName = normalizePlayerName(menuAdminUnbanSelect.value);
+    if (!selectedName) {
+        alert('Select a banned player first.');
+        return;
+    }
+    if (!confirm(`Unban ${selectedName}?`)) return;
+
+    adminUnbanInProgress = true;
+    setButtonBusyState(menuAdminUnbanBtn, true, 'UNBANNING...');
+    try {
+        await unbanPlayerPermanently(selectedName);
+        await refreshAdminUnbanList();
+        alert(`✅ Unbanned ${selectedName}.`);
+    } catch (error) {
+        console.error('Admin unban failed:', error);
+        alert(`Failed to unban ${selectedName}.`);
+    } finally {
+        adminUnbanInProgress = false;
+        setButtonBusyState(menuAdminUnbanBtn, false);
     }
 });
 
