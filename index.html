@@ -789,6 +789,7 @@
     <span style="color:#ffb3b3; font-weight:bold;">💰 SP SHOP:</span>
     <button class="tool-btn" id="buyX10Honey">🍯 x10 HONEY (5 SP)</button>
     <button class="tool-btn" id="buyRPAuto">🤖 RP AUTOBUY (10 SP)</button>
+    <button class="tool-btn" id="buyFlowerFieldUpgrade">🌸 FLOWER FIELD 100 TOTAL (25 SP)</button>
     <button class="tool-btn" id="buyRPGen">⏱️ RP GENERATOR lv<span id="rpGenLevel">0</span> (<span id="rpGenCost">1</span> SP) <span id="rpGenTime">5s</span> <span id="rpGenPreview" class="preview-text"></span></button>
     <button class="tool-btn" id="buyRPCompounding">📈 RP COMPOUNDING lv<span id="rpCompLevel">0</span> (<span id="rpCompCost">1</span> SP) x<span id="rpCompMult">1.00</span></button>
     <span class="multiplier-badge" id="spShopDisplay">SP: 0</span>
@@ -953,6 +954,7 @@ const buyCompounding = document.getElementById('buyCompounding');
 const buyFlowerHP = document.getElementById('buyFlowerHP');
 const buyX10Honey = document.getElementById('buyX10Honey');
 const buyRPAuto = document.getElementById('buyRPAuto');
+const buyFlowerFieldUpgrade = document.getElementById('buyFlowerFieldUpgrade');
 const buyRPGen = document.getElementById('buyRPGen');
 const buyRPCompounding = document.getElementById('buyRPCompounding');
 const buyClippers = document.getElementById('buyClippers');
@@ -1070,6 +1072,13 @@ function formatMultiplierValue(mult) {
 
 function parseBoolean(value, fallback = false) {
     return typeof value === 'boolean' ? value : fallback;
+}
+
+function showGameStatusMessage(message, durationMs = 2400) {
+    saveIndicator.textContent = message;
+    setTimeout(() => {
+        saveIndicator.textContent = '💾 Auto-saved';
+    }, durationMs);
 }
 
 const nativeAlert = window.alert.bind(window);
@@ -1400,6 +1409,7 @@ function applyLoadedSaveData(saveData) {
     rpGeneratorLevel = finiteOr(saveData.rpGeneratorLevel, 0);
     rpCompoundingLevel = finiteOr(saveData.rpCompoundingLevel, 0);
     rpCompoundingMultiplier = finiteOr(saveData.rpCompoundingMultiplier, 1.0);
+    flowerFieldUpgradePurchased = parseBoolean(saveData.flowerFieldUpgradePurchased, false);
     rpAutobuyEnabled = parseBoolean(saveData.rpAutobuyEnabled, false);
     autoActive = parseBoolean(saveData.autoActive, false);
     autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
@@ -1415,8 +1425,7 @@ function applyLoadedSaveData(saveData) {
     nextHireCost = computeNextHireCostFromBeeCount(loadedBeeCount);
     bees = [];
     for (let i = 0; i < loadedBeeCount; i++) addBee();
-    flowers = [];
-    for (let i = 0; i < 14; i++) spawnFlower();
+    resetFlowerFieldForCurrentLimits();
 
     if (autoActive && autoUnlocked) {
         toggleAutoBtn.textContent = '▶️ AUTO (ON)';
@@ -1919,6 +1928,7 @@ function resetAllGameDataState() {
     rpGeneratorLevel = 0;
     rpCompoundingLevel = 0;
     rpCompoundingMultiplier = 1.0;
+    flowerFieldUpgradePurchased = false;
 
     autoActive = false;
     rpAutobuyEnabled = false;
@@ -1943,9 +1953,7 @@ function resetAllGameDataState() {
     toggleRPAutoBtn.classList.remove('rp-autobuy-active');
 
     addBee();
-    for (let i = 0; i < 14; i++) {
-        spawnFlower();
-    }
+    resetFlowerFieldForCurrentLimits();
 
     setupRPGenerator();
     setupRPAutoBuy();
@@ -3340,7 +3348,11 @@ setupAnnouncementListener();
 // ========== GAME CONSTANTS ==========
 const HIVE_X = 100, HIVE_Y = 200;
 const FLOWER_RADIUS = 16;
-const MAX_FLOWERS = 100; //was 22
+const FLOWER_BASE_DEFAULT = 25;
+const FLOWER_BASE_UPGRADED = 50;
+const FLOWER_CLICK_DEFAULT = 15;
+const FLOWER_CLICK_UPGRADED = 50;
+const FLOWER_FIELD_UPGRADE_COST = 25;
 const BEE_SPEED_BASE = 1.1;
 const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
@@ -3414,6 +3426,7 @@ let rpGeneratorInterval = null;
 let rpAutoBuyInterval = null;
 let rpCompoundingLevel = 0;
 let rpCompoundingMultiplier = 1.0;
+let flowerFieldUpgradePurchased = false;
 
 // Automation
 let autoActive = false;
@@ -3424,23 +3437,116 @@ let performanceMode = false;
 let popupsDisabled = false;
 
 // ========== GAME MECHANICS ==========
+function getRandomFlowerTarget() {
+    return flowerFieldUpgradePurchased ? FLOWER_BASE_UPGRADED : FLOWER_BASE_DEFAULT;
+}
+
+function getClickFlowerLimit() {
+    return flowerFieldUpgradePurchased ? FLOWER_CLICK_UPGRADED : FLOWER_CLICK_DEFAULT;
+}
+
+function getTotalFlowerLimit() {
+    return getRandomFlowerTarget() + getClickFlowerLimit();
+}
+
+function getFlowerSpawnType(flower) {
+    return flower?.spawnType === 'click' ? 'click' : 'random';
+}
+
+function getActiveFlowerCount() {
+    let count = 0;
+    for (const flower of flowers) {
+        if (flower?.active) count++;
+    }
+    return count;
+}
+
+function getFlowerCountByType(type, activeOnly = false) {
+    let count = 0;
+    for (const flower of flowers) {
+        if (!flower) continue;
+        if (getFlowerSpawnType(flower) !== type) continue;
+        if (activeOnly && !flower.active) continue;
+        count++;
+    }
+    return count;
+}
+
+function getBaseFlowerPollen(randomize = true) {
+    const hpBonus = getSafeFlowerHpLevel() * FLOWER_HP_PER_LEVEL;
+    if (!randomize) return 8 + hpBonus;
+    return 8 + Math.floor(Math.random() * 12) + hpBonus;
+}
+
+function enforceRandomFlowerTarget(reactivateToTarget = false) {
+    const randomTarget = getRandomFlowerTarget();
+
+    let randomFlowerCount = getFlowerCountByType('random');
+    while (randomFlowerCount < randomTarget && flowers.length < getTotalFlowerLimit()) {
+        if (!spawnFlower('random')) break;
+        randomFlowerCount++;
+    }
+
+    if (!reactivateToTarget) return;
+
+    let activeRandomFlowers = getFlowerCountByType('random', true);
+    for (const flower of flowers) {
+        if (activeRandomFlowers >= randomTarget) break;
+        if (!flower || getFlowerSpawnType(flower) !== 'random' || flower.active) continue;
+        flower.active = true;
+        flower.pollen = getBaseFlowerPollen(true);
+        flower.timer = 0;
+        activeRandomFlowers++;
+    }
+
+    while (activeRandomFlowers < randomTarget && flowers.length < getTotalFlowerLimit()) {
+        if (!spawnFlower('random')) break;
+        activeRandomFlowers++;
+    }
+}
+
+function resetFlowerFieldForCurrentLimits() {
+    flowers = [];
+    const target = getRandomFlowerTarget();
+    for (let i = 0; i < target; i++) {
+        if (!spawnFlower('random')) break;
+    }
+}
+
+function trySpawnClickedFlower(x, y) {
+    if (flowers.length >= getTotalFlowerLimit()) return false;
+    if (getFlowerCountByType('click') >= getClickFlowerLimit()) return false;
+
+    flowers.push({
+        x,
+        y,
+        pollen: getBaseFlowerPollen(false),
+        active: true,
+        timer: 0,
+        spawnType: 'click'
+    });
+    return true;
+}
+
 function update() {
     if (gameplayBlocked) return;
 
+    let activeFlowerCount = getActiveFlowerCount();
     for (let i = flowers.length - 1; i >= 0; i--) {
         const f = flowers[i];
         if (!f.active) {
             f.timer--;
             if (f.timer <= 0) {
-                if (flowers.filter(fl => fl.active).length < MAX_FLOWERS) {
+                if (activeFlowerCount < getTotalFlowerLimit()) {
                     f.active = true;
-                    f.pollen = 8 + Math.floor(Math.random() * 12) + (getSafeFlowerHpLevel() * FLOWER_HP_PER_LEVEL);
+                    f.pollen = getBaseFlowerPollen(true);
                     f.timer = 0;
+                    activeFlowerCount++;
                 }
             }
         }
     }
-    if (flowers.filter(f => f.active).length < 5) spawnFlower();
+    enforceRandomFlowerTarget();
 
     for (let b of bees) {
         let maxCap = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
@@ -3613,6 +3719,14 @@ function updateSPUI() {
         buyRPAuto.innerHTML = '🤖 RP AUTOBUY (10 SP)';
         buyRPAuto.disabled = sacrificePoints < 10;
     }
+
+    if (flowerFieldUpgradePurchased) {
+        buyFlowerFieldUpgrade.innerHTML = '🌸 FLOWER FIELD 100 TOTAL MAXED <span class="maxed-badge">MAX</span>';
+        buyFlowerFieldUpgrade.disabled = true;
+    } else {
+        buyFlowerFieldUpgrade.innerHTML = `🌸 FLOWER FIELD 100 TOTAL (${FLOWER_FIELD_UPGRADE_COST} SP)`;
+        buyFlowerFieldUpgrade.disabled = sacrificePoints < FLOWER_FIELD_UPGRADE_COST;
+    }
     
     const nextLevel = rpGeneratorLevel + 1;
     const genCost = nextLevel;
@@ -3712,8 +3826,8 @@ function setupRPAutoBuy() {
     }
 }
 
-function spawnFlower() {
-    if (flowers.filter(f => f.active).length >= MAX_FLOWERS) return false;
+function spawnFlower(spawnType = 'random') {
+    if (flowers.length >= getTotalFlowerLimit()) return false;
     for (let attempt = 0; attempt < 200; attempt++) {
         const x = 200 + Math.random() * 550;
         const y = 50 + Math.random() * 300;
@@ -3728,8 +3842,14 @@ function spawnFlower() {
             }
         }
         if (!overlap) {
-            let basePollen = 8 + Math.floor(Math.random() * 12) + (getSafeFlowerHpLevel() * FLOWER_HP_PER_LEVEL);
-            flowers.push({ x, y, pollen: basePollen, active: true, timer: 0 });
+            flowers.push({
+                x,
+                y,
+                pollen: getBaseFlowerPollen(true),
+                active: true,
+                timer: 0,
+                spawnType
+            });
             return true;
         }
     }
@@ -3857,7 +3977,10 @@ function autoBuy() {
 }
 
 function toggleAuto() {
-    if (!autoUnlocked) { alert('Buy AUTO upgrade first!'); return; }
+    if (!autoUnlocked) {
+        showGameStatusMessage('Buy AUTO upgrade first.');
+        return;
+    }
     autoActive = !autoActive;
     toggleAutoBtn.textContent = autoActive ? '▶️ AUTO (ON)' : '⏸️ AUTO (OFF)';
     toggleAutoBtn.classList.toggle('auto-active', autoActive);
@@ -3868,7 +3991,7 @@ function toggleAuto() {
 
 function toggleRPAuto() {
     if (!rpAutoBuyActive) {
-        alert('Buy RP AUTOBUY upgrade in SP Shop first!');
+        showGameStatusMessage('Buy RP AUTOBUY upgrade in SP Shop first.');
         return;
     }
     rpAutobuyEnabled = !rpAutobuyEnabled;
@@ -3911,7 +4034,7 @@ canvas.addEventListener('click', (e) => {
             return;
         }
     }
-    if (flowers.length < 30) flowers.push({ x, y, pollen: 8 + (getSafeFlowerHpLevel() * FLOWER_HP_PER_LEVEL), active: true, timer: 0 });
+    trySpawnClickedFlower(x, y);
 });
 
 hireBtn.addEventListener('click', () => {
@@ -3936,15 +4059,15 @@ rebirthBtn.addEventListener('click', () => {
         hasHoneycomb = false; hasBeeGun = false; hasRoyalJelly = false; hasStarTreat = false;
         hasMoonCharm = false; hasSunRelic = false; hasStormTotem = false; hasGalaxyCrown = false;
         addBee();
-        for (let i = 0; i < 14; i++) spawnFlower();
+        resetFlowerFieldForCurrentLimits();
         honey = 0;
         
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
         updateHireCostDisplay();
         saveGame();
-        alert(`✨ Purchased ${maxRP} RP (multiplied to ${rpGain} RP) for ${formatNumber(cost)} honey! Honey reset to 0.`);
+        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)} => ${rpGain}). Honey reset to 0.`);
     } else {
-        alert(`❌ Need at least 10,000 honey for 1 RP!`);
+        showGameStatusMessage('Need at least 10,000 honey for 1 RP.');
     }
 });
 
@@ -3988,17 +4111,17 @@ sacrificeBtn.addEventListener('click', () => {
         setupRPGenerator(); // This will use the preserved rpCompoundingMultiplier
         
         addBee();
-        for (let i = 0; i < 14; i++) spawnFlower();
+        resetFlowerFieldForCurrentLimits();
         
         honey = 0;
         
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
         updateHireCostDisplay();
         saveGame();
-        
-        alert(`🔥 Sacrificed for ${maxSP} SP! Honey reset to 0. Everything else has been wiped. RP Compounding preserved at level ${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
+
+        showGameStatusMessage(`Sacrificed for ${maxSP} SP. Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
     } else {
-        alert(`❌ Need at least 100M honey and 10 RP for 1 SP!`);
+        showGameStatusMessage('Need at least 100M honey and 10 RP for 1 SP.');
     }
 });
 
@@ -4020,6 +4143,16 @@ buyRPAuto.addEventListener('click', () => {
         if (rpAutobuyEnabled) {
             setupRPAutoBuy();
         }
+        updateSPUI();
+        saveGame();
+    }
+});
+
+buyFlowerFieldUpgrade.addEventListener('click', () => {
+    if (sacrificePoints >= FLOWER_FIELD_UPGRADE_COST && !flowerFieldUpgradePurchased) {
+        sacrificePoints -= FLOWER_FIELD_UPGRADE_COST;
+        flowerFieldUpgradePurchased = true;
+        enforceRandomFlowerTarget(true);
         updateSPUI();
         saveGame();
     }
@@ -4153,6 +4286,7 @@ function buildSaveData(includeWorldData = true) {
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
         flowerHpLevel,
+        flowerFieldUpgradePurchased,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
         autoSpendPercent,
@@ -4170,7 +4304,8 @@ function buildSaveData(includeWorldData = true) {
         }));
         saveData.flowers = safeFlowers.map(f => ({
             x: f.x, y: f.y, pollen: f.pollen,
-            active: f.active, timer: f.timer
+            active: f.active, timer: f.timer,
+            spawnType: getFlowerSpawnType(f)
         }));
     }
 
@@ -4242,6 +4377,7 @@ function loadGame() {
         rpGeneratorLevel = finiteOr(data.rpGeneratorLevel, 0);
         rpCompoundingLevel = finiteOr(data.rpCompoundingLevel, 0);
         rpCompoundingMultiplier = finiteOr(data.rpCompoundingMultiplier, 1.0);
+        flowerFieldUpgradePurchased = parseBoolean(data.flowerFieldUpgradePurchased, false);
         rpAutobuyEnabled = data.rpAutobuyEnabled || false;
         autoSpendPercent = normalizeAutoSpendPercent(data.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(data.performanceMode, false);
@@ -4259,11 +4395,18 @@ function loadGame() {
         if (!Array.isArray(bees) || bees.length === 0) addBee();
 
         if (Array.isArray(data.flowers) && data.flowers.length > 0) {
-            flowers = data.flowers;
+            flowers = data.flowers.map(f => ({
+                x: finiteOr(f?.x, 0),
+                y: finiteOr(f?.y, 0),
+                pollen: Math.max(0, finiteOr(f?.pollen, getBaseFlowerPollen(true))),
+                active: parseBoolean(f?.active, true),
+                timer: Math.max(0, Math.floor(finiteOr(f?.timer, 0))),
+                spawnType: f?.spawnType === 'click' ? 'click' : 'random'
+            }));
         } else {
-            flowers = [];
-            for (let i = 0; i < 14; i++) spawnFlower();
+            resetFlowerFieldForCurrentLimits();
         }
+        enforceRandomFlowerTarget();
 
         nextHireCost = computeNextHireCostFromBeeCount(bees.length);
 
@@ -4317,7 +4460,7 @@ async function init() {
 
     if (!loadGame()) {
         addBee();
-        for (let i = 0; i < 14; i++) spawnFlower();
+        resetFlowerFieldForCurrentLimits();
     }
 
     await refreshAdminClaimState(true);
