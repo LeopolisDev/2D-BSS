@@ -1729,6 +1729,16 @@ function normalizePlayerNameKey(name) {
     return normalizePlayerName(name).toLowerCase();
 }
 
+function getPlayerGrantKeys(name) {
+    const normalized = normalizePlayerName(name);
+    const legacyKey = sanitizeFirebaseKey(normalized);
+    const normalizedKey = sanitizeFirebaseKey(normalizePlayerNameKey(normalized));
+    const keys = [];
+    if (normalizedKey) keys.push(normalizedKey);
+    if (legacyKey && legacyKey !== normalizedKey) keys.push(legacyKey);
+    return keys;
+}
+
 function getNameActionButtonLabel() {
     return forcedRenameFromName ? 'CHANGE NAME' : 'START HIVE';
 }
@@ -2478,11 +2488,12 @@ async function banPlayerPermanently(targetPlayer) {
 }
 
 let claimingAdminGrant = false;
-let adminGrantWatchRef = null;
+let adminGrantWatchRefs = [];
 
 async function queueAdminGrant(targetPlayer, stat, amount) {
     const sanitizedTarget = normalizePlayerName(targetPlayer);
-    const key = sanitizeFirebaseKey(sanitizedTarget);
+    const grantKeys = getPlayerGrantKeys(sanitizedTarget);
+    const key = grantKeys[0];
     if (!sanitizedTarget || !key) {
         throw new Error('Invalid target player');
     }
@@ -2544,7 +2555,7 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
             const now = Date.now();
 
             for (const targetName of normalizedTargets) {
-                const key = sanitizeFirebaseKey(targetName);
+                const key = getPlayerGrantKeys(targetName)[0];
                 if (!key) continue;
 
                 const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
@@ -2590,7 +2601,7 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
 
 async function queueAdminReset(targetPlayer, resetStat) {
     const sanitizedTarget = normalizePlayerName(targetPlayer);
-    const key = sanitizeFirebaseKey(sanitizedTarget);
+    const key = getPlayerGrantKeys(sanitizedTarget)[0];
     if (!sanitizedTarget || !key) {
         throw new Error('Invalid target player');
     }
@@ -2639,7 +2650,7 @@ async function queueAdminResetBulk(targetPlayers, resetStat) {
         const now = Date.now();
 
         for (const targetName of normalizedTargets) {
-            const key = sanitizeFirebaseKey(targetName);
+            const key = getPlayerGrantKeys(targetName)[0];
             if (!key) continue;
 
             const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
@@ -2857,40 +2868,65 @@ async function banPlayersPermanentlyBulk(targetPlayers) {
 async function claimAdminGrants() {
     if (claimingAdminGrant) return;
     if (!playerName) return;
-    const key = sanitizeFirebaseKey(playerName);
-    if (!key) return;
+    const keys = getPlayerGrantKeys(playerName);
+    if (keys.length === 0) return;
     
     claimingAdminGrant = true;
     console.log('Checking for admin grants...');
 
     try {
-        const grantRef = adminGrantsRef.child(key);
-        const snapshot = await grantRef.once('value');
-        
-        if (!snapshot.exists()) {
+        const snapshots = await Promise.all(keys.map((key) => adminGrantsRef.child(key).once('value')));
+        const sourceRefs = [];
+        const merged = {
+            honey: 0,
+            rp: 0,
+            sp: 0,
+            ap: 0,
+            resetAll: false,
+            resetHoney: false,
+            resetRp: false,
+            resetSp: false,
+            resetAp: false
+        };
+
+        snapshots.forEach((snapshot, index) => {
+            if (!snapshot.exists()) return;
+            sourceRefs.push(adminGrantsRef.child(keys[index]));
+            const data = snapshot.val() || {};
+            merged.honey += toSafeAmount(data.honey);
+            merged.rp += toSafeAmount(data.rp);
+            merged.sp += toSafeAmount(data.sp);
+            merged.ap += toSafeAmount(data.ap);
+            merged.resetAll = merged.resetAll || parseBoolean(data.resetAll, false);
+            merged.resetHoney = merged.resetHoney || parseBoolean(data.resetHoney, false);
+            merged.resetRp = merged.resetRp || parseBoolean(data.resetRp, false);
+            merged.resetSp = merged.resetSp || parseBoolean(data.resetSp, false);
+            merged.resetAp = merged.resetAp || parseBoolean(data.resetAp, false);
+        });
+
+        if (sourceRefs.length === 0) {
             console.log('No grants found');
             return;
         }
 
-        const data = snapshot.val() || {};
-        console.log('Found grants:', data);
+        console.log('Found grants:', merged);
         
-        const honeyGrant = toSafeAmount(data.honey);
-        const rpGrant = toSafeAmount(data.rp);
-        const spGrant = toSafeAmount(data.sp);
-        const apGrant = toSafeAmount(data.ap);
-        const resetAll = parseBoolean(data.resetAll, false);
-        const resetHoney = parseBoolean(data.resetHoney, false);
-        const resetRp = parseBoolean(data.resetRp, false);
-        const resetSp = parseBoolean(data.resetSp, false);
-        const resetAp = parseBoolean(data.resetAp, false);
+        const honeyGrant = merged.honey;
+        const rpGrant = merged.rp;
+        const spGrant = merged.sp;
+        const apGrant = merged.ap;
+        const resetAll = merged.resetAll;
+        const resetHoney = merged.resetHoney;
+        const resetRp = merged.resetRp;
+        const resetSp = merged.resetSp;
+        const resetAp = merged.resetAp;
         
         const totalGrant = honeyGrant + rpGrant + spGrant + apGrant;
 
         // If nothing to do, just remove the grant
         if (totalGrant <= 0 && !resetAll && !resetHoney && !resetRp && !resetSp && !resetAp) {
             console.log('No grants to apply, removing empty grant');
-            await grantRef.remove();
+            await Promise.all(sourceRefs.map((ref) => ref.remove().catch(() => {})));
             return;
         }
 
@@ -2938,7 +2974,7 @@ async function claimAdminGrants() {
         }
 
         // Remove the grant BEFORE updating UI to prevent double-processing
-        await grantRef.remove();
+        await Promise.all(sourceRefs.map((ref) => ref.remove().catch(() => {})));
         console.log('Grants removed from database');
 
         // Update UI
@@ -2977,20 +3013,25 @@ async function claimAdminGrants() {
 }
 
 function startAdminGrantWatcher() {
-    if (adminGrantWatchRef) {
-        adminGrantWatchRef.off();
-        adminGrantWatchRef = null;
+    if (adminGrantWatchRefs.length > 0) {
+        for (const ref of adminGrantWatchRefs) {
+            ref.off();
+        }
+        adminGrantWatchRefs = [];
     }
     if (!playerName) return;
-    const key = sanitizeFirebaseKey(playerName);
-    if (!key) return;
+    const keys = getPlayerGrantKeys(playerName);
+    if (keys.length === 0) return;
 
-    adminGrantWatchRef = adminGrantsRef.child(key);
-    adminGrantWatchRef.on('value', (snapshot) => {
-        if (snapshot.exists()) {
-            claimAdminGrants();
-        }
-    });
+    for (const key of keys) {
+        const watchRef = adminGrantsRef.child(key);
+        watchRef.on('value', (snapshot) => {
+            if (snapshot.exists()) {
+                claimAdminGrants();
+            }
+        });
+        adminGrantWatchRefs.push(watchRef);
+    }
 }
 
 // ========== ADMIN PANEL (menu version) ==========
