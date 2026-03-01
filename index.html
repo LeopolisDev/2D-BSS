@@ -1557,6 +1557,9 @@ function applyLoadedSaveData(saveData) {
     trueEndHoneyGrowthTicks = Math.max(0, Math.floor(finiteOr(saveData.trueEndHoneyGrowthTicks, 0)));
     loopCount = Math.max(0, Math.floor(finiteOr(saveData.loopCount, 0)));
     loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, finiteOr(saveData.loopMultiplier, Math.pow(2, loopCount)));
+    if (loopCount <= 0) {
+        loopMultiplier = LOOP_BASE_MULTIPLIER;
+    }
     honeyOverflowExp = Math.max(0, Math.floor(finiteOr(saveData.honeyOverflowExp, 0)));
     totalHoneyOverflowExp = Math.max(0, Math.floor(finiteOr(saveData.totalHoneyOverflowExp, 0)));
     if (trueEndResetDone && !trueEndGrowthActive) {
@@ -5919,6 +5922,9 @@ function loadGame() {
         trueEndHoneyGrowthTicks = Math.max(0, Math.floor(finiteOr(data.trueEndHoneyGrowthTicks, 0)));
         loopCount = Math.max(0, Math.floor(finiteOr(data.loopCount, 0)));
         loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, finiteOr(data.loopMultiplier, Math.pow(2, loopCount)));
+        if (loopCount <= 0) {
+            loopMultiplier = LOOP_BASE_MULTIPLIER;
+        }
         honeyOverflowExp = Math.max(0, Math.floor(finiteOr(data.honeyOverflowExp, 0)));
         totalHoneyOverflowExp = Math.max(0, Math.floor(finiteOr(data.totalHoneyOverflowExp, 0)));
         if (trueEndResetDone && !trueEndGrowthActive) {
