@@ -2041,6 +2041,8 @@ function resetAllGameDataState() {
     rpCompoundingLevel = 0;
     rpCompoundingMultiplier = 1.0;
     flowerFieldUpgradePurchased = false;
+    ascensionCorePurchased = false;
+    ascensionCorePowerFixApplied = false;
 
     autoActive = false;
     rpAutobuyEnabled = false;
@@ -2162,6 +2164,9 @@ async function performFullDataReset(options = {}) {
     ascensionCorePowerFixApplied = false;
 
     resetAllGameDataState();
+    // Enforce AP-upgrade wipe even if reset ordering changes.
+    ascensionCorePurchased = false;
+    ascensionCorePowerFixApplied = false;
     // Full reset always wipes AP currency and AP power progression.
     ascendPoints = 0;
     ascendPowerPoints = 0;
