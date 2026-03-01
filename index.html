@@ -3350,8 +3350,16 @@ function renderLeaderboard() {
     const actualPlayerEntry = playerName
         ? sorted.find(entry => isSamePlayerName(entry.name, playerName))
         : null;
-    if (actualPlayerEntry) {
-        setLastKnownLeaderboardTotal(actualPlayerEntry.total);
+    const cachedTotal = getLastKnownLeaderboardTotal();
+    const serverTotal = actualPlayerEntry ? toSafeAmount(actualPlayerEntry.total) : NaN;
+    const localTotal = toSafeAmount(totalHoneyEarned);
+    const stablePlayerTotal = Math.max(
+        Number.isFinite(serverTotal) ? serverTotal : 0,
+        Number.isFinite(cachedTotal) ? cachedTotal : 0,
+        localTotal
+    );
+    if (playerName) {
+        setLastKnownLeaderboardTotal(stablePlayerTotal);
     }
     
     let html = '';
@@ -3374,11 +3382,10 @@ function renderLeaderboard() {
             html += `<div class="leaderboard-entry you-row">
                 <span class="leaderboard-rank">${playerRank}.</span>
                 <span class="leaderboard-name">${escapeHtml(actualPlayerEntry.name)}</span>
-                <span class="leaderboard-score">🍯 ${formatNumber(actualPlayerEntry.total)}</span>
+                <span class="leaderboard-score">🍯 ${formatNumber(stablePlayerTotal)}</span>
             </div>`;
         } else {
-            const cachedTotal = getLastKnownLeaderboardTotal();
-            const fallbackTotal = Number.isFinite(cachedTotal) ? cachedTotal : toSafeAmount(totalHoneyEarned);
+            const fallbackTotal = stablePlayerTotal;
             const fallbackRank = sorted.filter(entry => toSafeAmount(entry.total) > fallbackTotal).length + 1;
             html += `<div class="leaderboard-entry you-row">
                 <span class="leaderboard-rank">${fallbackRank}.</span>
