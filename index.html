@@ -1642,6 +1642,9 @@ menuResetSelectedBtn.addEventListener('click', async () => {
     if (!confirm(`Reset your ${resetStat.toUpperCase()} stats?`)) return;
 
     applyLocalCurrencyReset(resetStat);
+    if (resetStat === 'honey') {
+        await resetPlayerHoneyScore(playerName);
+    }
     recalcMultiplier();
     updateRebirthUI();
     updateToolButtons();
@@ -2008,6 +2011,17 @@ async function resetPlayerHoneyScore(targetPlayer) {
         name: normalizedName,
         total: 0
     });
+
+    if (isSamePlayerName(normalizedName, playerName)) {
+        upsertLocalLeaderboardEntry(normalizedName, 0);
+        for (let i = 0; i < leaderboard.length; i++) {
+            if (isSamePlayerName(leaderboard[i]?.name, normalizedName)) {
+                leaderboard[i].total = 0;
+                break;
+            }
+        }
+        renderLeaderboard();
+    }
 }
 
 async function removePlayerFromLeaderboard(targetPlayer) {
@@ -2935,6 +2949,7 @@ async function claimAdminGrants() {
             console.log('Resetting honey');
             honey = 0;
             totalHoneyEarned = 0;
+            await resetPlayerHoneyScore(playerName);
         }
         if (resetAll || resetRp) {
             console.log('Resetting RP');
@@ -3365,6 +3380,10 @@ menuAdminResetBtn.addEventListener('click', async () => {
             } else {
                 if (selfIncluded) {
                     applyLocalCurrencyReset(resetStat);
+                    if (resetStat === 'honey' || resetStat === 'all') {
+                        await resetPlayerHoneyScore(playerName);
+                        leaderboardResetDone = true;
+                    }
                 }
 
                 if (otherPlayers.length > 0) {
@@ -3394,6 +3413,10 @@ menuAdminResetBtn.addEventListener('click', async () => {
             leaderboardResetDone = true;
         } else if (isSamePlayerName(targetPlayer, playerName)) {
             applyLocalCurrencyReset(resetStat);
+            if (resetStat === 'honey' || resetStat === 'all') {
+                await resetPlayerHoneyScore(playerName);
+                leaderboardResetDone = true;
+            }
         } else {
             if (resetStat === 'honey' || resetStat === 'all') {
                 await resetPlayerHoneyScore(targetPlayer);
