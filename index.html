@@ -3682,6 +3682,17 @@ function trySpawnClickedFlower(x, y) {
     return true;
 }
 
+async function ensurePlayerSessionIfNeeded() {
+    if (auth.currentUser) return true;
+    try {
+        await auth.signInAnonymously();
+        return true;
+    } catch (error) {
+        console.warn('Anonymous player sign-in failed:', error);
+        return false;
+    }
+}
+
 function update() {
     if (gameplayBlocked) return;
     beeSpeedMultiplier = clampBeeSpeedMultiplier(beeSpeedMultiplier);
@@ -4676,6 +4687,9 @@ async function init() {
             resolve();
         });
     });
+
+    // Needed when DB rules require auth != null for leaderboard writes.
+    await ensurePlayerSessionIfNeeded();
 
     if (!loadGame()) {
         addBee();
