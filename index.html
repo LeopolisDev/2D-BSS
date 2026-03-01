@@ -1556,7 +1556,7 @@ function applyLoadedSaveData(saveData) {
     trueEndGrowthActive = parseBoolean(saveData.trueEndGrowthActive, trueEndResetDone);
     trueEndHoneyGrowthTicks = Math.max(0, Math.floor(finiteOr(saveData.trueEndHoneyGrowthTicks, 0)));
     loopCount = Math.max(0, Math.floor(finiteOr(saveData.loopCount, 0)));
-    loopMultiplier = Math.max(1, finiteOr(saveData.loopMultiplier, Math.pow(2, loopCount)));
+    loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, finiteOr(saveData.loopMultiplier, Math.pow(2, loopCount + 1)));
     honeyOverflowExp = Math.max(0, Math.floor(finiteOr(saveData.honeyOverflowExp, 0)));
     totalHoneyOverflowExp = Math.max(0, Math.floor(finiteOr(saveData.totalHoneyOverflowExp, 0)));
     if (trueEndResetDone && !trueEndGrowthActive) {
@@ -2414,7 +2414,7 @@ async function performFullDataReset(options = {}) {
     trueEndInfinityBroken = false;
     trueEndHoneyGrowthTicks = 0;
     loopCount = 0;
-    loopMultiplier = 1;
+    loopMultiplier = LOOP_BASE_MULTIPLIER;
     honeyOverflowExp = 0;
     totalHoneyOverflowExp = 0;
 
@@ -2427,7 +2427,7 @@ async function performFullDataReset(options = {}) {
     trueEndInfinityBroken = false;
     trueEndHoneyGrowthTicks = 0;
     loopCount = 0;
-    loopMultiplier = 1;
+    loopMultiplier = LOOP_BASE_MULTIPLIER;
     honeyOverflowExp = 0;
     totalHoneyOverflowExp = 0;
     // Full reset always wipes AP currency and AP power progression.
@@ -4148,7 +4148,7 @@ const FLOWER_HP_MAX_LEVEL = 5;
 const FLOWER_HP_PER_LEVEL = 5;
 const DEFAULT_AUTO_SPEND_PERCENT = 10;
 const AUTO_SPEND_OPTIONS = [5, 10, 25, 50, 100];
-const AUTO_SAVE_INTERVAL_MS = 5000;
+const AUTO_SAVE_INTERVAL_MS = 2000;
 const ASCEND_HONEY_COST_BASE = 1_000_000_000_000;
 const ASCEND_RP_COST_BASE = 1000;
 const ASCEND_SP_COST_BASE = 10;
@@ -4168,6 +4168,7 @@ const TRUE_END_RP_COST = 2_500_000;
 const TRUE_END_SP_COST = 25_000;
 const TRUE_END_AP_COST = 100;
 const TRUE_END_GROWTH_MULTIPLIER = 2;
+const LOOP_BASE_MULTIPLIER = 2;
 const LOG10_2 = Math.log10(2);
 const SAVE_KEY = 'beeSwarmSave';
 
@@ -4353,7 +4354,7 @@ var trueEndInfinityBroken = false;
 var trueEndGrowthInterval = null;
 var trueEndHoneyGrowthTicks = 0;
 var loopCount = 0;
-var loopMultiplier = 1;
+var loopMultiplier = LOOP_BASE_MULTIPLIER;
 var honeyOverflowExp = 0;
 var totalHoneyOverflowExp = 0;
 
@@ -5038,7 +5039,7 @@ function canAffordTrueEndReset() {
 
 function getLoopGainMultiplier() {
     const parsed = Number(loopMultiplier);
-    if (!Number.isFinite(parsed) || parsed < 1) return 1;
+    if (!Number.isFinite(parsed) || parsed < LOOP_BASE_MULTIPLIER) return LOOP_BASE_MULTIPLIER;
     return parsed;
 }
 
@@ -5756,7 +5757,7 @@ loopBtn.addEventListener('click', async () => {
     if (!confirm(`LOOP will reset everything and set gain multiplier to x${formatMultiplierValue(nextLoopMult)}. Continue?`)) return;
 
     loopCount = Math.max(0, loopCount + 1);
-    loopMultiplier = Math.max(1, nextLoopMult);
+    loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, nextLoopMult);
 
     resetAllGameDataState();
     // LOOP is a full wipe of progression (including AP / True End state),
@@ -5917,7 +5918,7 @@ function loadGame() {
         trueEndGrowthActive = parseBoolean(data.trueEndGrowthActive, trueEndResetDone);
         trueEndHoneyGrowthTicks = Math.max(0, Math.floor(finiteOr(data.trueEndHoneyGrowthTicks, 0)));
         loopCount = Math.max(0, Math.floor(finiteOr(data.loopCount, 0)));
-        loopMultiplier = Math.max(1, finiteOr(data.loopMultiplier, Math.pow(2, loopCount)));
+        loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, finiteOr(data.loopMultiplier, Math.pow(2, loopCount + 1)));
         honeyOverflowExp = Math.max(0, Math.floor(finiteOr(data.honeyOverflowExp, 0)));
         totalHoneyOverflowExp = Math.max(0, Math.floor(finiteOr(data.totalHoneyOverflowExp, 0)));
         if (trueEndResetDone && !trueEndGrowthActive) {
