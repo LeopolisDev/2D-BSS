@@ -261,6 +261,10 @@
             border-bottom-width: 2px;
             box-shadow: 0 1px 0 #6b4f1c;
         }
+        .bee-btn:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
         .field-info {
             font-size: 1rem;
             background: #fdf5cf;
@@ -740,6 +744,8 @@
 </div>
             <div class="button-group">
                 <button class="bee-btn" id="hireBtn">🐝 HIRE <span id="hireCostSpan">20</span>🍯</button>
+                <button class="bee-btn" id="sellBeeBtn">💸 SELL BEE</button>
+                <button class="bee-btn" id="resetFlowersBtn">🌸 RESET FLOWERS</button>
             </div>
             <div class="field-info" id="fieldInfo">🌸 0 flowers</div>
         </div>
@@ -940,6 +946,8 @@ const menuResetSelectedBtn = document.getElementById('menuResetSelectedBtn');
 
 // Game buttons
 const hireBtn = document.getElementById('hireBtn');
+const sellBeeBtn = document.getElementById('sellBeeBtn');
+const resetFlowersBtn = document.getElementById('resetFlowersBtn');
 const hireCostSpan = document.getElementById('hireCostSpan');
 const toggleAutoBtn = document.getElementById('toggleAutoBtn');
 const toggleRPAutoBtn = document.getElementById('toggleRPAutoBtn');
@@ -3897,6 +3905,7 @@ function getFlowerHpCost(level = flowerHpLevel) {
 
 function updateHireCostDisplay() {
     hireCostSpan.textContent = formatNumber(nextHireCost);
+    if (sellBeeBtn) sellBeeBtn.disabled = bees.length <= 1;
 }
 
 function normalizeAutoSpendPercent(value) {
@@ -4045,6 +4054,29 @@ hireBtn.addEventListener('click', () => {
         updateHireCostDisplay();
         saveGame();
     }
+});
+
+sellBeeBtn.addEventListener('click', () => {
+    if (bees.length <= 1) {
+        showGameStatusMessage('You need at least 2 bees to sell one.');
+        return;
+    }
+
+    const refundAmount = computeNextHireCostFromBeeCount(bees.length - 1);
+    bees.pop();
+    honey += refundAmount;
+    nextHireCost = computeNextHireCostFromBeeCount(bees.length);
+    updateHireCostDisplay();
+    showGameStatusMessage(`Sold 1 bee for +${formatNumber(refundAmount)} honey.`);
+    saveGame();
+});
+
+resetFlowersBtn.addEventListener('click', () => {
+    resetFlowerFieldForCurrentLimits();
+    const randomTarget = getRandomFlowerTarget();
+    const clickLimit = getClickFlowerLimit();
+    showGameStatusMessage(`Flower field reset: ${randomTarget} base + ${clickLimit} click flowers max.`);
+    saveGame();
 });
 
 rebirthBtn.addEventListener('click', () => {
