@@ -769,6 +769,7 @@
     <div class="stat-item">🏆 <span id="totalEarnedDisplay">0</span></div>
     <div class="stat-item">🔥 <span id="rpDisplay">0</span> RP</div>
     <div class="stat-item">💥 <span id="spDisplay">0</span> SP</div>
+    <div class="stat-item">✨ <span id="apDisplay">0</span> AP</div>
 </div>
             <div class="button-group">
                 <button class="bee-btn" id="hireBtn">🐝 HIRE <span id="hireCostSpan">20</span>🍯</button>
@@ -1037,6 +1038,7 @@ const fieldInfo = document.getElementById('fieldInfo');
 const totalMultDisplay = document.getElementById('totalMultDisplay');
 const saveIndicator = document.getElementById('saveIndicator');
 const spDisplay = document.getElementById('spDisplay');
+const apDisplay = document.getElementById('apDisplay');
 const spBadge = document.getElementById('spBadge');
 const spShopDisplay = document.getElementById('spShopDisplay');
 const apBadge = document.getElementById('apBadge');
@@ -1439,6 +1441,7 @@ function applyLoadedSaveData(saveData) {
     rebirthPoints = finiteOr(saveData.rebirthPoints, 0);
     sacrificePoints = finiteOr(saveData.sacrificePoints, 0);
     ascendPoints = getSafeAscendPoints(finiteOr(saveData.ascendPoints, 0));
+    ascendPowerPoints = getSafeAscendPoints(finiteOr(saveData.ascendPowerPoints, ascendPoints));
     refreshAscendMultiplier();
 
     hasClippers = parseBoolean(saveData.hasClippers, false);
@@ -1987,6 +1990,7 @@ function applyLocalCurrencyReset(resetStat) {
     }
     if (resetStat === 'ap' || resetStat === 'all') {
         ascendPoints = 0;
+        ascendPowerPoints = 0;
         refreshAscendMultiplier();
     }
     applyAscensionAutomationBonuses();
@@ -2016,6 +2020,7 @@ function resetAllGameDataState() {
     rebirthPoints = 0;
     sacrificePoints = 0;
     ascendPoints = 0;
+    ascendPowerPoints = 0;
     refreshAscendMultiplier();
 
     autoUnlocked = false;
@@ -2812,6 +2817,7 @@ async function claimAdminGrants() {
         if (resetAll || resetAp) {
             console.log('Resetting AP');
             ascendPoints = 0;
+            ascendPowerPoints = 0;
         }
 
         // Apply grants
@@ -2831,6 +2837,7 @@ async function claimAdminGrants() {
         if (apGrant > 0) {
             console.log(`Adding ${apGrant} AP`);
             ascendPoints += apGrant;
+            ascendPowerPoints += apGrant;
         }
         if (resetAll || resetAp || apGrant > 0) {
             refreshAscendMultiplier();
@@ -3099,6 +3106,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
                     sacrificePoints += amount;
                 } else if (stat === 'ap') {
                     ascendPoints += amount;
+                    ascendPowerPoints += amount;
                     refreshAscendMultiplier();
                 }
             }
@@ -3142,6 +3150,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
                 sacrificePoints += amount;
             } else if (stat === 'ap') {
                 ascendPoints += amount;
+                ascendPowerPoints += amount;
                 refreshAscendMultiplier();
             }
         } else {
@@ -3768,7 +3777,11 @@ function getSafeAscendPoints(value = ascendPoints) {
 
 function refreshAscendMultiplier() {
     ascendPoints = getSafeAscendPoints(ascendPoints);
-    ascendMultiplier = Math.pow(ASCEND_MULTIPLIER_PER_POINT, ascendPoints);
+    ascendPowerPoints = getSafeAscendPoints(ascendPowerPoints);
+    if (ascendPowerPoints < ascendPoints) {
+        ascendPowerPoints = ascendPoints;
+    }
+    ascendMultiplier = Math.pow(ASCEND_MULTIPLIER_PER_POINT, ascendPowerPoints);
 }
 
 function getAscendCost(apNumber = 1) {
@@ -3843,6 +3856,7 @@ let toolMultiplier = 1.0;
 let rebirthPoints = 0;
 let sacrificePoints = 0;
 let ascendPoints = 0;
+let ascendPowerPoints = 0;
 let ascendMultiplier = 1.0;
 
 // Rebirth upgrades
@@ -4079,6 +4093,7 @@ function updateRebirthUI() {
     rpBadge.textContent = `RP: ${formatNumber(rebirthPoints)}`;
     rpShopDisplay.textContent = `RP: ${formatNumber(rebirthPoints)}`;
     spDisplay.textContent = formatNumber(sacrificePoints);
+    apDisplay.textContent = formatNumber(ascendPoints);
     spBadge.textContent = `SP: ${formatNumber(sacrificePoints)}`;
     spShopDisplay.textContent = `SP: ${formatNumber(sacrificePoints)}`;
     honeySpan.textContent = formatNumber(honey);
@@ -4652,6 +4667,7 @@ ascendBtn.addEventListener('click', () => {
     rebirthPoints -= cost.rp;
     sacrificePoints -= cost.sp;
     ascendPoints = getSafeAscendPoints(ascendPoints + maxAP);
+    ascendPowerPoints = getSafeAscendPoints(ascendPowerPoints + maxAP);
     refreshAscendMultiplier();
 
     applyAscendResetState();
@@ -4836,7 +4852,7 @@ function buildSaveData(includeWorldData = true) {
         hasClippers, hasShears, hasScythe, hasOil,
         hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
         hasMoonCharm, hasSunRelic, hasStormTotem, hasGalaxyCrown,
-        rebirthPoints, sacrificePoints, ascendPoints,
+        rebirthPoints, sacrificePoints, ascendPoints, ascendPowerPoints,
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
         flowerHpLevel,
@@ -4939,6 +4955,7 @@ function loadGame() {
         rebirthPoints = finiteOr(data.rebirthPoints, 0);
         sacrificePoints = finiteOr(data.sacrificePoints, 0);
         ascendPoints = getSafeAscendPoints(finiteOr(data.ascendPoints, 0));
+        ascendPowerPoints = getSafeAscendPoints(finiteOr(data.ascendPowerPoints, ascendPoints));
         refreshAscendMultiplier();
         autoUnlocked = data.autoUnlocked || false;
         beeSpeedMultiplier = clampBeeSpeedMultiplier(finiteOr(data.beeSpeedMultiplier, BEE_SPEED_MULTIPLIER_BASE));
