@@ -3363,13 +3363,22 @@ function renderLeaderboard() {
     
     const playerInTop10 = top10.some(entry => isSamePlayerName(entry.name, playerName));
     if (!playerInTop10 && playerName) {
-        const playerRank = sorted.findIndex(entry => isSamePlayerName(entry.name, playerName)) + 1;
-        if (playerRank > 0) {
-            const playerEntry = sorted.find(entry => isSamePlayerName(entry.name, playerName));
+        const playerEntry = sorted.find(entry => isSamePlayerName(entry.name, playerName));
+        if (playerEntry) {
+            const playerRank = sorted.findIndex(entry => isSamePlayerName(entry.name, playerName)) + 1;
             html += `<div class="leaderboard-entry you-row">
                 <span class="leaderboard-rank">${playerRank}.</span>
-                <span class="leaderboard-name">${escapeHtml(playerEntry?.name || playerName)}</span>
+                <span class="leaderboard-name">${escapeHtml(playerEntry.name)}</span>
                 <span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span>
+            </div>`;
+        } else {
+            // Fallback row to avoid disappearing while Firebase snapshots briefly lag.
+            const localScore = toSafeAmount(totalHoneyEarned);
+            const estimatedRank = sorted.filter(entry => toSafeAmount(entry.total) > localScore).length + 1;
+            html += `<div class="leaderboard-entry you-row">
+                <span class="leaderboard-rank">${estimatedRank}.</span>
+                <span class="leaderboard-name">${escapeHtml(playerName)}</span>
+                <span class="leaderboard-score">🍯 ${formatNumber(localScore)}</span>
             </div>`;
         }
     }
