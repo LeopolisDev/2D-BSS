@@ -873,7 +873,6 @@ const adminGrantsRef = database.ref('adminGrants');
 const playerBansRef = database.ref('playerBans');
 const ipBansRef = database.ref('ipBans');
 const playerIdentityRef = database.ref('playerIdentity');
-const playerProfilesRef = database.ref('playerProfiles');
 
 // ========== GLOBAL VARIABLES ==========
 let leaderboard = [];
@@ -3392,7 +3391,6 @@ saveNameBtn.addEventListener('click', async () => {
         playerName = name;
         forcedRenameFromName = '';
         localStorage.setItem('beeSwarmPlayerName', playerName);
-        await savePlayerNameToProfileByUid(playerName);
 
         await registerPlayerIdentity(playerName);
         // The ban check is now handled by startBanWatchers() which runs after login,
@@ -3436,8 +3434,7 @@ if (playerName) {
     saveNameBtn.textContent = getNameActionButtonLabel();
     playerNameDisplay.textContent = `Name: ${playerName}`;
 } else {
-    // Let init() resolve uid/profile first so players don't get blocked by the modal.
-    nameModal.style.display = 'none';
+    nameModal.style.display = 'flex';
     saveNameBtn.textContent = getNameActionButtonLabel();
 }
 fetchLeaderboard();
@@ -3627,61 +3624,6 @@ function trySpawnClickedFlower(x, y) {
         spawnType: 'click'
     });
     return true;
-}
-
-async function ensurePlayerSessionIfNeeded() {
-    if (auth.currentUser) return true;
-    try {
-        await auth.signInAnonymously();
-        return true;
-    } catch (error) {
-        console.warn('Anonymous player sign-in failed:', error);
-        return false;
-    }
-}
-
-function getCurrentAuthUid() {
-    return typeof auth.currentUser?.uid === 'string' ? auth.currentUser.uid : '';
-}
-
-async function loadPlayerNameFromProfileByUid() {
-    const uid = getCurrentAuthUid();
-    if (!uid) return '';
-
-    try {
-        const snapshot = await playerProfilesRef.child(uid).once('value');
-        if (!snapshot.exists()) return '';
-        const data = snapshot.val();
-
-        let rawName = '';
-        if (typeof data === 'string') {
-            rawName = data;
-        } else if (data && typeof data === 'object' && typeof data.name === 'string') {
-            rawName = data.name;
-        }
-        return normalizePlayerName(rawName);
-    } catch (error) {
-        console.warn('Failed to load player profile name by uid:', error);
-        return '';
-    }
-}
-
-async function savePlayerNameToProfileByUid(name = playerName) {
-    const uid = getCurrentAuthUid();
-    const normalizedName = normalizePlayerName(name);
-    if (!uid || !normalizedName) return false;
-
-    try {
-        await playerProfilesRef.child(uid).set({
-            uid,
-            name: normalizedName,
-            updatedAt: Date.now()
-        });
-        return true;
-    } catch (error) {
-        console.warn('Failed to save player profile name by uid:', error);
-        return false;
-    }
 }
 
 function update() {
@@ -4659,33 +4601,6 @@ async function init() {
             resolve();
         });
     });
-
-    // Ensure normal players don't need manual login prompts.
-    await ensurePlayerSessionIfNeeded();
-
-    // Prefer uid-bound profile name across domains/devices.
-    const profileNameByUid = await loadPlayerNameFromProfileByUid();
-    if (profileNameByUid) {
-        playerName = profileNameByUid;
-        localStorage.setItem('beeSwarmPlayerName', playerName);
-        playerNameInput.value = playerName;
-        nameModal.style.display = 'none';
-        playerNameDisplay.textContent = `Name: ${playerName}`;
-    } else if (playerName) {
-        // One-time migration from old local-only name storage.
-        await savePlayerNameToProfileByUid(playerName);
-    } else {
-        // First-time player on this uid: auto-generate a usable name so they can play immediately.
-        const uid = getCurrentAuthUid();
-        const uidSuffix = uid ? uid.slice(-6) : '';
-        const autoName = normalizePlayerName(uidSuffix ? `Bee${uidSuffix}` : 'BeeKeeper') || 'BeeKeeper';
-        playerName = autoName;
-        localStorage.setItem('beeSwarmPlayerName', playerName);
-        playerNameInput.value = playerName;
-        playerNameDisplay.textContent = `Name: ${playerName}`;
-        nameModal.style.display = 'none';
-        await savePlayerNameToProfileByUid(playerName);
-    }
 
     if (!loadGame()) {
         addBee();
