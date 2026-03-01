@@ -3347,6 +3347,12 @@ function renderLeaderboard() {
     
     const sorted = [...leaderboard].sort((a, b) => b.total - a.total);
     const top10 = sorted.slice(0, 10);
+    const actualPlayerEntry = playerName
+        ? sorted.find(entry => isSamePlayerName(entry.name, playerName))
+        : null;
+    if (actualPlayerEntry) {
+        setLastKnownLeaderboardTotal(actualPlayerEntry.total);
+    }
     
     let html = '';
     top10.forEach((entry, index) => {
@@ -3363,27 +3369,37 @@ function renderLeaderboard() {
     
     const playerInTop10 = top10.some(entry => isSamePlayerName(entry.name, playerName));
     if (!playerInTop10 && playerName) {
-        const playerEntry = sorted.find(entry => isSamePlayerName(entry.name, playerName));
-        if (playerEntry) {
+        if (actualPlayerEntry) {
             const playerRank = sorted.findIndex(entry => isSamePlayerName(entry.name, playerName)) + 1;
             html += `<div class="leaderboard-entry you-row">
                 <span class="leaderboard-rank">${playerRank}.</span>
-                <span class="leaderboard-name">${escapeHtml(playerEntry.name)}</span>
-                <span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span>
+                <span class="leaderboard-name">${escapeHtml(actualPlayerEntry.name)}</span>
+                <span class="leaderboard-score">🍯 ${formatNumber(actualPlayerEntry.total)}</span>
             </div>`;
         } else {
-            // Fallback row to avoid disappearing while Firebase snapshots briefly lag.
-            const localScore = toSafeAmount(totalHoneyEarned);
-            const estimatedRank = sorted.filter(entry => toSafeAmount(entry.total) > localScore).length + 1;
+            const cachedTotal = getLastKnownLeaderboardTotal();
+            const fallbackTotal = Number.isFinite(cachedTotal) ? cachedTotal : toSafeAmount(totalHoneyEarned);
+            const fallbackRank = sorted.filter(entry => toSafeAmount(entry.total) > fallbackTotal).length + 1;
             html += `<div class="leaderboard-entry you-row">
-                <span class="leaderboard-rank">${estimatedRank}.</span>
+                <span class="leaderboard-rank">${fallbackRank}.</span>
                 <span class="leaderboard-name">${escapeHtml(playerName)}</span>
-                <span class="leaderboard-score">🍯 ${formatNumber(localScore)}</span>
+                <span class="leaderboard-score">🍯 ${formatNumber(fallbackTotal)}</span>
             </div>`;
         }
     }
     
     listDiv.innerHTML = html;
+}
+
+function getLastKnownLeaderboardTotal() {
+    const raw = localStorage.getItem('beeSwarmLastLeaderboardTotal');
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : NaN;
+}
+
+function setLastKnownLeaderboardTotal(total) {
+    const safeTotal = toSafeAmount(total);
+    localStorage.setItem('beeSwarmLastLeaderboardTotal', String(safeTotal));
 }
 
 function escapeHtml(unsafe) {
