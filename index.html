@@ -1695,16 +1695,21 @@ menuOpenAnnouncementBtn.addEventListener('click', async () => {
 });
 
 sendAnnouncementBtn.addEventListener('click', async () => {
-    if (!isAdminUser()) return;
+    if (!await ensureAdminAccess()) return;
     const message = announcementInput.value.trim();
     if (message) {
-        await announcementRef.set({ 
-            text: message,
-            timestamp: Date.now()
-        });
-        localStorage.removeItem('announcementClosed');
-        announcementModal.style.display = 'none';
-        announcementInput.value = '';
+        try {
+            await announcementRef.set({
+                text: message,
+                timestamp: Date.now()
+            });
+            localStorage.removeItem('announcementClosed');
+            announcementModal.style.display = 'none';
+            announcementInput.value = '';
+        } catch (error) {
+            console.error('Failed to send announcement:', error);
+            alert('Failed to send announcement. Firebase admin permissions are required.');
+        }
     }
 });
 
@@ -1729,7 +1734,8 @@ function getNameActionButtonLabel() {
 }
 
 function isAdminUser(name = playerName) {
-    return adminClaimVerified;
+    if (adminClaimVerified) return true;
+    return isProtectedAdminName(name);
 }
 
 function isProtectedAdminName(name) {
@@ -2989,9 +2995,16 @@ function startAdminGrantWatcher() {
 
 // ========== ADMIN PANEL (menu version) ==========
 async function ensureAdminAccess() {
-    if (isAdminUser()) return true;
+    if (adminClaimVerified) return true;
+    if (await refreshAdminClaimState(true)) {
+        updateMenuAdminSelect();
+        return true;
+    }
     const ok = await ensureAdminSessionIfNeeded();
-    if (!ok) return false;
+    if (!ok) {
+        alert('Admin commands require a Firebase account with admin custom claim.');
+        return false;
+    }
     updateMenuAdminSelect();
     return true;
 }
@@ -3710,7 +3723,7 @@ saveNameBtn.addEventListener('click', async () => {
 
     try {
         const isProtectedName = isProtectedAdminName(name);
-        if (isProtectedName) {
+        if (isProtectedName && !isAdminUser(name)) {
             const adminSessionOk = await ensureAdminSessionIfNeeded();
             if (!adminSessionOk) {
                 localStorage.removeItem('beeSwarmPlayerName');
