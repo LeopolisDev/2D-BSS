@@ -1985,6 +1985,7 @@ function applyLocalCurrencyReset(resetStat) {
         ascendPoints = 0;
         refreshAscendMultiplier();
     }
+    applyAscensionAutomationBonuses();
 }
 
 function resetAllGameDataState() {
@@ -2027,7 +2028,6 @@ function resetAllGameDataState() {
     rpCompoundingLevel = 0;
     rpCompoundingMultiplier = 1.0;
     flowerFieldUpgradePurchased = false;
-    ascensionCorePurchased = false;
 
     autoActive = false;
     rpAutobuyEnabled = false;
@@ -2056,6 +2056,7 @@ function resetAllGameDataState() {
 
     setupRPGenerator();
     setupRPAutoBuy();
+    applyAscensionAutomationBonuses();
     updateAutoSpendButton();
     updateHireCostDisplay();
     recalcMultiplier();
