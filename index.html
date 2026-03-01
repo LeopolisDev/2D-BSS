@@ -73,28 +73,6 @@
             border-bottom-width: 2px;
             box-shadow: 0 1px 0 #1a3270;
         }
-        .logout-button {
-            position: absolute;
-            top: 20px;
-            left: 150px;
-            background: #ff8b6b;
-            border: none;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            padding: 10px 20px;
-            color: #ffffff;
-            border-bottom: 5px solid #b9553d;
-            cursor: pointer;
-            box-shadow: 0 4px 0 #7a3021;
-            z-index: 100;
-            transition: 0.06s linear;
-        }
-        .logout-button:active {
-            transform: translateY(4px);
-            border-bottom-width: 2px;
-            box-shadow: 0 1px 0 #7a3021;
-        }
         .menu-panel {
             position: absolute;
             top: 80px;
@@ -650,7 +628,6 @@
 
 <div class="game-wrapper">
     <a class="discord-button" href="https://discord.gg/tYawMKj9vC" target="_blank" rel="noopener noreferrer">Discord</a>
-    <button class="logout-button" id="logoutBtn">Logout</button>
     <!-- Menu Button (top right) -->
     <button class="menu-button" id="menuToggleBtn">☰ MENU</button>
     
@@ -940,7 +917,6 @@ const cancelAnnouncementBtn = document.getElementById('cancelAnnouncementBtn');
 const announcementPopup = document.getElementById('announcementPopup');
 const announcementMessage = document.getElementById('announcementMessage');
 const closeAnnouncementBtn = document.getElementById('closeAnnouncementBtn');
-const logoutBtn = document.getElementById('logoutBtn');
 
 // Menu elements
 const menuToggleBtn = document.getElementById('menuToggleBtn');
@@ -1637,19 +1613,6 @@ sendAnnouncementBtn.addEventListener('click', async () => {
 
 cancelAnnouncementBtn.addEventListener('click', () => {
     announcementModal.style.display = 'none';
-});
-
-logoutBtn.addEventListener('click', async () => {
-    try {
-        await auth.signOut();
-        adminClaimVerified = false;
-        menuPanel.classList.remove('show');
-        updateMenuAdminSelect();
-        showGameStatusMessage('Logged out. You can now sign into another account/domain.');
-    } catch (error) {
-        console.error('Logout failed:', error);
-        showGameStatusMessage('Logout failed. Try again.');
-    }
 });
 
 function sanitizeFirebaseKey(name) {
