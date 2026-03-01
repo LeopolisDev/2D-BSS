@@ -352,6 +352,26 @@
             color: white;
             box-shadow: 0 4px 0 #4a1e1e;
         }
+        .ascend-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            background: #fffdf0;
+            padding: 10px 20px;
+            border-radius: 60px;
+            margin-top: 12px;
+            border: 3px solid #ffd966;
+            width: 100%;
+        }
+        .ascend-btn {
+            background: #ffffff;
+            border: 2px solid #ffd966;
+            border-bottom: 5px solid #b59a3f;
+            color: #5f4a00;
+            box-shadow: 0 4px 0 #7d6a24;
+        }
         .rebirth-shop-row {
             display: flex;
             flex-wrap: wrap;
@@ -645,6 +665,7 @@
                     <option value="leaderboard_honey">🏆 Leaderboard Honey</option>
                     <option value="rp">🔥 RP</option>
                     <option value="sp">💥 SP</option>
+                    <option value="ap">🤍 AP</option>
                 </select>
                 <input type="text" id="menuAdminAmount" class="adder-input" value="1000" inputmode="decimal" style="width:110px;" placeholder="1000 / 1e9">
                 <button class="menu-btn" id="menuAdminAddBtn">➕ ADD</button>
@@ -656,7 +677,8 @@
                     <option value="leaderboard_honey">Reset LEADERBOARD HONEY Only</option>
                     <option value="rp">Reset RP</option>
                     <option value="sp">Reset SP</option>
-                    <option value="all">Reset ALL (Honey + RP + SP)</option>
+                    <option value="ap">Reset AP</option>
+                    <option value="all">Reset ALL (Honey + RP + SP + AP)</option>
                 </select>
                 <button class="menu-btn remove-btn" id="menuAdminResetBtn">RESET PLAYER STAT</button>
             </div>
@@ -723,7 +745,8 @@
                     <option value="honey">Reset My Honey</option>
                     <option value="rp">Reset My RP</option>
                     <option value="sp">Reset My SP</option>
-                    <option value="all">Reset My ALL (Honey + RP + SP)</option>
+                    <option value="ap">Reset My AP</option>
+                    <option value="all">Reset My ALL (Honey + RP + SP + AP)</option>
                     <option value="full">Reset My FULL DATA (Unlock one-time codes)</option>
                 </select>
                 <button class="menu-btn remove-btn" id="menuResetSelectedBtn">RESET SELECTED</button>
@@ -777,6 +800,14 @@
     <button class="tool-btn sacrifice-btn" id="sacrificeBtn">🔥 SACRIFICE</button>
     <span class="multiplier-badge" id="sacrificeInfo">1 SP = 100M + 10 RP</span>
     <span class="multiplier-badge" id="spBadge">SP: 0</span>
+</div>
+
+        <!-- ASCEND Row -->
+        <div class="ascend-row">
+    <span style="color:#7a6300; font-weight:bold;">✨ ASCEND RESET:</span>
+    <button class="tool-btn ascend-btn" id="ascendBtn">🤍 ASCEND</button>
+    <span class="multiplier-badge" id="ascendInfo">1 AP = x1.5 all gains</span>
+    <span class="multiplier-badge" id="apBadge">AP: 0</span>
 </div>
 
         <!-- Rebirth Shop -->
@@ -954,6 +985,7 @@ const toggleAutoBtn = document.getElementById('toggleAutoBtn');
 const toggleRPAutoBtn = document.getElementById('toggleRPAutoBtn');
 const toggleAutoSpendBtn = document.getElementById('toggleAutoSpendBtn');
 const sacrificeBtn = document.getElementById('sacrificeBtn');
+const ascendBtn = document.getElementById('ascendBtn');
 const rebirthBtn = document.getElementById('rebirthBtn');
 const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
 const buyBeeSpeed = document.getElementById('buyBeeSpeed');
@@ -988,12 +1020,14 @@ const rpBadge = document.getElementById('rpBadge');
 const rpShopDisplay = document.getElementById('rpShopDisplay');
 const rebirthInfo = document.getElementById('rebirthInfo');
 const sacrificeInfo = document.getElementById('sacrificeInfo');
+const ascendInfo = document.getElementById('ascendInfo');
 const fieldInfo = document.getElementById('fieldInfo');
 const totalMultDisplay = document.getElementById('totalMultDisplay');
 const saveIndicator = document.getElementById('saveIndicator');
 const spDisplay = document.getElementById('spDisplay');
 const spBadge = document.getElementById('spBadge');
 const spShopDisplay = document.getElementById('spShopDisplay');
+const apBadge = document.getElementById('apBadge');
 const autoStatus = document.getElementById('autoStatus');
 const speedStatus = document.getElementById('speedStatus');
 const capacityStatus = document.getElementById('capacityStatus');
@@ -1391,6 +1425,8 @@ function applyLoadedSaveData(saveData) {
     totalHoneyEarned = finiteOr(saveData.totalHoneyEarned, 0);
     rebirthPoints = finiteOr(saveData.rebirthPoints, 0);
     sacrificePoints = finiteOr(saveData.sacrificePoints, 0);
+    ascendPoints = getSafeAscendPoints(finiteOr(saveData.ascendPoints, 0));
+    refreshAscendMultiplier();
 
     hasClippers = parseBoolean(saveData.hasClippers, false);
     hasShears = parseBoolean(saveData.hasShears, false);
@@ -1530,7 +1566,7 @@ menuLoadSaveBtn.addEventListener('click', async () => {
 // ========== RESET BUTTONS ==========
 menuResetSelectedBtn.addEventListener('click', async () => {
     const resetStat = menuResetStatSelect.value;
-    if (!['honey', 'rp', 'sp', 'all', 'full'].includes(resetStat)) {
+    if (!['honey', 'rp', 'sp', 'ap', 'all', 'full'].includes(resetStat)) {
         alert('Invalid reset stat');
         return;
     }
@@ -1831,6 +1867,7 @@ function getAdminBanTargetPlayer() {
 
 function getResetStatDisplayName(resetStat) {
     if (resetStat === 'leaderboard_honey') return 'LEADERBOARD HONEY';
+    if (resetStat === 'ap') return 'AP';
     return resetStat.toUpperCase();
 }
 
@@ -1930,9 +1967,89 @@ function applyLocalCurrencyReset(resetStat) {
     if (resetStat === 'sp' || resetStat === 'all') {
         sacrificePoints = 0;
     }
+    if (resetStat === 'ap' || resetStat === 'all') {
+        ascendPoints = 0;
+        refreshAscendMultiplier();
+    }
 }
 
 function resetAllGameDataState() {
+    honey = 0;
+    totalHoneyEarned = 0;
+
+    bees = [];
+    flowers = [];
+    nextHireCost = HIRE_COST_BASE;
+
+    hasClippers = false;
+    hasShears = false;
+    hasScythe = false;
+    hasOil = false;
+    hasHoneycomb = false;
+    hasBeeGun = false;
+    hasRoyalJelly = false;
+    hasStarTreat = false;
+    hasMoonCharm = false;
+    hasSunRelic = false;
+    hasStormTotem = false;
+    hasGalaxyCrown = false;
+
+    rebirthPoints = 0;
+    sacrificePoints = 0;
+    ascendPoints = 0;
+    refreshAscendMultiplier();
+
+    autoUnlocked = false;
+    beeSpeedMultiplier = BEE_SPEED_MULTIPLIER_BASE;
+    capacityMultiplier = 1.0;
+    honeyMultUpgrade = 1.0;
+    compoundingLevel = 0;
+    compoundingMultiplier = 1.0;
+    flowerHpLevel = 0;
+
+    x10HoneyPurchased = false;
+    rpAutoBuyActive = false;
+    rpGeneratorLevel = 0;
+    rpCompoundingLevel = 0;
+    rpCompoundingMultiplier = 1.0;
+    flowerFieldUpgradePurchased = false;
+
+    autoActive = false;
+    rpAutobuyEnabled = false;
+    autoSpendPercent = DEFAULT_AUTO_SPEND_PERCENT;
+
+    if (autoInterval) {
+        clearInterval(autoInterval);
+        autoInterval = null;
+    }
+    if (rpGeneratorInterval) {
+        clearInterval(rpGeneratorInterval);
+        rpGeneratorInterval = null;
+    }
+    if (rpAutoBuyInterval) {
+        clearInterval(rpAutoBuyInterval);
+        rpAutoBuyInterval = null;
+    }
+
+    toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
+    toggleAutoBtn.classList.remove('auto-active');
+    toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
+    toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+
+    addBee();
+    resetFlowerFieldForCurrentLimits();
+
+    setupRPGenerator();
+    setupRPAutoBuy();
+    updateAutoSpendButton();
+    updateHireCostDisplay();
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+}
+
+function applyAscendResetState() {
     honey = 0;
     totalHoneyEarned = 0;
 
@@ -2261,9 +2378,11 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
             honey: toSafeAmount(safeCurrent.honey),
             rp: toSafeAmount(safeCurrent.rp),
             sp: toSafeAmount(safeCurrent.sp),
+            ap: toSafeAmount(safeCurrent.ap),
             resetHoney: parseBoolean(safeCurrent.resetHoney, false),
             resetRp: parseBoolean(safeCurrent.resetRp, false),
             resetSp: parseBoolean(safeCurrent.resetSp, false),
+            resetAp: parseBoolean(safeCurrent.resetAp, false),
             resetAll: parseBoolean(safeCurrent.resetAll, false),
             updatedAt: Date.now()
         };
@@ -2280,6 +2399,10 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
         if (stat === 'sp') {
             next.sp += amount;
             console.log(`Added ${amount} SP, new total: ${next.sp}`);
+        }
+        if (stat === 'ap') {
+            next.ap += amount;
+            console.log(`Added ${amount} AP, new total: ${next.ap}`);
         }
         
         return next;
@@ -2310,9 +2433,11 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
                     honey: toSafeAmount(safeCurrent.honey),
                     rp: toSafeAmount(safeCurrent.rp),
                     sp: toSafeAmount(safeCurrent.sp),
+                    ap: toSafeAmount(safeCurrent.ap),
                     resetHoney: parseBoolean(safeCurrent.resetHoney, false),
                     resetRp: parseBoolean(safeCurrent.resetRp, false),
                     resetSp: parseBoolean(safeCurrent.resetSp, false),
+                    resetAp: parseBoolean(safeCurrent.resetAp, false),
                     resetAll: parseBoolean(safeCurrent.resetAll, false),
                     updatedAt: now
                 };
@@ -2320,6 +2445,7 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
                 if (stat === 'honey') next.honey += amount;
                 if (stat === 'rp') next.rp += amount;
                 if (stat === 'sp') next.sp += amount;
+                if (stat === 'ap') next.ap += amount;
                 root[key] = next;
             }
 
@@ -2356,9 +2482,11 @@ async function queueAdminReset(targetPlayer, resetStat) {
             honey: toSafeAmount(safeCurrent.honey),
             rp: toSafeAmount(safeCurrent.rp),
             sp: toSafeAmount(safeCurrent.sp),
+            ap: toSafeAmount(safeCurrent.ap),
             resetHoney: parseBoolean(safeCurrent.resetHoney, false),
             resetRp: parseBoolean(safeCurrent.resetRp, false),
             resetSp: parseBoolean(safeCurrent.resetSp, false),
+            resetAp: parseBoolean(safeCurrent.resetAp, false),
             resetAll: parseBoolean(safeCurrent.resetAll, false),
             updatedAt: Date.now()
         };
@@ -2371,6 +2499,8 @@ async function queueAdminReset(targetPlayer, resetStat) {
             next.resetRp = true;
         } else if (resetStat === 'sp') {
             next.resetSp = true;
+        } else if (resetStat === 'ap') {
+            next.resetAp = true;
         }
         return next;
     });
@@ -2398,9 +2528,11 @@ async function queueAdminResetBulk(targetPlayers, resetStat) {
                 honey: toSafeAmount(safeCurrent.honey),
                 rp: toSafeAmount(safeCurrent.rp),
                 sp: toSafeAmount(safeCurrent.sp),
+                ap: toSafeAmount(safeCurrent.ap),
                 resetHoney: parseBoolean(safeCurrent.resetHoney, false),
                 resetRp: parseBoolean(safeCurrent.resetRp, false),
                 resetSp: parseBoolean(safeCurrent.resetSp, false),
+                resetAp: parseBoolean(safeCurrent.resetAp, false),
                 resetAll: parseBoolean(safeCurrent.resetAll, false),
                 updatedAt: now
             };
@@ -2413,6 +2545,8 @@ async function queueAdminResetBulk(targetPlayers, resetStat) {
                 next.resetRp = true;
             } else if (resetStat === 'sp') {
                 next.resetSp = true;
+            } else if (resetStat === 'ap') {
+                next.resetAp = true;
             }
 
             root[key] = next;
@@ -2624,15 +2758,17 @@ async function claimAdminGrants() {
         const honeyGrant = toSafeAmount(data.honey);
         const rpGrant = toSafeAmount(data.rp);
         const spGrant = toSafeAmount(data.sp);
+        const apGrant = toSafeAmount(data.ap);
         const resetAll = parseBoolean(data.resetAll, false);
         const resetHoney = parseBoolean(data.resetHoney, false);
         const resetRp = parseBoolean(data.resetRp, false);
         const resetSp = parseBoolean(data.resetSp, false);
+        const resetAp = parseBoolean(data.resetAp, false);
         
-        const totalGrant = honeyGrant + rpGrant + spGrant;
+        const totalGrant = honeyGrant + rpGrant + spGrant + apGrant;
 
         // If nothing to do, just remove the grant
-        if (totalGrant <= 0 && !resetAll && !resetHoney && !resetRp && !resetSp) {
+        if (totalGrant <= 0 && !resetAll && !resetHoney && !resetRp && !resetSp && !resetAp) {
             console.log('No grants to apply, removing empty grant');
             await grantRef.remove();
             return;
@@ -2652,6 +2788,10 @@ async function claimAdminGrants() {
             console.log('Resetting SP');
             sacrificePoints = 0;
         }
+        if (resetAll || resetAp) {
+            console.log('Resetting AP');
+            ascendPoints = 0;
+        }
 
         // Apply grants
         if (honeyGrant > 0) {
@@ -2666,6 +2806,13 @@ async function claimAdminGrants() {
         if (spGrant > 0) {
             console.log(`Adding ${spGrant} SP`);
             sacrificePoints += spGrant;
+        }
+        if (apGrant > 0) {
+            console.log(`Adding ${apGrant} AP`);
+            ascendPoints += apGrant;
+        }
+        if (resetAll || resetAp || apGrant > 0) {
+            refreshAscendMultiplier();
         }
 
         // Remove the grant BEFORE updating UI to prevent double-processing
@@ -2690,9 +2837,11 @@ async function claimAdminGrants() {
         if (!resetAll && resetHoney) grantParts.push('Reset Honey');
         if (!resetAll && resetRp) grantParts.push('Reset RP');
         if (!resetAll && resetSp) grantParts.push('Reset SP');
+        if (!resetAll && resetAp) grantParts.push('Reset AP');
         if (honeyGrant > 0) grantParts.push(`${formatNumber(honeyGrant)} Honey`);
         if (rpGrant > 0) grantParts.push(`${formatNumber(rpGrant)} RP`);
         if (spGrant > 0) grantParts.push(`${formatNumber(spGrant)} SP`);
+        if (apGrant > 0) grantParts.push(`${formatNumber(apGrant)} AP`);
         
         if (grantParts.length > 0) {
             alert(`✨ Admin update claimed: ${grantParts.join(', ')}`);
@@ -2887,7 +3036,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
         const stat = menuAdminStatSelect.value;
         const amount = toSafeAmount(menuAdminAmount.value);
     
-        if (!['honey', 'leaderboard_honey', 'rp', 'sp'].includes(stat)) {
+        if (!['honey', 'leaderboard_honey', 'rp', 'sp', 'ap'].includes(stat)) {
             alert('Invalid currency type');
             return;
         }
@@ -2927,6 +3076,9 @@ menuAdminAddBtn.addEventListener('click', async () => {
                     rebirthPoints += amount;
                 } else if (stat === 'sp') {
                     sacrificePoints += amount;
+                } else if (stat === 'ap') {
+                    ascendPoints += amount;
+                    refreshAscendMultiplier();
                 }
             }
 
@@ -2967,6 +3119,9 @@ menuAdminAddBtn.addEventListener('click', async () => {
                 rebirthPoints += amount;
             } else if (stat === 'sp') {
                 sacrificePoints += amount;
+            } else if (stat === 'ap') {
+                ascendPoints += amount;
+                refreshAscendMultiplier();
             }
         } else {
             if (stat === 'leaderboard_honey') {
@@ -3011,7 +3166,7 @@ menuAdminResetBtn.addEventListener('click', async () => {
         const resetStat = menuAdminResetStatSelect.value;
         const resetStatName = getResetStatDisplayName(resetStat);
 
-        if (!['honey', 'leaderboard_honey', 'rp', 'sp', 'all'].includes(resetStat)) {
+        if (!['honey', 'leaderboard_honey', 'rp', 'sp', 'ap', 'all'].includes(resetStat)) {
             alert('Invalid reset stat');
             return;
         }
@@ -3543,6 +3698,10 @@ const FLOWER_HP_PER_LEVEL = 5;
 const DEFAULT_AUTO_SPEND_PERCENT = 10;
 const AUTO_SPEND_OPTIONS = [5, 10, 25, 50, 100];
 const AUTO_SAVE_INTERVAL_MS = 5000;
+const ASCEND_HONEY_COST_BASE = 1_000_000_000_000;
+const ASCEND_RP_COST_BASE = 100;
+const ASCEND_SP_COST_BASE = 10;
+const ASCEND_MULTIPLIER_PER_POINT = 1.5;
 const SAVE_KEY = 'beeSwarmSave';
 
 // ========== RP PRICING ==========
@@ -3575,6 +3734,25 @@ function getMaxSPFromResources() {
     return spCount - 1;
 }
 
+function getSafeAscendPoints(value = ascendPoints) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return Math.max(0, Math.floor(parsed));
+}
+
+function refreshAscendMultiplier() {
+    ascendPoints = getSafeAscendPoints(ascendPoints);
+    ascendMultiplier = Math.pow(ASCEND_MULTIPLIER_PER_POINT, ascendPoints);
+}
+
+function getAscendCost() {
+    return {
+        honey: ASCEND_HONEY_COST_BASE,
+        rp: ASCEND_RP_COST_BASE,
+        sp: ASCEND_SP_COST_BASE
+    };
+}
+
 // ========== GAME STATE ==========
 let honey = 0;
 let bees = [];
@@ -3590,6 +3768,8 @@ let toolMultiplier = 1.0;
 // Rebirth
 let rebirthPoints = 0;
 let sacrificePoints = 0;
+let ascendPoints = 0;
+let ascendMultiplier = 1.0;
 
 // Rebirth upgrades
 let autoUnlocked = false;
@@ -3618,6 +3798,7 @@ let autoSpendPercent = DEFAULT_AUTO_SPEND_PERCENT;
 let performanceMode = false;
 let popupsDisabled = false;
 let autoSaveInterval = null;
+refreshAscendMultiplier();
 
 // ========== GAME MECHANICS ==========
 function getRandomFlowerTarget() {
@@ -3754,7 +3935,7 @@ function update() {
             const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
             const dist = Math.hypot(dx, dy);
             if (dist < 20) {
-                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * (x10HoneyPurchased ? 10 : 1));
+                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * ascendMultiplier * (x10HoneyPurchased ? 10 : 1));
                 honey += deposited;
                 totalHoneyEarned += deposited;
                 b.carrying = 0;
@@ -3831,19 +4012,25 @@ function updateRebirthUI() {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
         const rawRP = maxRP;
-        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier);
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (${rpCompoundingMultiplier.toFixed(2)}x)`;
+        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier * ascendMultiplier);
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (RP x${rpCompoundingMultiplier.toFixed(2)} * AP x${ascendMultiplier.toFixed(2)})`;
     } else {
-        rebirthInfo.textContent = `1 RP = 10k (${rpCompoundingMultiplier.toFixed(2)}x)`;
+        rebirthInfo.textContent = `1 RP = 10k (RP x${rpCompoundingMultiplier.toFixed(2)} * AP x${ascendMultiplier.toFixed(2)})`;
     }
 
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP`;
+        const multipliedSP = Math.max(1, Math.floor(maxSP * ascendMultiplier));
+        sacrificeInfo.textContent = `${multipliedSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP (AP x${ascendMultiplier.toFixed(2)})`;
     } else {
-        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
+        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP (AP x${ascendMultiplier.toFixed(2)})`;
     }
+
+    const ascendCost = getAscendCost();
+    ascendInfo.textContent = `Cost: ${formatNumber(ascendCost.honey)}🍯 + ${formatNumber(ascendCost.rp)} RP + ${formatNumber(ascendCost.sp)} SP | x${ASCEND_MULTIPLIER_PER_POINT.toFixed(2)}/AP`;
+    apBadge.textContent = `AP: ${formatNumber(ascendPoints)} (x${formatMultiplierValue(ascendMultiplier)})`;
+    ascendBtn.disabled = honey < ascendCost.honey || rebirthPoints < ascendCost.rp || sacrificePoints < ascendCost.sp;
 
     if (autoUnlocked) {
         autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
@@ -3935,7 +4122,7 @@ function updateSPUI() {
     }
     rpGenTime.textContent = intervalTime + 's';
     
-    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
+    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier * ascendMultiplier);
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
     
     if (rpGeneratorLevel >= 5) {
@@ -3969,7 +4156,7 @@ function recalcMultiplier() {
     if (hasGalaxyCrown) toolMult *= 5.0;
     toolMultiplier = toolMult;
     
-    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier;
+    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier * ascendMultiplier;
     if (x10HoneyPurchased) totalMult *= 10;
    totalMultDisplay.textContent = `✖️ ${formatMultiplierValue(totalMult)}`;
 }
@@ -3994,7 +4181,7 @@ function setupRPGenerator() {
     if (rpGeneratorLevel > 0) {
         const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000);
         rpGeneratorInterval = setInterval(() => {
-            let rpGain = Math.floor(1 * rpCompoundingMultiplier);
+            let rpGain = Math.floor(1 * rpCompoundingMultiplier * ascendMultiplier);
             rebirthPoints += rpGain;
             updateRebirthUI();
             saveGame();
@@ -4278,7 +4465,7 @@ rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
         const cost = getRPCost(maxRP);
-        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier);
+        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier * ascendMultiplier);
         rebirthPoints += rpGain;
         
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
@@ -4292,7 +4479,7 @@ rebirthBtn.addEventListener('click', () => {
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
         updateHireCostDisplay();
         saveGame();
-        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)} => ${rpGain}). Honey reset to 0.`);
+        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)} * AP x${ascendMultiplier.toFixed(2)} => ${rpGain}). Honey reset to 0.`);
     } else {
         showGameStatusMessage('Need at least 10,000 honey for 1 RP.');
     }
@@ -4303,9 +4490,10 @@ sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
+        const spGain = Math.max(1, Math.floor(maxSP * ascendMultiplier));
         honey -= cost.honey;
         rebirthPoints -= cost.rp;
-        sacrificePoints += maxSP;
+        sacrificePoints += spGain;
         
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
         hasClippers = false; hasShears = false; hasScythe = false; hasOil = false;
@@ -4346,10 +4534,28 @@ sacrificeBtn.addEventListener('click', () => {
         updateHireCostDisplay();
         saveGame();
 
-        showGameStatusMessage(`Sacrificed for ${maxSP} SP. Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
+        showGameStatusMessage(`Sacrificed for ${spGain} SP (base ${maxSP}, AP x${ascendMultiplier.toFixed(2)}). Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
     } else {
         showGameStatusMessage('Need at least 100M honey and 10 RP for 1 SP.');
     }
+});
+
+ascendBtn.addEventListener('click', () => {
+    const cost = getAscendCost();
+    if (honey < cost.honey || rebirthPoints < cost.rp || sacrificePoints < cost.sp) {
+        showGameStatusMessage(`Need ${formatNumber(cost.honey)}🍯 + ${formatNumber(cost.rp)} RP + ${formatNumber(cost.sp)} SP to Ascend.`);
+        return;
+    }
+
+    honey -= cost.honey;
+    rebirthPoints -= cost.rp;
+    sacrificePoints -= cost.sp;
+    ascendPoints = getSafeAscendPoints(ascendPoints + 1);
+    refreshAscendMultiplier();
+
+    applyAscendResetState();
+    saveGame();
+    showGameStatusMessage(`Ascended! AP is now ${formatNumber(ascendPoints)} (x${formatMultiplierValue(ascendMultiplier)} all gains).`);
 });
 
 // ========== SP SHOP ==========
@@ -4509,7 +4715,7 @@ function buildSaveData(includeWorldData = true) {
         hasClippers, hasShears, hasScythe, hasOil,
         hasHoneycomb, hasBeeGun, hasRoyalJelly, hasStarTreat,
         hasMoonCharm, hasSunRelic, hasStormTotem, hasGalaxyCrown,
-        rebirthPoints, sacrificePoints,
+        rebirthPoints, sacrificePoints, ascendPoints,
         autoUnlocked, beeSpeedMultiplier, capacityMultiplier, honeyMultUpgrade,
         compoundingLevel, compoundingMultiplier,
         flowerHpLevel,
@@ -4610,6 +4816,8 @@ function loadGame() {
         hasGalaxyCrown = data.hasGalaxyCrown || false;
         rebirthPoints = finiteOr(data.rebirthPoints, 0);
         sacrificePoints = finiteOr(data.sacrificePoints, 0);
+        ascendPoints = getSafeAscendPoints(finiteOr(data.ascendPoints, 0));
+        refreshAscendMultiplier();
         autoUnlocked = data.autoUnlocked || false;
         beeSpeedMultiplier = clampBeeSpeedMultiplier(finiteOr(data.beeSpeedMultiplier, BEE_SPEED_MULTIPLIER_BASE));
         capacityMultiplier = finiteOr(data.capacityMultiplier, 1.0);
