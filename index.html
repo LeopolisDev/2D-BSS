@@ -1556,7 +1556,7 @@ function applyLoadedSaveData(saveData) {
     trueEndGrowthActive = parseBoolean(saveData.trueEndGrowthActive, trueEndResetDone);
     trueEndHoneyGrowthTicks = Math.max(0, Math.floor(finiteOr(saveData.trueEndHoneyGrowthTicks, 0)));
     loopCount = Math.max(0, Math.floor(finiteOr(saveData.loopCount, 0)));
-    loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, finiteOr(saveData.loopMultiplier, Math.pow(2, loopCount + 1)));
+    loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, finiteOr(saveData.loopMultiplier, Math.pow(2, loopCount)));
     honeyOverflowExp = Math.max(0, Math.floor(finiteOr(saveData.honeyOverflowExp, 0)));
     totalHoneyOverflowExp = Math.max(0, Math.floor(finiteOr(saveData.totalHoneyOverflowExp, 0)));
     if (trueEndResetDone && !trueEndGrowthActive) {
@@ -4168,7 +4168,7 @@ const TRUE_END_RP_COST = 2_500_000;
 const TRUE_END_SP_COST = 25_000;
 const TRUE_END_AP_COST = 100;
 const TRUE_END_GROWTH_MULTIPLIER = 2;
-const LOOP_BASE_MULTIPLIER = 2;
+const LOOP_BASE_MULTIPLIER = 1;
 const LOG10_2 = Math.log10(2);
 const SAVE_KEY = 'beeSwarmSave';
 
@@ -5918,7 +5918,7 @@ function loadGame() {
         trueEndGrowthActive = parseBoolean(data.trueEndGrowthActive, trueEndResetDone);
         trueEndHoneyGrowthTicks = Math.max(0, Math.floor(finiteOr(data.trueEndHoneyGrowthTicks, 0)));
         loopCount = Math.max(0, Math.floor(finiteOr(data.loopCount, 0)));
-        loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, finiteOr(data.loopMultiplier, Math.pow(2, loopCount + 1)));
+        loopMultiplier = Math.max(LOOP_BASE_MULTIPLIER, finiteOr(data.loopMultiplier, Math.pow(2, loopCount)));
         honeyOverflowExp = Math.max(0, Math.floor(finiteOr(data.honeyOverflowExp, 0)));
         totalHoneyOverflowExp = Math.max(0, Math.floor(finiteOr(data.totalHoneyOverflowExp, 0)));
         if (trueEndResetDone && !trueEndGrowthActive) {
