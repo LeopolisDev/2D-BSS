@@ -3271,6 +3271,37 @@ async function isNameAvailable(name) {
     return !leaderboardSnapshot.exists() && !identitySnapshot.exists();
 }
 
+async function isNameInUseByAnotherPlayer(name, currentName = playerName) {
+    const targetName = normalizePlayerName(name);
+    const normalizedCurrent = normalizePlayerName(currentName);
+    if (!targetName) return false;
+    if (normalizedCurrent && isSamePlayerName(targetName, normalizedCurrent)) return false;
+
+    // Fast local cache check first.
+    if (Array.isArray(leaderboard)) {
+        for (const entry of leaderboard) {
+            if (!entry || !entry.name) continue;
+            if (!isSamePlayerName(entry.name, targetName)) continue;
+            if (normalizedCurrent && isSamePlayerName(entry.name, normalizedCurrent)) continue;
+            return true;
+        }
+    }
+
+    // Then confirm against latest server leaderboard data.
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val() || {};
+    for (const value of Object.values(data)) {
+        if (!value || typeof value !== 'object') continue;
+        const existingName = normalizePlayerName(value.name);
+        if (!existingName) continue;
+        if (!isSamePlayerName(existingName, targetName)) continue;
+        if (normalizedCurrent && isSamePlayerName(existingName, normalizedCurrent)) continue;
+        return true;
+    }
+
+    return false;
+}
+
 async function renameLeaderboardPlayer(oldName, newName) {
     const normalizedOld = normalizePlayerName(oldName);
     const normalizedNew = normalizePlayerName(newName);
@@ -3373,6 +3404,17 @@ saveNameBtn.addEventListener('click', async () => {
                 playerNameInput.value = '';
                 nameModal.style.display = 'flex';
                 nameError.textContent = '❌ Admin claim login required for that name.';
+                saveNameBtn.disabled = false;
+                saveNameBtn.textContent = getNameActionButtonLabel();
+                return;
+            }
+        }
+
+        const canBypassNameUniqueness = isAdminUser();
+        if (!canBypassNameUniqueness) {
+            const nameInUse = await isNameInUseByAnotherPlayer(name, playerName);
+            if (nameInUse) {
+                nameError.textContent = '❌ Name already in use. Pick a different name.';
                 saveNameBtn.disabled = false;
                 saveNameBtn.textContent = getNameActionButtonLabel();
                 return;
