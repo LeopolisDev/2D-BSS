@@ -2159,6 +2159,16 @@ async function performFullDataReset(options = {}) {
     const removeLeaderboardEntry = parseBoolean(options.removeLeaderboardEntry, false);
 
     resetAllGameDataState();
+    // Full reset always wipes AP currency and AP power progression.
+    ascendPoints = 0;
+    ascendPowerPoints = 0;
+    refreshAscendMultiplier();
+
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+
     if (clearRedeemedCodes) {
         clearRedeemedCodeUsage();
     }
