@@ -3350,7 +3350,7 @@ function renderLeaderboard() {
     
     let html = '';
     top10.forEach((entry, index) => {
-        const isYou = entry.name === playerName ? 'you-row' : '';
+        const isYou = isSamePlayerName(entry.name, playerName) ? 'you-row' : '';
         const rank = index + 1;
         let rankSymbol = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
         
@@ -3361,14 +3361,14 @@ function renderLeaderboard() {
         </div>`;
     });
     
-    const playerInTop10 = top10.some(entry => entry.name === playerName);
+    const playerInTop10 = top10.some(entry => isSamePlayerName(entry.name, playerName));
     if (!playerInTop10 && playerName) {
-        const playerRank = sorted.findIndex(entry => entry.name === playerName) + 1;
+        const playerRank = sorted.findIndex(entry => isSamePlayerName(entry.name, playerName)) + 1;
         if (playerRank > 0) {
-            const playerEntry = sorted.find(entry => entry.name === playerName);
+            const playerEntry = sorted.find(entry => isSamePlayerName(entry.name, playerName));
             html += `<div class="leaderboard-entry you-row">
                 <span class="leaderboard-rank">${playerRank}.</span>
-                <span class="leaderboard-name">${escapeHtml(playerName)}</span>
+                <span class="leaderboard-name">${escapeHtml(playerEntry?.name || playerName)}</span>
                 <span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span>
             </div>`;
         }
