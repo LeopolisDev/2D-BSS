@@ -3213,6 +3213,30 @@ function fetchLeaderboard() {
     });
 }
 
+function upsertLocalLeaderboardEntry(name, total) {
+    const normalizedName = normalizePlayerName(name);
+    const safeTotal = toSafeAmount(total);
+    if (!normalizedName) return;
+
+    if (!Array.isArray(leaderboard)) {
+        leaderboard = [];
+    }
+
+    const existingIndex = leaderboard.findIndex(entry => isSamePlayerName(entry?.name, normalizedName));
+    if (existingIndex >= 0) {
+        leaderboard[existingIndex] = {
+            ...leaderboard[existingIndex],
+            name: normalizedName,
+            total: Math.max(toSafeAmount(leaderboard[existingIndex]?.total), safeTotal)
+        };
+    } else {
+        leaderboard.push({
+            name: normalizedName,
+            total: safeTotal
+        });
+    }
+}
+
 async function submitScore(score) {
     if (!playerName) return;
     
@@ -3255,6 +3279,11 @@ async function submitScore(score) {
         if (Number.isFinite(finalTotal) && finalTotal > totalHoneyEarned) {
             totalHoneyEarned = finalTotal;
         }
+
+        // Immediate UI update for newly registered/updated players.
+        const localTotalForUi = Number.isFinite(finalTotal) ? finalTotal : incomingTotal;
+        upsertLocalLeaderboardEntry(normalizedName, localTotalForUi);
+        renderLeaderboard();
     } catch (error) {
         console.error('Failed to submit score:', error);
     }
