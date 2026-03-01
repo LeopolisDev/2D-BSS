@@ -3436,7 +3436,8 @@ if (playerName) {
     saveNameBtn.textContent = getNameActionButtonLabel();
     playerNameDisplay.textContent = `Name: ${playerName}`;
 } else {
-    nameModal.style.display = 'flex';
+    // Let init() resolve uid/profile first so players don't get blocked by the modal.
+    nameModal.style.display = 'none';
     saveNameBtn.textContent = getNameActionButtonLabel();
 }
 fetchLeaderboard();
@@ -4672,6 +4673,17 @@ async function init() {
         playerNameDisplay.textContent = `Name: ${playerName}`;
     } else if (playerName) {
         // One-time migration from old local-only name storage.
+        await savePlayerNameToProfileByUid(playerName);
+    } else {
+        // First-time player on this uid: auto-generate a usable name so they can play immediately.
+        const uid = getCurrentAuthUid();
+        const uidSuffix = uid ? uid.slice(-6) : '';
+        const autoName = normalizePlayerName(uidSuffix ? `Bee${uidSuffix}` : 'BeeKeeper') || 'BeeKeeper';
+        playerName = autoName;
+        localStorage.setItem('beeSwarmPlayerName', playerName);
+        playerNameInput.value = playerName;
+        playerNameDisplay.textContent = `Name: ${playerName}`;
+        nameModal.style.display = 'none';
         await savePlayerNameToProfileByUid(playerName);
     }
 
