@@ -869,6 +869,7 @@
         <div class="shop-row" style="background:#8f6d3c;">
     <button class="tool-btn" id="toggleAutoBtn">⏯️ AUTO (OFF)</button>
     <button class="tool-btn rp-autobuy-toggle" id="toggleRPAutoBtn">🤖 RP AUTO (OFF)</button>
+    <button class="tool-btn rp-autobuy-toggle" id="toggleSPAutoBtn">💥 SP AUTO (OFF)</button>
     <button class="tool-btn" id="toggleAutoSpendBtn">AUTO % (10%)</button>
     <span style="color:#ffefb0; margin-left:10px;" id="playerNameDisplay">Name: </span>
 </div>
@@ -997,6 +998,7 @@ const resetFlowersBtn = document.getElementById('resetFlowersBtn');
 const hireCostSpan = document.getElementById('hireCostSpan');
 const toggleAutoBtn = document.getElementById('toggleAutoBtn');
 const toggleRPAutoBtn = document.getElementById('toggleRPAutoBtn');
+const toggleSPAutoBtn = document.getElementById('toggleSPAutoBtn');
 const toggleAutoSpendBtn = document.getElementById('toggleAutoSpendBtn');
 const sacrificeBtn = document.getElementById('sacrificeBtn');
 const ascendBtn = document.getElementById('ascendBtn');
@@ -1493,6 +1495,7 @@ function applyLoadedSaveData(saveData) {
     spGeneratorLevel = getSafeSPGeneratorLevel(finiteOr(saveData.spGeneratorLevel, 0));
     spCompoundingLevel = getSafeSPCompoundingLevel(finiteOr(saveData.spCompoundingLevel, 0));
     spCompoundingMultiplier = Math.pow(SP_COMPOUNDING_GROWTH, spCompoundingLevel);
+    spAutobuyEnabled = parseBoolean(saveData.spAutobuyEnabled, false);
     rpAutobuyEnabled = parseBoolean(saveData.rpAutobuyEnabled, false);
     autoActive = parseBoolean(saveData.autoActive, false);
     autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
@@ -1514,15 +1517,13 @@ function applyLoadedSaveData(saveData) {
         applyAscensionAutomationBonuses();
     }
 
-    if (autoActive && autoUnlocked) {
-        toggleAutoBtn.textContent = '▶️ AUTO (ON)';
-        toggleAutoBtn.classList.add('auto-active');
-        if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
-    } else {
-        autoActive = false;
-        toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
-        toggleAutoBtn.classList.remove('auto-active');
+    autoActive = false;
+    if (autoInterval) {
+        clearInterval(autoInterval);
+        autoInterval = null;
     }
+    toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
+    toggleAutoBtn.classList.remove('auto-active');
 
     if (rpAutobuyEnabled && rpAutoBuyActive) {
         toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
@@ -1530,6 +1531,13 @@ function applyLoadedSaveData(saveData) {
     } else {
         toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
         toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+    }
+    if (spAutobuyEnabled && spAutobuyerPurchased) {
+        toggleSPAutoBtn.textContent = '💥 SP AUTO (ON)';
+        toggleSPAutoBtn.classList.add('rp-autobuy-active');
+    } else {
+        toggleSPAutoBtn.textContent = '💥 SP AUTO (OFF)';
+        toggleSPAutoBtn.classList.remove('rp-autobuy-active');
     }
     setupRPGenerator();
     setupRPAutoBuy();
@@ -2068,6 +2076,7 @@ function resetAllGameDataState() {
     spGeneratorLevel = 0;
     spCompoundingLevel = 0;
     spCompoundingMultiplier = 1.0;
+    spAutobuyEnabled = false;
 
     autoActive = false;
     rpAutobuyEnabled = false;
@@ -2183,6 +2192,10 @@ function applyAscendResetState() {
     toggleAutoBtn.classList.remove('auto-active');
     toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
     toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+    toggleSPAutoBtn.textContent = spAutobuyEnabled && spAutobuyerPurchased ? '💥 SP AUTO (ON)' : '💥 SP AUTO (OFF)';
+    toggleSPAutoBtn.classList.toggle('rp-autobuy-active', spAutobuyEnabled && spAutobuyerPurchased);
+    toggleSPAutoBtn.textContent = spAutobuyEnabled && spAutobuyerPurchased ? '💥 SP AUTO (ON)' : '💥 SP AUTO (OFF)';
+    toggleSPAutoBtn.classList.toggle('rp-autobuy-active', spAutobuyEnabled && spAutobuyerPurchased);
 
     addBee();
     resetFlowerFieldForCurrentLimits();
@@ -3986,6 +3999,7 @@ let spGeneratorInterval = null;
 let spCompoundingLevel = 0;
 let spCompoundingMultiplier = 1.0;
 let spAutobuyInterval = null;
+let spAutobuyEnabled = false;
 
 // Automation
 let autoActive = false;
@@ -4376,7 +4390,7 @@ function updateSPUI() {
     const nextSPGenLevel = spGeneratorLevel + 1;
     const spGenCostValue = getSPGeneratorAPCost(nextSPGenLevel);
     const spGenInterval = getSPGeneratorIntervalSeconds(Math.max(1, spGeneratorLevel));
-    const spGenPreviewValue = Math.max(1, Math.floor(1 * spCompoundingMultiplier * getAscensionSPMultiplier()));
+    const spGenPreviewValue = 1;
     spGenLevel.textContent = spGeneratorLevel;
     spGenCost.textContent = spGenCostValue;
     spGenTime.textContent = `${spGenInterval}s`;
@@ -4478,7 +4492,7 @@ function setupSPGenerator() {
         const intervalMs = getSPGeneratorIntervalSeconds(spGeneratorLevel) * 1000;
         spGeneratorInterval = setInterval(() => {
             if (gameplayBlocked) return;
-            const spGain = Math.max(1, Math.floor(1 * spCompoundingMultiplier * getAscensionSPMultiplier()));
+            const spGain = 1;
             sacrificePoints += spGain;
             updateRebirthUI();
             updateSPUI();
@@ -4489,7 +4503,7 @@ function setupSPGenerator() {
 
 function setupSPAutobuy() {
     if (spAutobuyInterval) clearInterval(spAutobuyInterval);
-    if (!spAutobuyerPurchased) return;
+    if (!spAutobuyerPurchased || !spAutobuyEnabled) return;
 
     spAutobuyInterval = setInterval(() => {
         if (gameplayBlocked) return;
@@ -4701,6 +4715,26 @@ function toggleRPAuto() {
         if (rpAutoBuyInterval) {
             clearInterval(rpAutoBuyInterval);
             rpAutoBuyInterval = null;
+        }
+    }
+    saveGame();
+}
+
+function toggleSPAuto() {
+    if (!spAutobuyerPurchased) {
+        showGameStatusMessage('Buy SP AUTOBUYER in Ascension Shop first.');
+        return;
+    }
+    spAutobuyEnabled = !spAutobuyEnabled;
+    toggleSPAutoBtn.textContent = spAutobuyEnabled ? '💥 SP AUTO (ON)' : '💥 SP AUTO (OFF)';
+    toggleSPAutoBtn.classList.toggle('rp-autobuy-active', spAutobuyEnabled);
+
+    if (spAutobuyEnabled) {
+        setupSPAutobuy();
+    } else {
+        if (spAutobuyInterval) {
+            clearInterval(spAutobuyInterval);
+            spAutobuyInterval = null;
         }
     }
     saveGame();
@@ -4965,6 +4999,9 @@ buySPAutobuyer.addEventListener('click', () => {
     ascendPoints = getSafeAscendPoints(ascendPoints);
     refreshAscendMultiplier();
     spAutobuyerPurchased = true;
+    spAutobuyEnabled = true;
+    toggleSPAutoBtn.textContent = '💥 SP AUTO (ON)';
+    toggleSPAutoBtn.classList.add('rp-autobuy-active');
     setupSPAutobuy();
     updateRebirthUI();
     updateSPUI();
@@ -5098,6 +5135,7 @@ buyGalaxyCrown.addEventListener('click', () => { if (!hasGalaxyCrown && honey>=2
 
 toggleAutoBtn.addEventListener('click', toggleAuto);
 toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
+toggleSPAutoBtn.addEventListener('click', toggleSPAuto);
 toggleAutoSpendBtn.addEventListener('click', configureAutoSpendPercent);
 
 // ========== SAVE GAME FUNCTION ==========
@@ -5123,7 +5161,7 @@ function buildSaveData(includeWorldData = true) {
         ascensionCorePurchased,
         ascensionCorePowerFixApplied,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
-        rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
+        rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled, spAutobuyEnabled,
         autoSpendPercent,
         performanceMode,
         popupsDisabled,
@@ -5245,6 +5283,7 @@ function loadGame() {
         spGeneratorLevel = getSafeSPGeneratorLevel(finiteOr(data.spGeneratorLevel, 0));
         spCompoundingLevel = getSafeSPCompoundingLevel(finiteOr(data.spCompoundingLevel, 0));
         spCompoundingMultiplier = Math.pow(SP_COMPOUNDING_GROWTH, spCompoundingLevel);
+        spAutobuyEnabled = parseBoolean(data.spAutobuyEnabled, false);
         rpAutobuyEnabled = data.rpAutobuyEnabled || false;
         autoSpendPercent = normalizeAutoSpendPercent(data.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(data.performanceMode, false);
@@ -5284,27 +5323,32 @@ function loadGame() {
             applyAscensionAutomationBonuses();
         }
 
-        if (autoActive && autoUnlocked) {
-            toggleAutoBtn.textContent = '▶️ AUTO (ON)';
-            toggleAutoBtn.classList.add('auto-active');
-            if (!autoInterval) autoInterval = setInterval(autoBuy, 1000);
-        } else {
-            autoActive = false;
-            toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
-            toggleAutoBtn.classList.remove('auto-active');
+        autoActive = false;
+        if (autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
         }
+        toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
+        toggleAutoBtn.classList.remove('auto-active');
 
         setupRPGenerator();
         setupRPAutoBuy();
         setupSPGenerator();
         setupSPAutobuy();
 
-        if (rpAutobuyEnabled && rpAutoBuyActive) {
+if (rpAutobuyEnabled && rpAutoBuyActive) {
     toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
     toggleRPAutoBtn.classList.add('rp-autobuy-active');
 } else {
     toggleRPAutoBtn.textContent = '🤖 RP AUTO (OFF)';
     toggleRPAutoBtn.classList.remove('rp-autobuy-active');
+}
+if (spAutobuyEnabled && spAutobuyerPurchased) {
+    toggleSPAutoBtn.textContent = '💥 SP AUTO (ON)';
+    toggleSPAutoBtn.classList.add('rp-autobuy-active');
+} else {
+    toggleSPAutoBtn.textContent = '💥 SP AUTO (OFF)';
+    toggleSPAutoBtn.classList.remove('rp-autobuy-active');
 }
 
         updateAutoSpendButton();
