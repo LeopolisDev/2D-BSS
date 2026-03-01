@@ -372,6 +372,33 @@
             color: #5f4a00;
             box-shadow: 0 4px 0 #7d6a24;
         }
+        .endgame-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 12px;
+            background: #1f1f1f;
+            padding: 12px 20px;
+            border-radius: 60px;
+            border: 3px solid #f0f0f0;
+            width: 100%;
+        }
+        .true-end-btn {
+            background: #000000;
+            color: #ffffff;
+            border: 2px solid #ffffff;
+            border-bottom: 5px solid #7f7f7f;
+            box-shadow: 0 4px 0 #2f2f2f;
+        }
+        .break-infinity-btn {
+            background: #8c3bff;
+            color: #ffffff;
+            border: 2px solid #000000;
+            border-bottom: 5px solid #1f1138;
+            box-shadow: 0 4px 0 #11081f;
+        }
         .rebirth-shop-row {
             display: flex;
             flex-wrap: wrap;
@@ -814,6 +841,12 @@
     <span class="multiplier-badge" id="apBadge">AP: 0</span>
 </div>
 
+        <!-- TRUE END / INFINITY -->
+        <div class="endgame-row" id="endgameRow" style="display:none;">
+    <button class="tool-btn true-end-btn" id="trueEndResetBtn">🖤 TRUE END RESET (100Qa🍯 + 1M RP + 25k SP + 100 AP)</button>
+    <button class="tool-btn break-infinity-btn" id="breakInfinityBtn" style="display:none;">💜 BREAK INFINITY</button>
+</div>
+
         <!-- Rebirth Shop -->
         <div class="rebirth-shop-row">
     <span style="color:#f2dcff; font-weight:bold;">🌀 REBIRTH SHOP:</span>
@@ -1002,6 +1035,8 @@ const toggleSPAutoBtn = document.getElementById('toggleSPAutoBtn');
 const toggleAutoSpendBtn = document.getElementById('toggleAutoSpendBtn');
 const sacrificeBtn = document.getElementById('sacrificeBtn');
 const ascendBtn = document.getElementById('ascendBtn');
+const trueEndResetBtn = document.getElementById('trueEndResetBtn');
+const breakInfinityBtn = document.getElementById('breakInfinityBtn');
 const rebirthBtn = document.getElementById('rebirthBtn');
 const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
 const buyBeeSpeed = document.getElementById('buyBeeSpeed');
@@ -1044,6 +1079,7 @@ const ascendInfo = document.getElementById('ascendInfo');
 const fieldInfo = document.getElementById('fieldInfo');
 const totalMultDisplay = document.getElementById('totalMultDisplay');
 const saveIndicator = document.getElementById('saveIndicator');
+const endgameRow = document.getElementById('endgameRow');
 const spDisplay = document.getElementById('spDisplay');
 const apDisplay = document.getElementById('apDisplay');
 const spBadge = document.getElementById('spBadge');
@@ -1086,13 +1122,37 @@ document.addEventListener('click', (e) => {
 });
 
 // ========== NUMBER FORMATTING ==========
+const SCIENTIFIC_NOTATION_THRESHOLD = 1e33; // 1 decillion
+const INFINITY_SOFT_CAP = 1.79e308;
+
+function clampToInfinitySoftCap(value) {
+    const n = Number(value);
+    if (Number.isNaN(n)) return 0;
+    if (!Number.isFinite(n)) return n < 0 ? -INFINITY_SOFT_CAP : INFINITY_SOFT_CAP;
+    if (n > INFINITY_SOFT_CAP) return INFINITY_SOFT_CAP;
+    if (n < -INFINITY_SOFT_CAP) return -INFINITY_SOFT_CAP;
+    return n;
+}
+
+function formatScientific(absNum, decimals = 2) {
+    const safe = Math.max(0, clampToInfinitySoftCap(absNum));
+    if (safe === 0) return '0';
+    const exponent = Math.floor(Math.log10(safe));
+    const mantissa = safe / Math.pow(10, exponent);
+    return `${mantissa.toFixed(decimals)}e${exponent}`;
+}
+
 function formatNumber(num) {
     if (num === undefined || num === null || Number.isNaN(num)) return '0';
 
-    const sign = num < 0 ? '-' : '';
-    const absNum = Math.abs(num);
+    const safeNum = clampToInfinitySoftCap(num);
+    const sign = safeNum < 0 ? '-' : '';
+    const absNum = Math.abs(safeNum);
+    if (absNum >= SCIENTIFIC_NOTATION_THRESHOLD) {
+        return sign + formatScientific(absNum, 2);
+    }
+
     const suffixes = [
-        { value: 1e33, suffix: 'Dc' },
         { value: 1e30, suffix: 'No' },
         { value: 1e27, suffix: 'Oc' },
         { value: 1e24, suffix: 'Sp' },
@@ -1117,10 +1177,14 @@ function formatNumber(num) {
 function formatMultiplierValue(mult) {
     if (mult === undefined || mult === null || Number.isNaN(mult)) return '1.00';
 
-    const sign = mult < 0 ? '-' : '';
-    const absNum = Math.abs(mult);
+    const safeNum = clampToInfinitySoftCap(mult);
+    const sign = safeNum < 0 ? '-' : '';
+    const absNum = Math.abs(safeNum);
+    if (absNum >= SCIENTIFIC_NOTATION_THRESHOLD) {
+        return sign + formatScientific(absNum, 2);
+    }
+
     const suffixes = [
-        { value: 1e33, suffix: 'Dc' },
         { value: 1e30, suffix: 'No' },
         { value: 1e27, suffix: 'Oc' },
         { value: 1e24, suffix: 'Sp' },
@@ -1458,6 +1522,12 @@ function applyLoadedSaveData(saveData) {
     ascendPowerPoints = getSafeAscendPoints(finiteOr(saveData.ascendPowerPoints, ascendPoints));
     ascensionCorePurchased = parseBoolean(saveData.ascensionCorePurchased, false);
     ascensionCorePowerFixApplied = parseBoolean(saveData.ascensionCorePowerFixApplied, false);
+    trueEndResetDone = parseBoolean(saveData.trueEndResetDone, false);
+    trueEndInfinityBroken = parseBoolean(saveData.trueEndInfinityBroken, false);
+    trueEndGrowthActive = parseBoolean(saveData.trueEndGrowthActive, trueEndResetDone && !trueEndInfinityBroken);
+    if (trueEndInfinityBroken) {
+        trueEndGrowthActive = false;
+    }
     if (ascensionCorePurchased && !ascensionCorePowerFixApplied && ascendPoints > 0 && ascendPowerPoints <= ascendPoints) {
         ascendPowerPoints = ascendPoints + ASCENSION_SHOP_COST_AP;
         ascensionCorePowerFixApplied = true;
@@ -1550,6 +1620,7 @@ function applyLoadedSaveData(saveData) {
     setupRPAutoBuy();
     setupSPGenerator();
     setupSPAutobuy();
+    setupTrueEndGrowth();
     updateAutoSpendButton();
     updateHireCostDisplay();
 
@@ -2031,20 +2102,38 @@ async function removePlayerFromLeaderboard(targetPlayer) {
         throw new Error('Invalid target player');
     }
 
-    const snapshot = await leaderboardRef.once('value');
-    const data = snapshot.val();
-    let keyToUse = sanitizedName;
+    const fallbackKeys = new Set([
+        sanitizeFirebaseKey(normalizedName),
+        sanitizeFirebaseKey(normalizePlayerNameKey(normalizedName))
+    ].filter(Boolean));
 
-    if (data) {
-        for (const [key, value] of Object.entries(data)) {
-            if (value && value.name === normalizedName) {
-                keyToUse = key;
-                break;
+    await leaderboardRef.transaction((current) => {
+        const root = current && typeof current === 'object' ? current : {};
+        let removedAny = false;
+
+        for (const [key, value] of Object.entries(root)) {
+            if (!value || typeof value !== 'object') continue;
+            const entryName = normalizePlayerName(value.name);
+            if (!entryName) continue;
+            if (isSamePlayerName(entryName, normalizedName)) {
+                delete root[key];
+                removedAny = true;
             }
         }
-    }
 
-    await leaderboardRef.child(keyToUse).remove();
+        if (!removedAny) {
+            for (const key of fallbackKeys) {
+                if (Object.prototype.hasOwnProperty.call(root, key)) {
+                    delete root[key];
+                }
+            }
+        }
+
+        return root;
+    });
+
+    leaderboard = leaderboard.filter((entry) => !isSamePlayerName(entry?.name, normalizedName));
+    renderLeaderboard();
 }
 
 function applyLocalCurrencyReset(resetStat) {
@@ -2114,6 +2203,7 @@ function resetAllGameDataState() {
     spCompoundingLevel = 0;
     spCompoundingMultiplier = 1.0;
     spAutobuyEnabled = false;
+    trueEndGrowthActive = trueEndResetDone && !trueEndInfinityBroken;
 
     autoActive = false;
     rpAutobuyEnabled = false;
@@ -2152,6 +2242,7 @@ function resetAllGameDataState() {
     setupRPAutoBuy();
     setupSPGenerator();
     setupSPAutobuy();
+    setupTrueEndGrowth();
     applyAscensionAutomationBonuses();
     updateAutoSpendButton();
     updateHireCostDisplay();
@@ -2203,6 +2294,7 @@ function applyAscendResetState() {
     autoActive = false;
     rpAutobuyEnabled = false;
     autoSpendPercent = DEFAULT_AUTO_SPEND_PERCENT;
+    trueEndGrowthActive = trueEndResetDone && !trueEndInfinityBroken;
 
     if (autoInterval) {
         clearInterval(autoInterval);
@@ -2241,6 +2333,7 @@ function applyAscendResetState() {
     setupRPAutoBuy();
     setupSPGenerator();
     setupSPAutobuy();
+    setupTrueEndGrowth();
     applyAscensionAutomationBonuses();
     updateAutoSpendButton();
     updateHireCostDisplay();
@@ -2805,26 +2898,47 @@ async function removePlayersFromLeaderboardBulk(targetPlayers) {
 
     await leaderboardRef.transaction((current) => {
         const root = current && typeof current === 'object' ? current : {};
-        const existingKeyByName = new Map();
+        const targetNameKeys = new Set(
+            normalizedTargets
+                .map(name => normalizePlayerNameKey(name))
+                .filter(Boolean)
+        );
+        const fallbackKeys = new Set();
+        for (const targetName of normalizedTargets) {
+            const directKey = sanitizeFirebaseKey(targetName);
+            const normalizedKey = sanitizeFirebaseKey(normalizePlayerNameKey(targetName));
+            if (directKey) fallbackKeys.add(directKey);
+            if (normalizedKey) fallbackKeys.add(normalizedKey);
+        }
 
         for (const [key, value] of Object.entries(root)) {
             if (!value || typeof value !== 'object') continue;
             const nameKey = normalizePlayerNameKey(value.name);
-            if (!nameKey || existingKeyByName.has(nameKey)) continue;
-            existingKeyByName.set(nameKey, key);
+            if (!nameKey) continue;
+            if (targetNameKeys.has(nameKey)) {
+                delete root[key];
+            }
         }
 
-        for (const targetName of normalizedTargets) {
-            const nameKey = normalizePlayerNameKey(targetName);
-            if (!nameKey) continue;
-
-            const key = existingKeyByName.get(nameKey) || sanitizeFirebaseKey(targetName);
-            if (!key) continue;
-            delete root[key];
+        for (const key of fallbackKeys) {
+            if (Object.prototype.hasOwnProperty.call(root, key)) {
+                delete root[key];
+            }
         }
 
         return root;
     });
+
+    const targetNameKeys = new Set(
+        normalizedTargets
+            .map(name => normalizePlayerNameKey(name))
+            .filter(Boolean)
+    );
+    leaderboard = leaderboard.filter((entry) => {
+        const nameKey = normalizePlayerNameKey(entry?.name);
+        return !nameKey || !targetNameKeys.has(nameKey);
+    });
+    renderLeaderboard();
 }
 
 async function banPlayersPermanentlyBulk(targetPlayers) {
@@ -3906,6 +4020,12 @@ const SP_GENERATOR_MAX_LEVEL = 5;
 const SP_GENERATOR_BASE_SECONDS = 25;
 const SP_GENERATOR_SECONDS_PER_LEVEL = 5;
 const SP_COMPOUNDING_GROWTH = 1.25;
+const TRUE_END_UNLOCK_AP = 100;
+const TRUE_END_HONEY_COST = 100_000_000_000_000_000; // 100 Qa / 100 QD
+const TRUE_END_RP_COST = 1_000_000;
+const TRUE_END_SP_COST = 25_000;
+const TRUE_END_AP_COST = 100;
+const TRUE_END_GROWTH_MULTIPLIER = 2;
 const SAVE_KEY = 'beeSwarmSave';
 
 // ========== RP PRICING ==========
@@ -4084,6 +4204,10 @@ let spCompoundingLevel = 0;
 let spCompoundingMultiplier = 1.0;
 let spAutobuyInterval = null;
 let spAutobuyEnabled = false;
+let trueEndResetDone = false;
+let trueEndGrowthActive = false;
+let trueEndInfinityBroken = false;
+let trueEndGrowthInterval = null;
 
 // Automation
 let autoActive = false;
@@ -4293,6 +4417,7 @@ function update() {
 }
 
 function updateRebirthUI() {
+    clampCoreProgressValues();
     beeSpeedMultiplier = clampBeeSpeedMultiplier(beeSpeedMultiplier);
 
     rpSpan.textContent = formatNumber(rebirthPoints);
@@ -4346,6 +4471,7 @@ function updateRebirthUI() {
     }
     apBadge.textContent = `AP: ${formatNumber(ascendPoints)}`;
     ascendBtn.disabled = maxAP <= 0;
+    updateEndgameUI();
 
     if (autoUnlocked) {
         autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
@@ -4713,6 +4839,90 @@ function normalizeAutoSpendPercent(value) {
 
 function updateAutoSpendButton() {
     toggleAutoSpendBtn.textContent = `AUTO % (${autoSpendPercent}%)`;
+}
+
+function clampCoreProgressValues() {
+    honey = Math.max(0, clampToInfinitySoftCap(honey));
+    totalHoneyEarned = Math.max(0, clampToInfinitySoftCap(totalHoneyEarned));
+    rebirthPoints = Math.max(0, clampToInfinitySoftCap(rebirthPoints));
+    sacrificePoints = Math.max(0, clampToInfinitySoftCap(sacrificePoints));
+    ascendPoints = getSafeAscendPoints(clampToInfinitySoftCap(ascendPoints));
+    ascendPowerPoints = getSafeAscendPoints(clampToInfinitySoftCap(ascendPowerPoints));
+    if (ascendPowerPoints < ascendPoints) {
+        ascendPowerPoints = ascendPoints;
+    }
+}
+
+function canAffordTrueEndReset() {
+    return honey >= TRUE_END_HONEY_COST &&
+        rebirthPoints >= TRUE_END_RP_COST &&
+        sacrificePoints >= TRUE_END_SP_COST &&
+        ascendPoints >= TRUE_END_AP_COST;
+}
+
+function updateEndgameUI() {
+    if (!endgameRow || !trueEndResetBtn || !breakInfinityBtn) return;
+
+    const unlocked = ascendPoints >= TRUE_END_UNLOCK_AP || trueEndResetDone;
+    endgameRow.style.display = unlocked ? 'flex' : 'none';
+    if (!unlocked) {
+        breakInfinityBtn.style.display = 'none';
+        return;
+    }
+
+    if (trueEndResetDone) {
+        trueEndResetBtn.innerHTML = '🖤 TRUE END RESET MAXED <span class="maxed-badge">MAX</span>';
+        trueEndResetBtn.disabled = true;
+    } else {
+        trueEndResetBtn.textContent = `🖤 TRUE END RESET (${formatNumber(TRUE_END_HONEY_COST)}🍯 + ${formatNumber(TRUE_END_RP_COST)} RP + ${formatNumber(TRUE_END_SP_COST)} SP + ${formatNumber(TRUE_END_AP_COST)} AP)`;
+        trueEndResetBtn.disabled = !canAffordTrueEndReset();
+    }
+
+    if (trueEndInfinityBroken) {
+        breakInfinityBtn.style.display = 'inline-block';
+        breakInfinityBtn.disabled = true;
+        breakInfinityBtn.innerHTML = '💜 INFINITY BROKEN <span class="maxed-badge">MAX</span>';
+        return;
+    }
+
+    const canBreakInfinityNow = trueEndResetDone && honey >= INFINITY_SOFT_CAP;
+    breakInfinityBtn.style.display = canBreakInfinityNow ? 'inline-block' : 'none';
+    breakInfinityBtn.disabled = !canBreakInfinityNow;
+    if (canBreakInfinityNow) {
+        breakInfinityBtn.textContent = '💜 BREAK INFINITY';
+    }
+}
+
+function applyTrueEndGrowthTick() {
+    if (!trueEndResetDone || !trueEndGrowthActive || trueEndInfinityBroken) return;
+
+    const mult = TRUE_END_GROWTH_MULTIPLIER;
+    honey = clampToInfinitySoftCap(Math.floor(honey * mult));
+    totalHoneyEarned = clampToInfinitySoftCap(Math.floor(totalHoneyEarned * mult));
+    rebirthPoints = clampToInfinitySoftCap(Math.floor(rebirthPoints * mult));
+    sacrificePoints = clampToInfinitySoftCap(Math.floor(sacrificePoints * mult));
+    ascendPoints = getSafeAscendPoints(clampToInfinitySoftCap(Math.floor(ascendPoints * mult)));
+    ascendPowerPoints = getSafeAscendPoints(clampToInfinitySoftCap(Math.floor(ascendPowerPoints * mult)));
+    refreshAscendMultiplier();
+
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+    saveGame({ skipLeaderboardSubmit: true, silent: true });
+}
+
+function setupTrueEndGrowth() {
+    if (trueEndGrowthInterval) {
+        clearInterval(trueEndGrowthInterval);
+        trueEndGrowthInterval = null;
+    }
+
+    if (!trueEndResetDone || !trueEndGrowthActive || trueEndInfinityBroken) return;
+    trueEndGrowthInterval = setInterval(() => {
+        if (gameplayBlocked) return;
+        applyTrueEndGrowthTick();
+    }, 1000);
 }
 
 function findBestFlower(beeX, beeY) {
@@ -5220,6 +5430,55 @@ toggleAutoBtn.addEventListener('click', toggleAuto);
 toggleRPAutoBtn.addEventListener('click', toggleRPAuto);
 toggleSPAutoBtn.addEventListener('click', toggleSPAuto);
 toggleAutoSpendBtn.addEventListener('click', configureAutoSpendPercent);
+trueEndResetBtn.addEventListener('click', async () => {
+    if (trueEndResetDone) {
+        showGameStatusMessage('TRUE END RESET can only be done once.');
+        return;
+    }
+    if (ascendPoints < TRUE_END_UNLOCK_AP) {
+        showGameStatusMessage(`Need at least ${formatNumber(TRUE_END_UNLOCK_AP)} AP to unlock TRUE END RESET.`);
+        return;
+    }
+    if (!canAffordTrueEndReset()) {
+        showGameStatusMessage(`Need ${formatNumber(TRUE_END_HONEY_COST)}🍯 + ${formatNumber(TRUE_END_RP_COST)} RP + ${formatNumber(TRUE_END_SP_COST)} SP + ${formatNumber(TRUE_END_AP_COST)} AP.`);
+        return;
+    }
+
+    if (!confirm('TRUE END RESET is one-time and wipes everything. Continue?')) return;
+
+    trueEndResetDone = true;
+    trueEndInfinityBroken = false;
+    trueEndGrowthActive = true;
+
+    resetAllGameDataState();
+    // Keep the one-time TRUE END flag after full wipe.
+    trueEndResetDone = true;
+    trueEndInfinityBroken = false;
+    trueEndGrowthActive = true;
+    setupTrueEndGrowth();
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+    saveGame();
+    showGameStatusMessage('TRUE END RESET activated: x2 ALL STATS every second until BREAK INFINITY.');
+});
+
+breakInfinityBtn.addEventListener('click', () => {
+    if (!trueEndResetDone) return;
+    if (trueEndInfinityBroken) return;
+    if (honey < INFINITY_SOFT_CAP) {
+        showGameStatusMessage(`Reach ${formatNumber(INFINITY_SOFT_CAP)} honey first.`);
+        return;
+    }
+
+    trueEndInfinityBroken = true;
+    trueEndGrowthActive = false;
+    setupTrueEndGrowth();
+    updateEndgameUI();
+    saveGame();
+    showGameStatusMessage('You broke Infinity.');
+});
 
 // ========== SAVE GAME FUNCTION ==========
 function buildSaveData(includeWorldData = true) {
@@ -5243,6 +5502,7 @@ function buildSaveData(includeWorldData = true) {
         spAutobuyerPurchased, spGeneratorLevel, spCompoundingLevel, spCompoundingMultiplier,
         ascensionCorePurchased,
         ascensionCorePowerFixApplied,
+        trueEndResetDone, trueEndGrowthActive, trueEndInfinityBroken,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled, spAutobuyEnabled,
         autoSpendPercent,
@@ -5343,6 +5603,12 @@ function loadGame() {
         ascendPowerPoints = getSafeAscendPoints(finiteOr(data.ascendPowerPoints, ascendPoints));
         ascensionCorePurchased = parseBoolean(data.ascensionCorePurchased, false);
         ascensionCorePowerFixApplied = parseBoolean(data.ascensionCorePowerFixApplied, false);
+        trueEndResetDone = parseBoolean(data.trueEndResetDone, false);
+        trueEndInfinityBroken = parseBoolean(data.trueEndInfinityBroken, false);
+        trueEndGrowthActive = parseBoolean(data.trueEndGrowthActive, trueEndResetDone && !trueEndInfinityBroken);
+        if (trueEndInfinityBroken) {
+            trueEndGrowthActive = false;
+        }
         if (ascensionCorePurchased && !ascensionCorePowerFixApplied && ascendPoints > 0 && ascendPowerPoints <= ascendPoints) {
             ascendPowerPoints = ascendPoints + ASCENSION_SHOP_COST_AP;
             ascensionCorePowerFixApplied = true;
@@ -5425,6 +5691,7 @@ function loadGame() {
         setupRPAutoBuy();
         setupSPGenerator();
         setupSPAutobuy();
+        setupTrueEndGrowth();
 
 if (rpAutobuyEnabled && rpAutoBuyActive) {
     toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
