@@ -750,7 +750,6 @@
                     <option value="rp">Reset My RP</option>
                     <option value="sp">Reset My SP</option>
                     <option value="ap">Reset My AP</option>
-                    <option value="all">Reset My ALL (Honey + RP + SP + AP)</option>
                     <option value="full">Reset My FULL DATA (Unlock one-time codes)</option>
                 </select>
                 <button class="menu-btn remove-btn" id="menuResetSelectedBtn">RESET SELECTED</button>
@@ -1592,7 +1591,7 @@ menuLoadSaveBtn.addEventListener('click', async () => {
 // ========== RESET BUTTONS ==========
 menuResetSelectedBtn.addEventListener('click', async () => {
     const resetStat = menuResetStatSelect.value;
-    if (!['honey', 'rp', 'sp', 'ap', 'all', 'full'].includes(resetStat)) {
+    if (!['honey', 'rp', 'sp', 'ap', 'full'].includes(resetStat)) {
         alert('Invalid reset stat');
         return;
     }
@@ -2157,6 +2156,10 @@ function applyAscendResetState() {
 async function performFullDataReset(options = {}) {
     const clearRedeemedCodes = parseBoolean(options.clearRedeemedCodes, false);
     const removeLeaderboardEntry = parseBoolean(options.removeLeaderboardEntry, false);
+
+    // Full reset wipes AP upgrades too.
+    ascensionCorePurchased = false;
+    ascensionCorePowerFixApplied = false;
 
     resetAllGameDataState();
     // Full reset always wipes AP currency and AP power progression.
