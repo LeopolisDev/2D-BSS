@@ -842,7 +842,7 @@
     <span style="color:#fff4c2; font-weight:bold;">✨ ASCENSION SHOP:</span>
     <button class="tool-btn ascend-btn" id="buyAscensionUpgrade">🌟 ASCENSION CORE (3 AP) x1000🍯 x25 RP x5 SP + ALL AUTO</button>
     <button class="tool-btn ascend-btn" id="buySPAutobuyer">🤖 SP AUTOBUYER (5 AP)</button>
-    <button class="tool-btn ascend-btn" id="buySPGen">⏱️ SP GENERATOR lv<span id="spGenLevel">0</span> (<span id="spGenCost">1</span> AP) <span id="spGenTime">25s</span> <span id="spGenPreview" class="preview-text"></span></button>
+    <button class="tool-btn ascend-btn" id="buySPGen">⏱️ SP GENERATOR lv<span id="spGenLevel">0</span> (<span id="spGenCost">1</span> AP) <span id="spGenTime">25s</span> <span id="spGenPreview" class="preview-text">(+1 SP / 25s)</span></button>
     <button class="tool-btn ascend-btn" id="buySPCompounding">📈 SP COMPOUNDING lv<span id="spCompLevel">0</span> (<span id="spCompCost">1</span> AP) x<span id="spCompMult">1.00</span></button>
     <span class="multiplier-badge" id="apShopDisplay">AP: 0</span>
 </div>
@@ -1524,6 +1524,13 @@ function applyLoadedSaveData(saveData) {
     }
     toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
     toggleAutoBtn.classList.remove('auto-active');
+
+    // RP auto is always OFF after reload/load; player must enable manually.
+    rpAutobuyEnabled = false;
+    if (rpAutoBuyInterval) {
+        clearInterval(rpAutoBuyInterval);
+        rpAutoBuyInterval = null;
+    }
 
     if (rpAutobuyEnabled && rpAutoBuyActive) {
         toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
@@ -3813,7 +3820,6 @@ const ASCEND_HONEY_COST_BASE = 1_000_000_000_000;
 const ASCEND_RP_COST_BASE = 1000;
 const ASCEND_SP_COST_BASE = 10;
 const ASCEND_COST_SCALING = 1.5;
-const ASCEND_MULTIPLIER_PER_POINT = 1.5;
 const ASCENSION_SHOP_COST_AP = 3;
 const ASCENSION_HONEY_MULTIPLIER = 1000;
 const ASCENSION_RP_MULTIPLIER = 25;
@@ -3867,7 +3873,8 @@ function refreshAscendMultiplier() {
     if (ascendPowerPoints < ascendPoints) {
         ascendPowerPoints = ascendPoints;
     }
-    ascendMultiplier = Math.pow(ASCEND_MULTIPLIER_PER_POINT, ascendPowerPoints);
+    // AP count no longer scales Honey/RP/SP gains directly.
+    ascendMultiplier = 1;
 }
 
 function getAscendCost(apNumber = 1) {
@@ -4146,7 +4153,7 @@ function update() {
             const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
             const dist = Math.hypot(dx, dy);
             if (dist < 20) {
-                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * ascendMultiplier * getAscensionHoneyMultiplier() * (x10HoneyPurchased ? 10 : 1));
+                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * getAscensionHoneyMultiplier() * (x10HoneyPurchased ? 10 : 1));
                 honey += deposited;
                 totalHoneyEarned += deposited;
                 b.carrying = 0;
@@ -4227,10 +4234,10 @@ function updateRebirthUI() {
         const rawRP = maxRP;
         const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier * ascensionRpMult);
         const rpBonusText = ascensionRpMult > 1 ? ` * ASC x${formatMultiplierValue(ascensionRpMult)}` : '';
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (RP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText})`;
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (COMP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText})`;
     } else {
         const rpBonusText = ascensionRpMult > 1 ? ` * ASC x${formatMultiplierValue(ascensionRpMult)}` : '';
-        rebirthInfo.textContent = `1 RP = 10k (RP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText})`;
+        rebirthInfo.textContent = `1 RP = 10k (COMP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText})`;
     }
 
     const maxSP = getMaxSPFromResources();
@@ -4390,17 +4397,16 @@ function updateSPUI() {
     const nextSPGenLevel = spGeneratorLevel + 1;
     const spGenCostValue = getSPGeneratorAPCost(nextSPGenLevel);
     const spGenInterval = getSPGeneratorIntervalSeconds(Math.max(1, spGeneratorLevel));
-    const spGenPreviewValue = 1;
     spGenLevel.textContent = spGeneratorLevel;
     spGenCost.textContent = spGenCostValue;
     spGenTime.textContent = `${spGenInterval}s`;
-    spGenPreview.textContent = `(+${spGenPreviewValue} SP/tick)`;
+    spGenPreview.textContent = `(+1 SP / ${spGenInterval}s)`;
 
     if (spGeneratorLevel >= SP_GENERATOR_MAX_LEVEL) {
-        buySPGen.innerHTML = `⏱️ SP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+${spGenPreviewValue} SP/tick)</span>`;
+        buySPGen.innerHTML = `⏱️ SP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+1 SP / ${spGenInterval}s)</span>`;
         buySPGen.disabled = true;
     } else {
-        buySPGen.innerHTML = `⏱️ SP GENERATOR lv<span id="spGenLevel">${spGeneratorLevel}</span> (<span id="spGenCost">${spGenCostValue}</span> AP) <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+${spGenPreviewValue} SP/tick next)</span>`;
+        buySPGen.innerHTML = `⏱️ SP GENERATOR lv<span id="spGenLevel">${spGeneratorLevel}</span> (<span id="spGenCost">${spGenCostValue}</span> AP) <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+1 SP / ${spGenInterval}s)</span>`;
         buySPGen.disabled = ascendPoints < spGenCostValue;
     }
 
@@ -4431,7 +4437,7 @@ function recalcMultiplier() {
     if (hasGalaxyCrown) toolMult *= 5.0;
     toolMultiplier = toolMult;
     
-    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier * ascendMultiplier * getAscensionHoneyMultiplier();
+    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier * getAscensionHoneyMultiplier();
     if (x10HoneyPurchased) totalMult *= 10;
    totalMultDisplay.textContent = `✖️ ${formatMultiplierValue(totalMult)}`;
 }
@@ -4905,7 +4911,7 @@ ascendBtn.addEventListener('click', () => {
 
     applyAscendResetState();
     saveGame();
-    showGameStatusMessage(`Ascended for +${formatNumber(maxAP)} AP! AP is now ${formatNumber(ascendPoints)} (x${formatMultiplierValue(ascendMultiplier)} honey gains).`);
+    showGameStatusMessage(`Ascended for +${formatNumber(maxAP)} AP! AP is now ${formatNumber(ascendPoints)}.`);
 });
 
 // ========== SACRIFICE SHOP ==========
@@ -5330,6 +5336,13 @@ function loadGame() {
         }
         toggleAutoBtn.textContent = '⏸️ AUTO (OFF)';
         toggleAutoBtn.classList.remove('auto-active');
+
+        // RP auto is always OFF after reload/load; player must enable manually.
+        rpAutobuyEnabled = false;
+        if (rpAutoBuyInterval) {
+            clearInterval(rpAutoBuyInterval);
+            rpAutoBuyInterval = null;
+        }
 
         setupRPGenerator();
         setupRPAutoBuy();
