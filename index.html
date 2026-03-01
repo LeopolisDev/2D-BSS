@@ -5702,6 +5702,10 @@ trueEndResetBtn.addEventListener('click', async () => {
     totalHoneyOverflowExp = 0;
 
     resetAllGameDataState();
+    // Enforce full wipe including AP and AP progression.
+    ascendPoints = 0;
+    ascendPowerPoints = 0;
+    refreshAscendMultiplier();
     // Keep the one-time TRUE END flag after full wipe.
     trueEndResetDone = true;
     trueEndInfinityBroken = false;
@@ -5743,11 +5747,14 @@ loopBtn.addEventListener('click', () => {
     loopMultiplier = Math.max(1, nextLoopMult);
 
     resetAllGameDataState();
-
-    // LOOP keeps endgame progression unlocked and active.
-    trueEndResetDone = true;
-    trueEndInfinityBroken = true;
-    trueEndGrowthActive = true;
+    // LOOP is a full wipe of progression (including AP / True End state),
+    // while keeping only the permanent loop reward multiplier.
+    ascendPoints = 0;
+    ascendPowerPoints = 0;
+    refreshAscendMultiplier();
+    trueEndResetDone = false;
+    trueEndInfinityBroken = false;
+    trueEndGrowthActive = false;
     trueEndHoneyGrowthTicks = 0;
     honeyOverflowExp = 0;
     totalHoneyOverflowExp = 0;
