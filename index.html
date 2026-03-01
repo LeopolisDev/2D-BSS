@@ -806,7 +806,7 @@
         <div class="ascend-row">
     <span style="color:#7a6300; font-weight:bold;">✨ ASCEND RESET:</span>
     <button class="tool-btn ascend-btn" id="ascendBtn">🤍 ASCEND</button>
-    <span class="multiplier-badge" id="ascendInfo">1 AP = x1.5 all gains</span>
+    <span class="multiplier-badge" id="ascendInfo">1 AP = 1T🍯 + 1K RP + 10 SP</span>
     <span class="multiplier-badge" id="apBadge">AP: 0</span>
 </div>
 
@@ -3699,8 +3699,9 @@ const DEFAULT_AUTO_SPEND_PERCENT = 10;
 const AUTO_SPEND_OPTIONS = [5, 10, 25, 50, 100];
 const AUTO_SAVE_INTERVAL_MS = 5000;
 const ASCEND_HONEY_COST_BASE = 1_000_000_000_000;
-const ASCEND_RP_COST_BASE = 100;
+const ASCEND_RP_COST_BASE = 1000;
 const ASCEND_SP_COST_BASE = 10;
+const ASCEND_COST_SCALING = 1.5;
 const ASCEND_MULTIPLIER_PER_POINT = 1.5;
 const SAVE_KEY = 'beeSwarmSave';
 
@@ -3745,12 +3746,27 @@ function refreshAscendMultiplier() {
     ascendMultiplier = Math.pow(ASCEND_MULTIPLIER_PER_POINT, ascendPoints);
 }
 
-function getAscendCost() {
+function getAscendCost(apNumber = 1) {
+    const safeApNumber = Math.max(1, Math.floor(Number(apNumber) || 1));
+    const scale = Math.pow(ASCEND_COST_SCALING, safeApNumber - 1);
     return {
-        honey: ASCEND_HONEY_COST_BASE,
-        rp: ASCEND_RP_COST_BASE,
-        sp: ASCEND_SP_COST_BASE
+        honey: Math.floor(ASCEND_HONEY_COST_BASE * scale),
+        rp: Math.floor(ASCEND_RP_COST_BASE * scale),
+        sp: Math.floor(ASCEND_SP_COST_BASE * scale)
     };
+}
+
+function getMaxAPFromResources() {
+    let apCount = 1;
+    while (true) {
+        const cost = getAscendCost(apCount);
+        if (honey >= cost.honey && rebirthPoints >= cost.rp && sacrificePoints >= cost.sp) {
+            apCount++;
+        } else {
+            break;
+        }
+    }
+    return apCount - 1;
 }
 
 // ========== GAME STATE ==========
@@ -4012,25 +4028,30 @@ function updateRebirthUI() {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
         const rawRP = maxRP;
-        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier * ascendMultiplier);
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (RP x${rpCompoundingMultiplier.toFixed(2)} * AP x${ascendMultiplier.toFixed(2)})`;
+        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier);
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (RP x${rpCompoundingMultiplier.toFixed(2)})`;
     } else {
-        rebirthInfo.textContent = `1 RP = 10k (RP x${rpCompoundingMultiplier.toFixed(2)} * AP x${ascendMultiplier.toFixed(2)})`;
+        rebirthInfo.textContent = `1 RP = 10k (RP x${rpCompoundingMultiplier.toFixed(2)})`;
     }
 
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        const multipliedSP = Math.max(1, Math.floor(maxSP * ascendMultiplier));
-        sacrificeInfo.textContent = `${multipliedSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP (AP x${ascendMultiplier.toFixed(2)})`;
+        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP`;
     } else {
-        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP (AP x${ascendMultiplier.toFixed(2)})`;
+        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
     }
 
-    const ascendCost = getAscendCost();
-    ascendInfo.textContent = `Cost: ${formatNumber(ascendCost.honey)}🍯 + ${formatNumber(ascendCost.rp)} RP + ${formatNumber(ascendCost.sp)} SP | x${ASCEND_MULTIPLIER_PER_POINT.toFixed(2)}/AP`;
+    const maxAP = getMaxAPFromResources();
+    const ascendCost = getAscendCost(Math.max(1, maxAP));
+    if (maxAP > 0) {
+        ascendInfo.textContent = `${formatNumber(maxAP)} AP = ${formatNumber(ascendCost.honey)}🍯 + ${formatNumber(ascendCost.rp)} RP + ${formatNumber(ascendCost.sp)} SP`;
+    } else {
+        const firstCost = getAscendCost(1);
+        ascendInfo.textContent = `1 AP = ${formatNumber(firstCost.honey)}🍯 + ${formatNumber(firstCost.rp)} RP + ${formatNumber(firstCost.sp)} SP`;
+    }
     apBadge.textContent = `AP: ${formatNumber(ascendPoints)} (x${formatMultiplierValue(ascendMultiplier)})`;
-    ascendBtn.disabled = honey < ascendCost.honey || rebirthPoints < ascendCost.rp || sacrificePoints < ascendCost.sp;
+    ascendBtn.disabled = maxAP <= 0;
 
     if (autoUnlocked) {
         autoStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
@@ -4122,7 +4143,7 @@ function updateSPUI() {
     }
     rpGenTime.textContent = intervalTime + 's';
     
-    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier * ascendMultiplier);
+    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
     
     if (rpGeneratorLevel >= 5) {
@@ -4181,7 +4202,7 @@ function setupRPGenerator() {
     if (rpGeneratorLevel > 0) {
         const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000);
         rpGeneratorInterval = setInterval(() => {
-            let rpGain = Math.floor(1 * rpCompoundingMultiplier * ascendMultiplier);
+            let rpGain = Math.floor(1 * rpCompoundingMultiplier);
             rebirthPoints += rpGain;
             updateRebirthUI();
             saveGame();
@@ -4465,7 +4486,7 @@ rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
         const cost = getRPCost(maxRP);
-        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier * ascendMultiplier);
+        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier);
         rebirthPoints += rpGain;
         
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
@@ -4479,7 +4500,7 @@ rebirthBtn.addEventListener('click', () => {
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
         updateHireCostDisplay();
         saveGame();
-        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)} * AP x${ascendMultiplier.toFixed(2)} => ${rpGain}). Honey reset to 0.`);
+        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)} => ${rpGain}). Honey reset to 0.`);
     } else {
         showGameStatusMessage('Need at least 10,000 honey for 1 RP.');
     }
@@ -4490,7 +4511,7 @@ sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        const spGain = Math.max(1, Math.floor(maxSP * ascendMultiplier));
+        const spGain = maxSP;
         honey -= cost.honey;
         rebirthPoints -= cost.rp;
         sacrificePoints += spGain;
@@ -4534,28 +4555,30 @@ sacrificeBtn.addEventListener('click', () => {
         updateHireCostDisplay();
         saveGame();
 
-        showGameStatusMessage(`Sacrificed for ${spGain} SP (base ${maxSP}, AP x${ascendMultiplier.toFixed(2)}). Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
+        showGameStatusMessage(`Sacrificed for ${spGain} SP. Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
     } else {
         showGameStatusMessage('Need at least 100M honey and 10 RP for 1 SP.');
     }
 });
 
 ascendBtn.addEventListener('click', () => {
-    const cost = getAscendCost();
-    if (honey < cost.honey || rebirthPoints < cost.rp || sacrificePoints < cost.sp) {
-        showGameStatusMessage(`Need ${formatNumber(cost.honey)}🍯 + ${formatNumber(cost.rp)} RP + ${formatNumber(cost.sp)} SP to Ascend.`);
+    const maxAP = getMaxAPFromResources();
+    if (maxAP <= 0) {
+        const firstCost = getAscendCost(1);
+        showGameStatusMessage(`Need ${formatNumber(firstCost.honey)}🍯 + ${formatNumber(firstCost.rp)} RP + ${formatNumber(firstCost.sp)} SP for 1 AP.`);
         return;
     }
+    const cost = getAscendCost(maxAP);
 
     honey -= cost.honey;
     rebirthPoints -= cost.rp;
     sacrificePoints -= cost.sp;
-    ascendPoints = getSafeAscendPoints(ascendPoints + 1);
+    ascendPoints = getSafeAscendPoints(ascendPoints + maxAP);
     refreshAscendMultiplier();
 
     applyAscendResetState();
     saveGame();
-    showGameStatusMessage(`Ascended! AP is now ${formatNumber(ascendPoints)} (x${formatMultiplierValue(ascendMultiplier)} all gains).`);
+    showGameStatusMessage(`Ascended for +${formatNumber(maxAP)} AP! AP is now ${formatNumber(ascendPoints)} (x${formatMultiplierValue(ascendMultiplier)} honey gains).`);
 });
 
 // ========== SP SHOP ==========
