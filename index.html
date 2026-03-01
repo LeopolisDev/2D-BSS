@@ -3238,11 +3238,23 @@ async function submitScore(score) {
         
         // Use the existing key if found, otherwise use sanitized name
         const keyToUse = existingKey || sanitizedName;
-        
-        await leaderboardRef.child(keyToUse).set({
-            name: normalizedName,
-            total: toSafeAmount(score)
+
+        const incomingTotal = toSafeAmount(score);
+        const txResult = await leaderboardRef.child(keyToUse).transaction((current) => {
+            const safeCurrent = current && typeof current === 'object' ? current : {};
+            const currentTotal = toSafeAmount(safeCurrent.total);
+            return {
+                ...safeCurrent,
+                name: normalizedName,
+                // Prevent cross-site score bouncing: never allow this write path to decrease total.
+                total: Math.max(currentTotal, incomingTotal)
+            };
         });
+
+        const finalTotal = toSafeAmount(txResult?.snapshot?.val()?.total);
+        if (Number.isFinite(finalTotal) && finalTotal > totalHoneyEarned) {
+            totalHoneyEarned = finalTotal;
+        }
     } catch (error) {
         console.error('Failed to submit score:', error);
     }
@@ -3533,6 +3545,7 @@ const FLOWER_HP_MAX_LEVEL = 5;
 const FLOWER_HP_PER_LEVEL = 5;
 const DEFAULT_AUTO_SPEND_PERCENT = 10;
 const AUTO_SPEND_OPTIONS = [5, 10, 25, 50, 100];
+const AUTO_SAVE_INTERVAL_MS = 5000;
 const SAVE_KEY = 'beeSwarmSave';
 
 // ========== RP PRICING ==========
@@ -3607,6 +3620,7 @@ let rpAutobuyEnabled = false;
 let autoSpendPercent = DEFAULT_AUTO_SPEND_PERCENT;
 let performanceMode = false;
 let popupsDisabled = false;
+let autoSaveInterval = null;
 
 // ========== GAME MECHANICS ==========
 function getRandomFlowerTarget() {
@@ -4519,25 +4533,44 @@ function buildSaveData(includeWorldData = true) {
 
 function saveGame(options = {}) {
     const skipLeaderboardSubmit = parseBoolean(options.skipLeaderboardSubmit, false);
+    const silent = parseBoolean(options.silent, false);
 
     try {
         localStorage.setItem(SAVE_KEY, JSON.stringify(buildSaveData(true)));
-        saveIndicator.textContent = 'Saved ' + new Date().toLocaleTimeString();
-        setTimeout(() => { saveIndicator.textContent = 'Auto-saved'; }, 2000);
+        if (!silent) {
+            saveIndicator.textContent = 'Saved ' + new Date().toLocaleTimeString();
+            setTimeout(() => { saveIndicator.textContent = 'Auto-saved'; }, 2000);
+        }
     } catch (fullSaveError) {
         console.warn('Full save failed, attempting compact save.', fullSaveError);
         try {
             localStorage.setItem(SAVE_KEY, JSON.stringify(buildSaveData(false)));
-            saveIndicator.textContent = 'Saved (compact)';
+            if (!silent) {
+                saveIndicator.textContent = 'Saved (compact)';
+            }
         } catch (compactSaveError) {
             console.error('Compact save also failed.', compactSaveError);
-            saveIndicator.textContent = 'Save failed';
+            if (!silent) {
+                saveIndicator.textContent = 'Save failed';
+            }
         }
     }
     
     if (!skipLeaderboardSubmit) {
         submitScore(totalHoneyEarned);
     }
+}
+
+function setupAutoSave() {
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+        autoSaveInterval = null;
+    }
+
+    autoSaveInterval = setInterval(() => {
+        if (gameplayBlocked) return;
+        saveGame({ skipLeaderboardSubmit: true, silent: true });
+    }, AUTO_SAVE_INTERVAL_MS);
 }
 
 function loadGame() {
@@ -4655,7 +4688,7 @@ function loadGame() {
 
 function persistGameForPageExit() {
     if (gameplayBlocked) return;
-    saveGame({ skipLeaderboardSubmit: true });
+    saveGame({ skipLeaderboardSubmit: true, silent: true });
 }
 
 window.addEventListener('beforeunload', persistGameForPageExit);
@@ -4706,8 +4739,9 @@ async function init() {
     recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
     updateAutoSpendButton();
     updateHireCostDisplay();
+    setupAutoSave();
     if (!gameplayBlocked) {
-        saveGame({ skipLeaderboardSubmit: true });
+        saveGame({ skipLeaderboardSubmit: true, silent: true });
     }
 }
 init();
