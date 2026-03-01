@@ -5874,7 +5874,8 @@ function setupAutoSave() {
 
     autoSaveInterval = setInterval(() => {
         if (gameplayBlocked) return;
-        saveGame({ skipLeaderboardSubmit: true, silent: true });
+        // Keep leaderboard live without requiring a page reload.
+        saveGame({ skipLeaderboardSubmit: false, silent: true });
     }, AUTO_SAVE_INTERVAL_MS);
 }
 
