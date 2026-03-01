@@ -822,15 +822,22 @@
     <span class="multiplier-badge" id="rpShopDisplay">RP: 0</span>
 </div>
 
-        <!-- SP SHOP -->
+        <!-- SACRIFICE SHOP -->
         <div class="sp-shop-row">
-    <span style="color:#ffb3b3; font-weight:bold;">💰 SP SHOP:</span>
+    <span style="color:#ffb3b3; font-weight:bold;">💰 SACRIFICE SHOP:</span>
     <button class="tool-btn" id="buyX10Honey">🍯 x10 HONEY (5 SP)</button>
     <button class="tool-btn" id="buyRPAuto">🤖 RP AUTOBUY (10 SP)</button>
     <button class="tool-btn" id="buyFlowerFieldUpgrade">🌸 FLOWER FIELD 100 TOTAL (25 SP)</button>
     <button class="tool-btn" id="buyRPGen">⏱️ RP GENERATOR lv<span id="rpGenLevel">0</span> (<span id="rpGenCost">1</span> SP) <span id="rpGenTime">5s</span> <span id="rpGenPreview" class="preview-text"></span></button>
     <button class="tool-btn" id="buyRPCompounding">📈 RP COMPOUNDING lv<span id="rpCompLevel">0</span> (<span id="rpCompCost">1</span> SP) x<span id="rpCompMult">1.00</span></button>
     <span class="multiplier-badge" id="spShopDisplay">SP: 0</span>
+</div>
+
+        <!-- ASCENSION SHOP -->
+        <div class="sp-shop-row">
+    <span style="color:#fff4c2; font-weight:bold;">✨ ASCENSION SHOP:</span>
+    <button class="tool-btn ascend-btn" id="buyAscensionUpgrade">🌟 ASCENSION CORE (3 AP) x1000🍯 x25 RP x5 SP + AUTO</button>
+    <span class="multiplier-badge" id="apShopDisplay">AP: 0</span>
 </div>
 
         <!-- Tool shop -->
@@ -998,6 +1005,7 @@ const buyRPAuto = document.getElementById('buyRPAuto');
 const buyFlowerFieldUpgrade = document.getElementById('buyFlowerFieldUpgrade');
 const buyRPGen = document.getElementById('buyRPGen');
 const buyRPCompounding = document.getElementById('buyRPCompounding');
+const buyAscensionUpgrade = document.getElementById('buyAscensionUpgrade');
 const buyClippers = document.getElementById('buyClippers');
 const buyShears = document.getElementById('buyShears');
 const buyScythe = document.getElementById('buyScythe');
@@ -1028,6 +1036,7 @@ const spDisplay = document.getElementById('spDisplay');
 const spBadge = document.getElementById('spBadge');
 const spShopDisplay = document.getElementById('spShopDisplay');
 const apBadge = document.getElementById('apBadge');
+const apShopDisplay = document.getElementById('apShopDisplay');
 const autoStatus = document.getElementById('autoStatus');
 const speedStatus = document.getElementById('speedStatus');
 const capacityStatus = document.getElementById('capacityStatus');
@@ -1455,6 +1464,7 @@ function applyLoadedSaveData(saveData) {
     rpCompoundingLevel = finiteOr(saveData.rpCompoundingLevel, 0);
     rpCompoundingMultiplier = finiteOr(saveData.rpCompoundingMultiplier, 1.0);
     flowerFieldUpgradePurchased = parseBoolean(saveData.flowerFieldUpgradePurchased, false);
+    ascensionCorePurchased = parseBoolean(saveData.ascensionCorePurchased, false);
     rpAutobuyEnabled = parseBoolean(saveData.rpAutobuyEnabled, false);
     autoActive = parseBoolean(saveData.autoActive, false);
     autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
@@ -1471,6 +1481,10 @@ function applyLoadedSaveData(saveData) {
     bees = [];
     for (let i = 0; i < loadedBeeCount; i++) addBee();
     resetFlowerFieldForCurrentLimits();
+
+    if (ascensionCorePurchased) {
+        applyAscensionAutomationBonuses();
+    }
 
     if (autoActive && autoUnlocked) {
         toggleAutoBtn.textContent = '▶️ AUTO (ON)';
@@ -2013,6 +2027,7 @@ function resetAllGameDataState() {
     rpCompoundingLevel = 0;
     rpCompoundingMultiplier = 1.0;
     flowerFieldUpgradePurchased = false;
+    ascensionCorePurchased = false;
 
     autoActive = false;
     rpAutobuyEnabled = false;
@@ -2115,6 +2130,7 @@ function applyAscendResetState() {
 
     setupRPGenerator();
     setupRPAutoBuy();
+    applyAscensionAutomationBonuses();
     updateAutoSpendButton();
     updateHireCostDisplay();
     recalcMultiplier();
@@ -3703,6 +3719,10 @@ const ASCEND_RP_COST_BASE = 1000;
 const ASCEND_SP_COST_BASE = 10;
 const ASCEND_COST_SCALING = 1.5;
 const ASCEND_MULTIPLIER_PER_POINT = 1.5;
+const ASCENSION_SHOP_COST_AP = 3;
+const ASCENSION_HONEY_MULTIPLIER = 1000;
+const ASCENSION_RP_MULTIPLIER = 25;
+const ASCENSION_SP_MULTIPLIER = 5;
 const SAVE_KEY = 'beeSwarmSave';
 
 // ========== RP PRICING ==========
@@ -3769,6 +3789,39 @@ function getMaxAPFromResources() {
     return apCount - 1;
 }
 
+function getAscensionHoneyMultiplier() {
+    return ascensionCorePurchased ? ASCENSION_HONEY_MULTIPLIER : 1;
+}
+
+function getAscensionRPMultiplier() {
+    return ascensionCorePurchased ? ASCENSION_RP_MULTIPLIER : 1;
+}
+
+function getAscensionSPMultiplier() {
+    return ascensionCorePurchased ? ASCENSION_SP_MULTIPLIER : 1;
+}
+
+function applyAscensionAutomationBonuses() {
+    if (!ascensionCorePurchased) return;
+
+    autoUnlocked = true;
+    rpAutoBuyActive = true;
+    rpGeneratorLevel = Math.max(5, rpGeneratorLevel);
+    autoActive = true;
+    rpAutobuyEnabled = true;
+
+    toggleAutoBtn.textContent = '▶️ AUTO (ON)';
+    toggleAutoBtn.classList.add('auto-active');
+    toggleRPAutoBtn.textContent = '🤖 RP AUTO (ON)';
+    toggleRPAutoBtn.classList.add('rp-autobuy-active');
+
+    if (!autoInterval) {
+        autoInterval = setInterval(autoBuy, 1000);
+    }
+    setupRPGenerator();
+    setupRPAutoBuy();
+}
+
 // ========== GAME STATE ==========
 let honey = 0;
 let bees = [];
@@ -3805,6 +3858,7 @@ let rpAutoBuyInterval = null;
 let rpCompoundingLevel = 0;
 let rpCompoundingMultiplier = 1.0;
 let flowerFieldUpgradePurchased = false;
+let ascensionCorePurchased = false;
 
 // Automation
 let autoActive = false;
@@ -3951,7 +4005,7 @@ function update() {
             const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
             const dist = Math.hypot(dx, dy);
             if (dist < 20) {
-                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * ascendMultiplier * (x10HoneyPurchased ? 10 : 1));
+                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * ascendMultiplier * getAscensionHoneyMultiplier() * (x10HoneyPurchased ? 10 : 1));
                 honey += deposited;
                 totalHoneyEarned += deposited;
                 b.carrying = 0;
@@ -4026,20 +4080,27 @@ function updateRebirthUI() {
     totalEarnedSpan.textContent = formatNumber(totalHoneyEarned);
 
     const maxRP = getMaxRPFromHoney();
+    const ascensionRpMult = getAscensionRPMultiplier();
     if (maxRP > 0) {
         const rawRP = maxRP;
-        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier);
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (RP x${rpCompoundingMultiplier.toFixed(2)})`;
+        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier * ascensionRpMult);
+        const rpBonusText = ascensionRpMult > 1 ? ` * ASC x${formatMultiplierValue(ascensionRpMult)}` : '';
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (RP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText})`;
     } else {
-        rebirthInfo.textContent = `1 RP = 10k (RP x${rpCompoundingMultiplier.toFixed(2)})`;
+        const rpBonusText = ascensionRpMult > 1 ? ` * ASC x${formatMultiplierValue(ascensionRpMult)}` : '';
+        rebirthInfo.textContent = `1 RP = 10k (RP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText})`;
     }
 
     const maxSP = getMaxSPFromResources();
+    const ascensionSpMult = getAscensionSPMultiplier();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        sacrificeInfo.textContent = `${maxSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP`;
+        const multipliedSP = Math.max(1, Math.floor(maxSP * ascensionSpMult));
+        const spBonusText = ascensionSpMult > 1 ? ` (ASC x${formatMultiplierValue(ascensionSpMult)})` : '';
+        sacrificeInfo.textContent = `${multipliedSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP${spBonusText}`;
     } else {
-        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP`;
+        const spBonusText = ascensionSpMult > 1 ? ` (ASC x${formatMultiplierValue(ascensionSpMult)})` : '';
+        sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP${spBonusText}`;
     }
 
     const maxAP = getMaxAPFromResources();
@@ -4050,7 +4111,7 @@ function updateRebirthUI() {
         const firstCost = getAscendCost(1);
         ascendInfo.textContent = `1 AP = ${formatNumber(firstCost.honey)}🍯 + ${formatNumber(firstCost.rp)} RP + ${formatNumber(firstCost.sp)} SP`;
     }
-    apBadge.textContent = `AP: ${formatNumber(ascendPoints)} (x${formatMultiplierValue(ascendMultiplier)})`;
+    apBadge.textContent = `AP: ${formatNumber(ascendPoints)}`;
     ascendBtn.disabled = maxAP <= 0;
 
     if (autoUnlocked) {
@@ -4143,7 +4204,7 @@ function updateSPUI() {
     }
     rpGenTime.textContent = intervalTime + 's';
     
-    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier);
+    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier * getAscensionRPMultiplier());
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
     
     if (rpGeneratorLevel >= 5) {
@@ -4159,6 +4220,15 @@ function updateSPUI() {
     rpCompCost.textContent = compCost;
     rpCompMult.textContent = rpCompoundingMultiplier.toFixed(2);
     buyRPCompounding.disabled = sacrificePoints < compCost;
+
+    if (ascensionCorePurchased) {
+        buyAscensionUpgrade.innerHTML = '🌟 ASCENSION CORE MAXED <span class="maxed-badge">MAX</span>';
+        buyAscensionUpgrade.disabled = true;
+    } else {
+        buyAscensionUpgrade.innerHTML = `🌟 ASCENSION CORE (${ASCENSION_SHOP_COST_AP} AP) x${formatMultiplierValue(ASCENSION_HONEY_MULTIPLIER)}🍯 x${formatMultiplierValue(ASCENSION_RP_MULTIPLIER)} RP x${formatMultiplierValue(ASCENSION_SP_MULTIPLIER)} SP + AUTO`;
+        buyAscensionUpgrade.disabled = ascendPoints < ASCENSION_SHOP_COST_AP;
+    }
+    apShopDisplay.textContent = `AP: ${formatNumber(ascendPoints)}`;
 }
 
 function recalcMultiplier() {
@@ -4177,7 +4247,7 @@ function recalcMultiplier() {
     if (hasGalaxyCrown) toolMult *= 5.0;
     toolMultiplier = toolMult;
     
-    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier * ascendMultiplier;
+    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier * ascendMultiplier * getAscensionHoneyMultiplier();
     if (x10HoneyPurchased) totalMult *= 10;
    totalMultDisplay.textContent = `✖️ ${formatMultiplierValue(totalMult)}`;
 }
@@ -4202,7 +4272,7 @@ function setupRPGenerator() {
     if (rpGeneratorLevel > 0) {
         const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000);
         rpGeneratorInterval = setInterval(() => {
-            let rpGain = Math.floor(1 * rpCompoundingMultiplier);
+            let rpGain = Math.floor(1 * rpCompoundingMultiplier * getAscensionRPMultiplier());
             rebirthPoints += rpGain;
             updateRebirthUI();
             saveGame();
@@ -4403,7 +4473,7 @@ function toggleAuto() {
 
 function toggleRPAuto() {
     if (!rpAutoBuyActive) {
-        showGameStatusMessage('Buy RP AUTOBUY upgrade in SP Shop first.');
+        showGameStatusMessage('Buy RP AUTOBUY upgrade in Sacrifice Shop first.');
         return;
     }
     rpAutobuyEnabled = !rpAutobuyEnabled;
@@ -4486,7 +4556,7 @@ rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
         const cost = getRPCost(maxRP);
-        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier);
+        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier * getAscensionRPMultiplier());
         rebirthPoints += rpGain;
         
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
@@ -4500,7 +4570,8 @@ rebirthBtn.addEventListener('click', () => {
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
         updateHireCostDisplay();
         saveGame();
-        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)} => ${rpGain}). Honey reset to 0.`);
+        const rpAscText = getAscensionRPMultiplier() > 1 ? ` * ASC x${formatMultiplierValue(getAscensionRPMultiplier())}` : '';
+        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)}${rpAscText} => ${rpGain}). Honey reset to 0.`);
     } else {
         showGameStatusMessage('Need at least 10,000 honey for 1 RP.');
     }
@@ -4511,7 +4582,7 @@ sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        const spGain = maxSP;
+        const spGain = Math.max(1, Math.floor(maxSP * getAscensionSPMultiplier()));
         honey -= cost.honey;
         rebirthPoints -= cost.rp;
         sacrificePoints += spGain;
@@ -4545,6 +4616,7 @@ sacrificeBtn.addEventListener('click', () => {
         toggleRPAutoBtn.classList.remove('rp-autobuy-active');
         
         setupRPGenerator(); // This will use the preserved rpCompoundingMultiplier
+        applyAscensionAutomationBonuses();
         
         addBee();
         resetFlowerFieldForCurrentLimits();
@@ -4555,7 +4627,8 @@ sacrificeBtn.addEventListener('click', () => {
         updateHireCostDisplay();
         saveGame();
 
-        showGameStatusMessage(`Sacrificed for ${spGain} SP. Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
+        const spAscText = getAscensionSPMultiplier() > 1 ? ` (ASC x${formatMultiplierValue(getAscensionSPMultiplier())})` : '';
+        showGameStatusMessage(`Sacrificed for ${spGain} SP${spAscText}. Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
     } else {
         showGameStatusMessage('Need at least 100M honey and 10 RP for 1 SP.');
     }
@@ -4581,7 +4654,7 @@ ascendBtn.addEventListener('click', () => {
     showGameStatusMessage(`Ascended for +${formatNumber(maxAP)} AP! AP is now ${formatNumber(ascendPoints)} (x${formatMultiplierValue(ascendMultiplier)} honey gains).`);
 });
 
-// ========== SP SHOP ==========
+// ========== SACRIFICE SHOP ==========
 buyX10Honey.addEventListener('click', () => {
     if (sacrificePoints >= 5 && !x10HoneyPurchased) {
         sacrificePoints -= 5;
@@ -4636,6 +4709,26 @@ buyRPCompounding.addEventListener('click', () => {
         updateRebirthUI();
         saveGame();
     }
+});
+
+buyAscensionUpgrade.addEventListener('click', () => {
+    if (ascensionCorePurchased) return;
+    if (ascendPoints < ASCENSION_SHOP_COST_AP) {
+        showGameStatusMessage(`Need ${ASCENSION_SHOP_COST_AP} AP for Ascension Core.`);
+        return;
+    }
+
+    ascendPoints -= ASCENSION_SHOP_COST_AP;
+    ascendPoints = getSafeAscendPoints(ascendPoints);
+    refreshAscendMultiplier();
+    ascensionCorePurchased = true;
+
+    applyAscensionAutomationBonuses();
+    recalcMultiplier();
+    updateRebirthUI();
+    updateSPUI();
+    saveGame();
+    showGameStatusMessage(`Ascension Core purchased: x${formatMultiplierValue(ASCENSION_HONEY_MULTIPLIER)} Honey, x${formatMultiplierValue(ASCENSION_RP_MULTIPLIER)} RP, x${formatMultiplierValue(ASCENSION_SP_MULTIPLIER)} SP, automation enabled.`);
 });
 
 // ========== REBIRTH SHOP ==========
@@ -4743,6 +4836,7 @@ function buildSaveData(includeWorldData = true) {
         compoundingLevel, compoundingMultiplier,
         flowerHpLevel,
         flowerFieldUpgradePurchased,
+        ascensionCorePurchased,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
         autoSpendPercent,
@@ -4855,6 +4949,7 @@ function loadGame() {
         rpCompoundingLevel = finiteOr(data.rpCompoundingLevel, 0);
         rpCompoundingMultiplier = finiteOr(data.rpCompoundingMultiplier, 1.0);
         flowerFieldUpgradePurchased = parseBoolean(data.flowerFieldUpgradePurchased, false);
+        ascensionCorePurchased = parseBoolean(data.ascensionCorePurchased, false);
         rpAutobuyEnabled = data.rpAutobuyEnabled || false;
         autoSpendPercent = normalizeAutoSpendPercent(data.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(data.performanceMode, false);
@@ -4889,6 +4984,10 @@ function loadGame() {
 
         updatePerformanceButton();
         updatePopupBlockButton();
+
+        if (ascensionCorePurchased) {
+            applyAscensionAutomationBonuses();
+        }
 
         if (autoActive && autoUnlocked) {
             toggleAutoBtn.textContent = '▶️ AUTO (ON)';
