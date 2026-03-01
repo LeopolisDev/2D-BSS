@@ -1132,6 +1132,7 @@ document.addEventListener('click', (e) => {
 
 // ========== NUMBER FORMATTING ==========
 const SCIENTIFIC_NOTATION_THRESHOLD = 1e33; // 1 decillion
+const SCIENTIFIC_NOTATION_EXP_THRESHOLD = Math.floor(Math.log10(SCIENTIFIC_NOTATION_THRESHOLD));
 const INFINITY_SOFT_CAP = 1.79e308;
 
 function clampToInfinitySoftCap(value) {
@@ -1162,7 +1163,7 @@ function formatWithOverflow(num, overflowExp = 0, decimals = 2, integerIfSmall =
     const totalExp = baseExp + Math.max(0, Math.floor(Number(overflowExp) || 0));
     const mantissa = absNum / Math.pow(10, baseExp);
 
-    if (totalExp >= 33 || absNum >= SCIENTIFIC_NOTATION_THRESHOLD || overflowExp > 0) {
+    if (totalExp >= SCIENTIFIC_NOTATION_EXP_THRESHOLD || absNum >= SCIENTIFIC_NOTATION_THRESHOLD || overflowExp > 0) {
         return `${sign}${mantissa.toFixed(decimals)}e${totalExp}`;
     }
     if (integerIfSmall) {
@@ -4577,16 +4578,17 @@ function updateRebirthUI() {
 
     const maxRP = getMaxRPFromHoney();
     const ascensionRpMult = getAscensionRPMultiplier();
+    const rpCompText = formatMultiplierValue(rpCompoundingMultiplier);
     if (maxRP > 0) {
         const rawRP = maxRP;
         const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier * ascensionRpMult * loopGainMult);
         const rpBonusText = ascensionRpMult > 1 ? ` * ASC x${formatMultiplierValue(ascensionRpMult)}` : '';
         const loopText = loopGainMult > 1 ? ` * LOOP x${formatMultiplierValue(loopGainMult)}` : '';
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (COMP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText}${loopText})`;
+        rebirthInfo.textContent = `${formatNumber(multipliedRP)} RP = ${formatNumber(getRPCost(maxRP))}🍯 (COMP x${rpCompText}${rpBonusText}${loopText})`;
     } else {
         const rpBonusText = ascensionRpMult > 1 ? ` * ASC x${formatMultiplierValue(ascensionRpMult)}` : '';
         const loopText = loopGainMult > 1 ? ` * LOOP x${formatMultiplierValue(loopGainMult)}` : '';
-        rebirthInfo.textContent = `1 RP = 10k (COMP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText}${loopText})`;
+        rebirthInfo.textContent = `1 RP = 10k (COMP x${rpCompText}${rpBonusText}${loopText})`;
     }
 
     const maxSP = getMaxSPFromResources();
@@ -4600,7 +4602,7 @@ function updateRebirthUI() {
         if (ascensionSpMult > 1) spBonusParts.push(`ASC x${formatMultiplierValue(ascensionSpMult)}`);
         if (loopGainMult > 1) spBonusParts.push(`LOOP x${formatMultiplierValue(loopGainMult)}`);
         const spBonusText = spBonusParts.length ? ` (${spBonusParts.join(' * ')})` : '';
-        sacrificeInfo.textContent = `${multipliedSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP${spBonusText}`;
+        sacrificeInfo.textContent = `${formatNumber(multipliedSP)} SP = ${formatNumber(cost.honey)}🍯 + ${formatNumber(cost.rp)} RP${spBonusText}`;
     } else {
         const spBonusParts = [];
         if (spCompoundingMultiplier > 1) spBonusParts.push(`COMP x${formatMultiplierValue(spCompoundingMultiplier)}`);
@@ -4632,7 +4634,7 @@ function updateRebirthUI() {
     
     if (beeSpeedMultiplier > BEE_SPEED_MULTIPLIER_BASE) {
         speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        speedBoost.textContent = `(x${beeSpeedMultiplier.toFixed(1)})`;
+        speedBoost.textContent = `(x${formatMultiplierValue(beeSpeedMultiplier)})`;
         buyBeeSpeed.disabled = true;
     } else {
         speedStatus.textContent = '(1 RP)';
@@ -4642,7 +4644,7 @@ function updateRebirthUI() {
     
     if (capacityMultiplier > 1.0) {
         capacityStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
-        capacityBoost.textContent = `(x${capacityMultiplier.toFixed(1)})`;
+        capacityBoost.textContent = `(x${formatMultiplierValue(capacityMultiplier)})`;
         buyCapacity.disabled = true;
     } else {
         capacityStatus.textContent = '(3 RP)';
@@ -4660,9 +4662,9 @@ function updateRebirthUI() {
     
     const compoundingCost = Math.pow(2, compoundingLevel);
     compoundingLevelSpan.textContent = compoundingLevel;
-    compoundingCostSpan.textContent = compoundingCost;
-    const compoundingBonus = ((compoundingMultiplier - 1) * 100).toFixed(1);
-    buyCompounding.innerHTML = `📈 HONEY COMPOUNDING lv<span id="compoundingLevel">${compoundingLevel}</span> (<span id="compoundingCost">${compoundingCost}</span> RP) +${compoundingBonus}%`;
+    compoundingCostSpan.textContent = formatNumber(compoundingCost);
+    const compoundingBonus = formatNumber((compoundingMultiplier - 1) * 100);
+    buyCompounding.innerHTML = `📈 HONEY COMPOUNDING lv<span id="compoundingLevel">${formatNumber(compoundingLevel)}</span> (<span id="compoundingCost">${formatNumber(compoundingCost)}</span> RP) +${compoundingBonus}%`;
     buyCompounding.disabled = rebirthPoints < compoundingCost;
 
     flowerHpLevel = getSafeFlowerHpLevel(flowerHpLevel);
@@ -4705,8 +4707,8 @@ function updateSPUI() {
     
     const nextLevel = rpGeneratorLevel + 1;
     const genCost = nextLevel;
-    rpGenLevel.textContent = rpGeneratorLevel;
-    rpGenCost.textContent = genCost;
+    rpGenLevel.textContent = formatNumber(rpGeneratorLevel);
+    rpGenCost.textContent = formatNumber(genCost);
     let intervalTime = 5;
     if (rpGeneratorLevel > 0) {
         intervalTime = Math.max(1, 5 - (rpGeneratorLevel - 1));
@@ -4714,20 +4716,20 @@ function updateSPUI() {
     rpGenTime.textContent = intervalTime + 's';
     
     const currentGenRP = Math.floor(1 * rpCompoundingMultiplier * getAscensionRPMultiplier() * loopGainMult);
-    rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
+    rpGenPreview.textContent = `(${formatNumber(currentGenRP)} RP/s)`;
     
     if (rpGeneratorLevel >= 5) {
-        buyRPGen.innerHTML = `⏱️ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s)</span>`;
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${formatNumber(currentGenRP)} RP/s)</span>`;
         buyRPGen.disabled = true;
     } else {
-        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${rpGeneratorLevel}</span> (<span id="rpGenCost">${genCost}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${currentGenRP} RP/s next)</span>`;
+        buyRPGen.innerHTML = `⏱️ RP GENERATOR lv<span id="rpGenLevel">${formatNumber(rpGeneratorLevel)}</span> (<span id="rpGenCost">${formatNumber(genCost)}</span> SP) <span id="rpGenTime">${intervalTime}s</span> <span class="preview-text">(${formatNumber(currentGenRP)} RP/s next)</span>`;
         buyRPGen.disabled = sacrificePoints < genCost;
     }
 
     const compCost = Math.pow(2, rpCompoundingLevel);
-    rpCompLevel.textContent = rpCompoundingLevel;
-    rpCompCost.textContent = compCost;
-    rpCompMult.textContent = rpCompoundingMultiplier.toFixed(2);
+    rpCompLevel.textContent = formatNumber(rpCompoundingLevel);
+    rpCompCost.textContent = formatNumber(compCost);
+    rpCompMult.textContent = formatMultiplierValue(rpCompoundingMultiplier);
     buyRPCompounding.disabled = sacrificePoints < compCost;
 
     if (ascensionCorePurchased) {
@@ -4750,8 +4752,8 @@ function updateSPUI() {
     const nextSPGenLevel = spGeneratorLevel + 1;
     const spGenCostValue = getSPGeneratorAPCost(nextSPGenLevel);
     const spGenInterval = getSPGeneratorIntervalSeconds(Math.max(1, spGeneratorLevel));
-    spGenLevel.textContent = spGeneratorLevel;
-    spGenCost.textContent = spGenCostValue;
+    spGenLevel.textContent = formatNumber(spGeneratorLevel);
+    spGenCost.textContent = formatNumber(spGenCostValue);
     spGenTime.textContent = `${spGenInterval}s`;
     const spPerTick = Math.max(1, Math.floor(1 * loopGainMult));
     spGenPreview.textContent = `(+${formatNumber(spPerTick)} SP / ${spGenInterval}s)`;
@@ -4760,16 +4762,16 @@ function updateSPUI() {
         buySPGen.innerHTML = `⏱️ SP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+${formatNumber(spPerTick)} SP / ${spGenInterval}s)</span>`;
         buySPGen.disabled = true;
     } else {
-        buySPGen.innerHTML = `⏱️ SP GENERATOR lv<span id="spGenLevel">${spGeneratorLevel}</span> (<span id="spGenCost">${spGenCostValue}</span> AP) <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+${formatNumber(spPerTick)} SP / ${spGenInterval}s)</span>`;
+        buySPGen.innerHTML = `⏱️ SP GENERATOR lv<span id="spGenLevel">${formatNumber(spGeneratorLevel)}</span> (<span id="spGenCost">${formatNumber(spGenCostValue)}</span> AP) <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+${formatNumber(spPerTick)} SP / ${spGenInterval}s)</span>`;
         buySPGen.disabled = ascendPoints < spGenCostValue;
     }
 
     spCompoundingLevel = getSafeSPCompoundingLevel(spCompoundingLevel);
     const spCompCostValue = getSPCompoundingAPCost(spCompoundingLevel);
-    spCompLevel.textContent = spCompoundingLevel;
-    spCompCost.textContent = spCompCostValue;
-    spCompMult.textContent = spCompoundingMultiplier.toFixed(2);
-    buySPCompounding.innerHTML = `📈 SP COMPOUNDING lv<span id="spCompLevel">${spCompoundingLevel}</span> (<span id="spCompCost">${spCompCostValue}</span> AP) x<span id="spCompMult">${spCompoundingMultiplier.toFixed(2)}</span>`;
+    spCompLevel.textContent = formatNumber(spCompoundingLevel);
+    spCompCost.textContent = formatNumber(spCompCostValue);
+    spCompMult.textContent = formatMultiplierValue(spCompoundingMultiplier);
+    buySPCompounding.innerHTML = `📈 SP COMPOUNDING lv<span id="spCompLevel">${formatNumber(spCompoundingLevel)}</span> (<span id="spCompCost">${formatNumber(spCompCostValue)}</span> AP) x<span id="spCompMult">${formatMultiplierValue(spCompoundingMultiplier)}</span>`;
     buySPCompounding.disabled = ascendPoints < spCompCostValue;
 
     apShopDisplay.textContent = `AP: ${formatNumber(ascendPoints)}`;
@@ -5357,7 +5359,7 @@ rebirthBtn.addEventListener('click', () => {
         saveGame();
         const rpAscText = getAscensionRPMultiplier() > 1 ? ` * ASC x${formatMultiplierValue(getAscensionRPMultiplier())}` : '';
         const rpLoopText = loopGainMult > 1 ? ` * LOOP x${formatMultiplierValue(loopGainMult)}` : '';
-        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)}${rpAscText}${rpLoopText} => ${rpGain}). Honey reset to 0.`);
+        showGameStatusMessage(`Purchased ${formatNumber(maxRP)} RP (x${formatMultiplierValue(rpCompoundingMultiplier)}${rpAscText}${rpLoopText} => ${formatNumber(rpGain)}). Honey reset to 0.`);
     } else {
         showGameStatusMessage('Need at least 10,000 honey for 1 RP.');
     }
@@ -5421,7 +5423,7 @@ sacrificeBtn.addEventListener('click', () => {
         if (getAscensionSPMultiplier() > 1) spBonusParts.push(`ASC x${formatMultiplierValue(getAscensionSPMultiplier())}`);
         if (loopGainMult > 1) spBonusParts.push(`LOOP x${formatMultiplierValue(loopGainMult)}`);
         const spBonusText = spBonusParts.length ? ` (${spBonusParts.join(' * ')})` : '';
-        showGameStatusMessage(`Sacrificed for ${spGain} SP${spBonusText}. Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
+        showGameStatusMessage(`Sacrificed for ${formatNumber(spGain)} SP${spBonusText}. Honey reset to 0. RP Compounding kept at lv${formatNumber(rpCompoundingLevel)} (${formatMultiplierValue(rpCompoundingMultiplier)}x).`);
     } else {
         showGameStatusMessage('Need at least 100M honey and 10 RP for 1 SP.');
     }
@@ -5589,7 +5591,7 @@ buySPCompounding.addEventListener('click', () => {
     updateRebirthUI();
     updateSPUI();
     saveGame();
-    showGameStatusMessage(`SP Compounding lv${spCompoundingLevel} (x${spCompoundingMultiplier.toFixed(2)}).`);
+    showGameStatusMessage(`SP Compounding lv${formatNumber(spCompoundingLevel)} (x${formatMultiplierValue(spCompoundingMultiplier)}).`);
 });
 
 // ========== REBIRTH SHOP ==========
@@ -5718,6 +5720,13 @@ trueEndResetBtn.addEventListener('click', async () => {
     updateRebirthUI();
     updateToolButtons();
     updateSPUI();
+    if (playerName) {
+        try {
+            await removePlayerFromLeaderboard(playerName);
+        } catch (error) {
+            console.warn('Failed to clear leaderboard entry on TRUE END RESET:', error);
+        }
+    }
     saveGame();
     showGameStatusMessage('TRUE END RESET activated: Honey multiplier doubles every second.');
 });
@@ -5738,7 +5747,7 @@ breakInfinityBtn.addEventListener('click', () => {
     showGameStatusMessage('You broke Infinity. LOOP is now unlocked.');
 });
 
-loopBtn.addEventListener('click', () => {
+loopBtn.addEventListener('click', async () => {
     if (!trueEndResetDone || !trueEndInfinityBroken) return;
     const nextLoopMult = getLoopGainMultiplier() * 2;
     if (!confirm(`LOOP will reset everything and set gain multiplier to x${formatMultiplierValue(nextLoopMult)}. Continue?`)) return;
@@ -5764,6 +5773,13 @@ loopBtn.addEventListener('click', () => {
     updateRebirthUI();
     updateToolButtons();
     updateSPUI();
+    if (playerName) {
+        try {
+            await removePlayerFromLeaderboard(playerName);
+        } catch (error) {
+            console.warn('Failed to clear leaderboard entry on LOOP:', error);
+        }
+    }
     saveGame();
     showGameStatusMessage(`Loop complete. Global gain multiplier is now x${formatMultiplierValue(loopMultiplier)}.`);
 });
