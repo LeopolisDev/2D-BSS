@@ -3463,7 +3463,7 @@ const SAVE_KEY = 'beeSwarmSave';
 
 // ========== RP PRICING ==========
 function getRPCost(rpNumber) {
-    return Math.floor(10000 * Math.pow(1.5, rpNumber - 1));
+    return Math.floor(10000 * Math.pow(1.2, rpNumber - 1));
 }
 
 function getMaxRPFromHoney() {
@@ -3476,7 +3476,7 @@ function getMaxRPFromHoney() {
 function getSPCost(spNumber) {
     return {
         honey: Math.floor(100000000 * Math.pow(1.5, spNumber - 1)),
-        rp: Math.floor(10 * Math.pow(1.5, spNumber - 1))
+        rp: Math.floor(10 * Math.pow(1.2, spNumber - 1))
     };
 }
 
