@@ -840,7 +840,7 @@
         <!-- ASCENSION SHOP -->
         <div class="sp-shop-row ascension-shop-row">
     <span style="color:#fff4c2; font-weight:bold;">✨ ASCENSION SHOP:</span>
-    <button class="tool-btn ascend-btn" id="buyAscensionUpgrade">🌟 ASCENSION CORE (3 AP) x1000🍯 x25 RP x5 SP + AUTO</button>
+    <button class="tool-btn ascend-btn" id="buyAscensionUpgrade">🌟 ASCENSION CORE (3 AP) x1000🍯 x25 RP x5 SP + ALL AUTO</button>
     <span class="multiplier-badge" id="apShopDisplay">AP: 0</span>
 </div>
 
@@ -4230,7 +4230,7 @@ function updateSPUI() {
         buyAscensionUpgrade.innerHTML = '🌟 ASCENSION CORE MAXED <span class="maxed-badge">MAX</span>';
         buyAscensionUpgrade.disabled = true;
     } else {
-        buyAscensionUpgrade.innerHTML = `🌟 ASCENSION CORE (${ASCENSION_SHOP_COST_AP} AP) x${formatMultiplierValue(ASCENSION_HONEY_MULTIPLIER)}🍯 x${formatMultiplierValue(ASCENSION_RP_MULTIPLIER)} RP x${formatMultiplierValue(ASCENSION_SP_MULTIPLIER)} SP + AUTO`;
+        buyAscensionUpgrade.innerHTML = `🌟 ASCENSION CORE (${ASCENSION_SHOP_COST_AP} AP) x${formatMultiplierValue(ASCENSION_HONEY_MULTIPLIER)}🍯 x${formatMultiplierValue(ASCENSION_RP_MULTIPLIER)} RP x${formatMultiplierValue(ASCENSION_SP_MULTIPLIER)} SP + ALL AUTO`;
         buyAscensionUpgrade.disabled = ascendPoints < ASCENSION_SHOP_COST_AP;
     }
     apShopDisplay.textContent = `AP: ${formatNumber(ascendPoints)}`;
