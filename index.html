@@ -642,6 +642,7 @@
             <div class="menu-row">
                 <select id="menuAdminStatSelect" class="admin-select" style="width:100%;">
                     <option value="honey">🍯 Honey</option>
+                    <option value="leaderboard_honey">🏆 Leaderboard Honey</option>
                     <option value="rp">🔥 RP</option>
                     <option value="sp">💥 SP</option>
                 </select>
@@ -1405,7 +1406,7 @@ function applyLoadedSaveData(saveData) {
     hasGalaxyCrown = parseBoolean(saveData.hasGalaxyCrown, false);
 
     autoUnlocked = parseBoolean(saveData.autoUnlocked, false);
-    beeSpeedMultiplier = finiteOr(saveData.beeSpeedMultiplier, 1.0);
+    beeSpeedMultiplier = clampBeeSpeedMultiplier(finiteOr(saveData.beeSpeedMultiplier, BEE_SPEED_MULTIPLIER_BASE));
     capacityMultiplier = finiteOr(saveData.capacityMultiplier, 1.0);
     honeyMultUpgrade = finiteOr(saveData.honeyMultUpgrade, 1.0);
     compoundingLevel = finiteOr(saveData.compoundingLevel, 0);
@@ -1758,6 +1759,38 @@ async function getAllKnownPlayerNamesForAdmin() {
     return Array.from(namesByKey.values());
 }
 
+async function getActiveBannedPlayerNameKeySet() {
+    const bannedNameKeys = new Set();
+    try {
+        const snapshot = await playerBansRef.once('value');
+        const data = snapshot.val() || {};
+        for (const [key, value] of Object.entries(data)) {
+            if (!value || typeof value !== 'object') continue;
+            if (!parseBoolean(value.active, true)) continue;
+
+            const bannedName = normalizePlayerName(value.name || key);
+            const bannedKey = normalizePlayerNameKey(bannedName);
+            if (!bannedKey) continue;
+            bannedNameKeys.add(bannedKey);
+        }
+    } catch (error) {
+        console.warn('Unable to load active bans for admin filtering:', error);
+    }
+    return bannedNameKeys;
+}
+
+function excludeBannedPlayers(playerNames, bannedNameKeys) {
+    const filtered = [];
+    for (const name of Array.isArray(playerNames) ? playerNames : []) {
+        const normalized = normalizePlayerName(name);
+        const key = normalizePlayerNameKey(normalized);
+        if (!normalized || !key) continue;
+        if (bannedNameKeys && bannedNameKeys.has(key)) continue;
+        filtered.push(normalized);
+    }
+    return Array.from(new Set(filtered));
+}
+
 function isSamePlayerName(left, right) {
     const leftName = normalizePlayerName(left).toLowerCase();
     const rightName = normalizePlayerName(right).toLowerCase();
@@ -1924,7 +1957,7 @@ function resetAllGameDataState() {
     sacrificePoints = 0;
 
     autoUnlocked = false;
-    beeSpeedMultiplier = 1.0;
+    beeSpeedMultiplier = BEE_SPEED_MULTIPLIER_BASE;
     capacityMultiplier = 1.0;
     honeyMultUpgrade = 1.0;
     compoundingLevel = 0;
@@ -2262,35 +2295,51 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
     ));
     if (normalizedTargets.length === 0) return;
 
-    await adminGrantsRef.transaction((current) => {
-        const root = current && typeof current === 'object' ? current : {};
-        const now = Date.now();
+    try {
+        await adminGrantsRef.transaction((current) => {
+            const root = current && typeof current === 'object' ? current : {};
+            const now = Date.now();
 
+            for (const targetName of normalizedTargets) {
+                const key = sanitizeFirebaseKey(targetName);
+                if (!key) continue;
+
+                const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
+                const next = {
+                    name: targetName,
+                    honey: toSafeAmount(safeCurrent.honey),
+                    rp: toSafeAmount(safeCurrent.rp),
+                    sp: toSafeAmount(safeCurrent.sp),
+                    resetHoney: parseBoolean(safeCurrent.resetHoney, false),
+                    resetRp: parseBoolean(safeCurrent.resetRp, false),
+                    resetSp: parseBoolean(safeCurrent.resetSp, false),
+                    resetAll: parseBoolean(safeCurrent.resetAll, false),
+                    updatedAt: now
+                };
+
+                if (stat === 'honey') next.honey += amount;
+                if (stat === 'rp') next.rp += amount;
+                if (stat === 'sp') next.sp += amount;
+                root[key] = next;
+            }
+
+            return root;
+        });
+    } catch (bulkError) {
+        console.warn('Bulk admin grant transaction failed, falling back to per-player writes:', bulkError);
+        let successCount = 0;
         for (const targetName of normalizedTargets) {
-            const key = sanitizeFirebaseKey(targetName);
-            if (!key) continue;
-
-            const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
-            const next = {
-                name: targetName,
-                honey: toSafeAmount(safeCurrent.honey),
-                rp: toSafeAmount(safeCurrent.rp),
-                sp: toSafeAmount(safeCurrent.sp),
-                resetHoney: parseBoolean(safeCurrent.resetHoney, false),
-                resetRp: parseBoolean(safeCurrent.resetRp, false),
-                resetSp: parseBoolean(safeCurrent.resetSp, false),
-                resetAll: parseBoolean(safeCurrent.resetAll, false),
-                updatedAt: now
-            };
-
-            if (stat === 'honey') next.honey += amount;
-            if (stat === 'rp') next.rp += amount;
-            if (stat === 'sp') next.sp += amount;
-            root[key] = next;
+            try {
+                await queueAdminGrant(targetName, stat, amount);
+                successCount++;
+            } catch (error) {
+                console.warn(`Failed to queue admin grant for ${targetName}:`, error);
+            }
         }
-
-        return root;
-    });
+        if (successCount === 0) {
+            throw bulkError;
+        }
+    }
 }
 
 async function queueAdminReset(targetPlayer, resetStat) {
@@ -2381,35 +2430,51 @@ async function addHoneyToPlayersScoreBulk(targetPlayers, amount) {
     ));
     if (normalizedTargets.length === 0) return;
 
-    await leaderboardRef.transaction((current) => {
-        const root = current && typeof current === 'object' ? current : {};
-        const existingKeyByName = new Map();
+    try {
+        await leaderboardRef.transaction((current) => {
+            const root = current && typeof current === 'object' ? current : {};
+            const existingKeyByName = new Map();
 
-        for (const [key, value] of Object.entries(root)) {
-            if (!value || typeof value !== 'object') continue;
-            const nameKey = normalizePlayerNameKey(value.name);
-            if (!nameKey || existingKeyByName.has(nameKey)) continue;
-            existingKeyByName.set(nameKey, key);
-        }
+            for (const [key, value] of Object.entries(root)) {
+                if (!value || typeof value !== 'object') continue;
+                const nameKey = normalizePlayerNameKey(value.name);
+                if (!nameKey || existingKeyByName.has(nameKey)) continue;
+                existingKeyByName.set(nameKey, key);
+            }
 
+            for (const targetName of normalizedTargets) {
+                const nameKey = normalizePlayerNameKey(targetName);
+                if (!nameKey) continue;
+
+                const key = existingKeyByName.get(nameKey) || sanitizeFirebaseKey(targetName);
+                if (!key) continue;
+
+                const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
+                root[key] = {
+                    ...safeCurrent,
+                    name: targetName,
+                    total: toSafeAmount(safeCurrent.total) + amount
+                };
+                existingKeyByName.set(nameKey, key);
+            }
+
+            return root;
+        });
+    } catch (bulkError) {
+        console.warn('Bulk leaderboard update failed, falling back to per-player writes:', bulkError);
+        let successCount = 0;
         for (const targetName of normalizedTargets) {
-            const nameKey = normalizePlayerNameKey(targetName);
-            if (!nameKey) continue;
-
-            const key = existingKeyByName.get(nameKey) || sanitizeFirebaseKey(targetName);
-            if (!key) continue;
-
-            const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
-            root[key] = {
-                ...safeCurrent,
-                name: targetName,
-                total: toSafeAmount(safeCurrent.total) + amount
-            };
-            existingKeyByName.set(nameKey, key);
+            try {
+                await addHoneyToPlayerScore(targetName, amount);
+                successCount++;
+            } catch (error) {
+                console.warn(`Failed leaderboard add for ${targetName}:`, error);
+            }
         }
-
-        return root;
-    });
+        if (successCount === 0) {
+            throw bulkError;
+        }
+    }
 }
 
 async function resetPlayersHoneyScoreBulk(targetPlayers) {
@@ -2822,7 +2887,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
         const stat = menuAdminStatSelect.value;
         const amount = toSafeAmount(menuAdminAmount.value);
     
-        if (!['honey', 'rp', 'sp'].includes(stat)) {
+        if (!['honey', 'leaderboard_honey', 'rp', 'sp'].includes(stat)) {
             alert('Invalid currency type');
             return;
         }
@@ -2838,9 +2903,12 @@ menuAdminAddBtn.addEventListener('click', async () => {
         }
     
         if (targetPlayer === '__ALL__') {
-            const allPlayers = await getAllKnownPlayerNamesForAdmin();
+            const allKnownPlayers = await getAllKnownPlayerNamesForAdmin();
+            const activeBannedNameKeys = await getActiveBannedPlayerNameKeySet();
+            const allPlayers = excludeBannedPlayers(allKnownPlayers, activeBannedNameKeys);
+            const skippedBannedCount = Math.max(0, allKnownPlayers.length - allPlayers.length);
             if (allPlayers.length === 0) {
-                alert('No players found to update.');
+                alert('No eligible (non-banned) players found to update.');
                 return;
             }
 
@@ -2852,6 +2920,9 @@ menuAdminAddBtn.addEventListener('click', async () => {
                     honey += amount;
                     totalHoneyEarned += amount;
                     await submitScore(totalHoneyEarned);
+                } else if (stat === 'leaderboard_honey') {
+                    await addHoneyToPlayerScore(playerName, amount);
+                    leaderboardHoneyUpdated = true;
                 } else if (stat === 'rp') {
                     rebirthPoints += amount;
                 } else if (stat === 'sp') {
@@ -2860,10 +2931,15 @@ menuAdminAddBtn.addEventListener('click', async () => {
             }
 
             if (otherPlayers.length > 0) {
-                await queueAdminGrantBulk(otherPlayers, stat, amount);
-                if (stat === 'honey') {
+                if (stat === 'leaderboard_honey') {
                     await addHoneyToPlayersScoreBulk(otherPlayers, amount);
                     leaderboardHoneyUpdated = true;
+                } else {
+                    await queueAdminGrantBulk(otherPlayers, stat, amount);
+                    if (stat === 'honey') {
+                        await addHoneyToPlayersScoreBulk(otherPlayers, amount);
+                        leaderboardHoneyUpdated = true;
+                    }
                 }
             }
 
@@ -2872,8 +2948,10 @@ menuAdminAddBtn.addEventListener('click', async () => {
             updateToolButtons();
             updateSPUI();
             saveGame();
-    
-            alert(`✅ Added ${amount} ${stat.toUpperCase()} to ALL (${allPlayers.length}) players`);
+
+            const statLabel = stat === 'leaderboard_honey' ? 'LEADERBOARD HONEY' : stat.toUpperCase();
+            const bannedSuffix = skippedBannedCount > 0 ? ` (skipped ${skippedBannedCount} banned)` : '';
+            alert(`✅ Added ${amount} ${statLabel} to ALL (${allPlayers.length}) players${bannedSuffix}`);
             return;
         }
 
@@ -2882,16 +2960,24 @@ menuAdminAddBtn.addEventListener('click', async () => {
                 honey += amount;
                 totalHoneyEarned += amount;
                 await submitScore(totalHoneyEarned);
+            } else if (stat === 'leaderboard_honey') {
+                await addHoneyToPlayerScore(playerName, amount);
+                leaderboardHoneyUpdated = true;
             } else if (stat === 'rp') {
                 rebirthPoints += amount;
             } else if (stat === 'sp') {
                 sacrificePoints += amount;
             }
         } else {
-            await queueAdminGrant(targetPlayer, stat, amount);
-            if (stat === 'honey') {
+            if (stat === 'leaderboard_honey') {
                 await addHoneyToPlayerScore(targetPlayer, amount);
                 leaderboardHoneyUpdated = true;
+            } else {
+                await queueAdminGrant(targetPlayer, stat, amount);
+                if (stat === 'honey') {
+                    await addHoneyToPlayerScore(targetPlayer, amount);
+                    leaderboardHoneyUpdated = true;
+                }
             }
         }
 
@@ -2900,7 +2986,8 @@ menuAdminAddBtn.addEventListener('click', async () => {
         updateToolButtons();
         updateSPUI();
         saveGame();
-        alert(`✅ Added ${amount} ${stat.toUpperCase()} to ${targetPlayer}`);
+        const statLabel = stat === 'leaderboard_honey' ? 'LEADERBOARD HONEY' : stat.toUpperCase();
+        alert(`✅ Added ${amount} ${statLabel} to ${targetPlayer}`);
 
     } catch (error) {
         console.error('Admin add failed:', error);
@@ -3361,7 +3448,10 @@ const FLOWER_BASE_UPGRADED = 50;
 const FLOWER_CLICK_DEFAULT = 15;
 const FLOWER_CLICK_UPGRADED = 50;
 const FLOWER_FIELD_UPGRADE_COST = 25;
-const BEE_SPEED_BASE = 1.1;
+const BEE_SPEED_BASE = 1;
+const BEE_SPEED_MULTIPLIER_BASE = 1.0;
+const BEE_SPEED_UPGRADE_MULTIPLIER = 1.5;
+const BEE_SPEED_MULTIPLIER_MAX = BEE_SPEED_UPGRADE_MULTIPLIER;
 const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
 const FLOWER_HP_COST_BASE = 50;
@@ -3419,7 +3509,7 @@ let sacrificePoints = 0;
 
 // Rebirth upgrades
 let autoUnlocked = false;
-let beeSpeedMultiplier = 1.0;
+let beeSpeedMultiplier = BEE_SPEED_MULTIPLIER_BASE;
 let capacityMultiplier = 1.0;
 let honeyMultUpgrade = 1.0;
 let compoundingLevel = 0;
@@ -3538,6 +3628,7 @@ function trySpawnClickedFlower(x, y) {
 
 function update() {
     if (gameplayBlocked) return;
+    beeSpeedMultiplier = clampBeeSpeedMultiplier(beeSpeedMultiplier);
 
     let activeFlowerCount = getActiveFlowerCount();
     for (let i = flowers.length - 1; i >= 0; i--) {
@@ -3630,6 +3721,8 @@ function update() {
 }
 
 function updateRebirthUI() {
+    beeSpeedMultiplier = clampBeeSpeedMultiplier(beeSpeedMultiplier);
+
     rpSpan.textContent = formatNumber(rebirthPoints);
     rpBadge.textContent = `RP: ${formatNumber(rebirthPoints)}`;
     rpShopDisplay.textContent = `RP: ${formatNumber(rebirthPoints)}`;
@@ -3664,7 +3757,7 @@ function updateRebirthUI() {
         buyAutoUpgrade.disabled = rebirthPoints < 2;
     }
     
-    if (beeSpeedMultiplier > 1.0) {
+    if (beeSpeedMultiplier > BEE_SPEED_MULTIPLIER_BASE) {
         speedStatus.innerHTML = 'MAXED <span class="maxed-badge">MAX</span>';
         speedBoost.textContent = `(x${beeSpeedMultiplier.toFixed(1)})`;
         buyBeeSpeed.disabled = true;
@@ -3823,7 +3916,7 @@ function setupRPAutoBuy() {
                 buyFlowerHP.click();
             } else if (!autoUnlocked && rebirthPoints >= 2) {
                 buyAutoUpgrade.click();
-            } else if (beeSpeedMultiplier === 1.0 && rebirthPoints >= 1) {
+            } else if (beeSpeedMultiplier < BEE_SPEED_MULTIPLIER_MAX && rebirthPoints >= 1) {
                 buyBeeSpeed.click();
             } else if (capacityMultiplier === 1.0 && rebirthPoints >= 3) {
                 buyCapacity.click();
@@ -3881,6 +3974,12 @@ function getSafeBeeCount(value, fallback = 1) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
     return Math.max(1, Math.floor(parsed));
+}
+
+function clampBeeSpeedMultiplier(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return BEE_SPEED_MULTIPLIER_BASE;
+    return Math.max(BEE_SPEED_MULTIPLIER_BASE, Math.min(BEE_SPEED_MULTIPLIER_MAX, parsed));
 }
 
 function computeNextHireCostFromBeeCount(beeCount) {
@@ -4119,7 +4218,7 @@ sacrificeBtn.addEventListener('click', () => {
         
         // Reset rebirth upgrades but KEEP SP upgrades
         autoUnlocked = false;
-        beeSpeedMultiplier = 1.0;
+        beeSpeedMultiplier = BEE_SPEED_MULTIPLIER_BASE;
         capacityMultiplier = 1.0;
         honeyMultUpgrade = 1.0;
         compoundingLevel = 0;
@@ -4225,9 +4324,9 @@ buyAutoUpgrade.addEventListener('click', () => {
 });
 
 buyBeeSpeed.addEventListener('click', () => { 
-    if (rebirthPoints >= 1 && beeSpeedMultiplier === 1.0) { 
+    if (rebirthPoints >= 1 && beeSpeedMultiplier < BEE_SPEED_MULTIPLIER_MAX) { 
         rebirthPoints -= 1; 
-        beeSpeedMultiplier = 1.5; 
+        beeSpeedMultiplier = BEE_SPEED_MULTIPLIER_MAX; 
         updateRebirthUI(); 
         saveGame(); 
     } 
@@ -4397,7 +4496,7 @@ function loadGame() {
         rebirthPoints = finiteOr(data.rebirthPoints, 0);
         sacrificePoints = finiteOr(data.sacrificePoints, 0);
         autoUnlocked = data.autoUnlocked || false;
-        beeSpeedMultiplier = finiteOr(data.beeSpeedMultiplier, 1.0);
+        beeSpeedMultiplier = clampBeeSpeedMultiplier(finiteOr(data.beeSpeedMultiplier, BEE_SPEED_MULTIPLIER_BASE));
         capacityMultiplier = finiteOr(data.capacityMultiplier, 1.0);
         honeyMultUpgrade = finiteOr(data.honeyMultUpgrade, 1.0);
         compoundingLevel = finiteOr(data.compoundingLevel, 0);
@@ -4480,6 +4579,19 @@ function loadGame() {
     }
 }
 
+function persistGameForPageExit() {
+    if (gameplayBlocked) return;
+    saveGame({ skipLeaderboardSubmit: true });
+}
+
+window.addEventListener('beforeunload', persistGameForPageExit);
+window.addEventListener('pagehide', persistGameForPageExit);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        persistGameForPageExit();
+    }
+});
+
 // ========== INIT ==========
 async function init() {
     // 1. Wait for auth state to settle
@@ -4512,6 +4624,7 @@ async function init() {
         startAdminGrantWatcher();
         startBanWatchers();
         await claimAdminGrants();
+        await submitScore(totalHoneyEarned);
     }
     applyPopupPreference();
     updatePerformanceButton();
@@ -4520,7 +4633,7 @@ async function init() {
     updateAutoSpendButton();
     updateHireCostDisplay();
     if (!gameplayBlocked) {
-        saveGame();
+        saveGame({ skipLeaderboardSubmit: true });
     }
 }
 init();
