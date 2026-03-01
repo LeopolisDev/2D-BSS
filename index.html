@@ -705,7 +705,7 @@
                     <option value="sp">💥 SP</option>
                     <option value="ap">🤍 AP</option>
                 </select>
-                <input type="text" id="menuAdminAmount" class="adder-input" value="1000" inputmode="decimal" style="width:110px;" placeholder="1000 / 1e9">
+                <input type="text" id="menuAdminAmount" class="adder-input" value="1000" inputmode="text" style="width:110px;" placeholder="1000 / 1e10000+">
                 <button class="menu-btn" id="menuAdminAddBtn">➕ ADD</button>
             </div>
             
@@ -977,7 +977,7 @@ let ipBanWatchRef = null;
 let banEnforcementInProgress = false;
 let gameplayBlocked = false;
 
-const ONE_TIME_REDEEM_CODES = new Set(['release']);
+const ONE_TIME_REDEEM_CODES = new Set(['endgame']);
 let redeemedCodeKeys = new Set();
 let adminClaimVerified = false;
 let adminAddInProgress = false;
@@ -1134,6 +1134,7 @@ document.addEventListener('click', (e) => {
 const SCIENTIFIC_NOTATION_THRESHOLD = 1e33; // 1 decillion
 const SCIENTIFIC_NOTATION_EXP_THRESHOLD = Math.floor(Math.log10(SCIENTIFIC_NOTATION_THRESHOLD));
 const INFINITY_SOFT_CAP = 1.79e308;
+const MAX_TRACKED_OVERFLOW_EXP = 1_000_000_000;
 
 function clampToInfinitySoftCap(value) {
     const n = Number(value);
@@ -1287,7 +1288,7 @@ function togglePopupBlockMode() {
 
 // ========== REDEEM CODE SYSTEM ==========
 const validCodes = {
-    'release': { honey: 100000, rp: 5, sp: 0, message: 'Release code redeemed! +100k Honey, +5 RP' },
+    'endgame': { honey: 10_000_000, rp: 250, sp: 5, message: 'ENDGAME redeemed! +10M Honey, +250 RP, +5 SP' },
 };
 
 function normalizeRedeemCodeKey(code) {
@@ -2066,12 +2067,170 @@ function getResetStatDisplayName(resetStat) {
 }
 
 function toSafeAmount(value) {
-    const parsed = Number(String(value ?? '').replace(/,/g, '').trim());
-    if (!Number.isFinite(parsed) || parsed < 0) return 0;
-    return Math.floor(parsed);
+    const raw = String(value ?? '').replace(/,/g, '').trim();
+    if (!raw) return 0;
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+        // Accept huge scientific notation like 1e10000 by clamping to the max numeric range.
+        return parsed === Infinity ? Math.floor(INFINITY_SOFT_CAP) : 0;
+    }
+    if (parsed < 0) return 0;
+    return Math.floor(Math.max(0, clampToInfinitySoftCap(parsed)));
 }
 
-async function addHoneyToPlayerScore(targetPlayer, amount) {
+function toSafeOverflowExp(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+    return Math.max(0, Math.min(MAX_TRACKED_OVERFLOW_EXP, Math.floor(parsed)));
+}
+
+function parseAdminAmountInput(value) {
+    const raw = String(value ?? '').replace(/,/g, '').trim();
+    const match = raw.match(/^(\+?(?:\d+\.?\d*|\.\d+))(?:e([+-]?\d+))?$/i);
+    if (!match) {
+        return { valid: false, amount: 0, overflowExp: 0 };
+    }
+
+    const coefficient = Number(match[1]);
+    const explicitExp = Number(match[2] || 0);
+    if (!Number.isFinite(coefficient) || coefficient <= 0 || !Number.isFinite(explicitExp)) {
+        return { valid: false, amount: 0, overflowExp: 0 };
+    }
+
+    const coefficientExp = Math.floor(Math.log10(coefficient));
+    const normalizedMantissa = coefficient / Math.pow(10, coefficientExp);
+    const totalExpRaw = coefficientExp + Math.floor(explicitExp);
+    const totalExp = Math.max(0, Math.min(MAX_TRACKED_OVERFLOW_EXP, totalExpRaw));
+    const overflowExp = Math.max(0, totalExp - 307);
+    const localExp = totalExp - overflowExp;
+    const localValue = clampToInfinitySoftCap(normalizedMantissa * Math.pow(10, localExp));
+    const amount = Math.max(0, Math.floor(localValue));
+
+    return { valid: true, amount, overflowExp };
+}
+
+function toMantissaExponentFromOverflow(value, overflowExp = 0) {
+    const safeValue = toSafeAmount(value);
+    if (safeValue <= 0) {
+        return { mantissa: 0, exponent: 0 };
+    }
+    const baseExp = Math.floor(Math.log10(Math.max(1, safeValue)));
+    const mantissa = safeValue / Math.pow(10, baseExp);
+    const exponent = baseExp + toSafeOverflowExp(overflowExp);
+    return { mantissa, exponent };
+}
+
+function sumMantissaExponent(left, right) {
+    const safeLeft = left && Number.isFinite(left.mantissa) ? left : { mantissa: 0, exponent: 0 };
+    const safeRight = right && Number.isFinite(right.mantissa) ? right : { mantissa: 0, exponent: 0 };
+
+    if (safeLeft.mantissa <= 0) return { ...safeRight };
+    if (safeRight.mantissa <= 0) return { ...safeLeft };
+
+    let hi = safeLeft;
+    let lo = safeRight;
+    if (safeRight.exponent > safeLeft.exponent) {
+        hi = safeRight;
+        lo = safeLeft;
+    }
+
+    const exponentDiff = Math.max(0, hi.exponent - lo.exponent);
+    let mantissa = hi.mantissa;
+    if (exponentDiff <= 18) {
+        mantissa += lo.mantissa * Math.pow(10, -exponentDiff);
+    }
+
+    let exponent = hi.exponent;
+    if (mantissa >= 10) {
+        mantissa /= 10;
+        exponent += 1;
+    }
+
+    return { mantissa, exponent };
+}
+
+function composeOverflowFromMantissaExponent(mantissa, exponent) {
+    if (!Number.isFinite(mantissa) || mantissa <= 0) {
+        return { value: 0, overflowExp: 0 };
+    }
+
+    let safeMantissa = mantissa;
+    let safeExponent = Math.max(0, Math.floor(Number(exponent) || 0));
+    while (safeMantissa >= 10) {
+        safeMantissa /= 10;
+        safeExponent += 1;
+    }
+    while (safeMantissa > 0 && safeMantissa < 1 && safeExponent > 0) {
+        safeMantissa *= 10;
+        safeExponent -= 1;
+    }
+
+    safeExponent = Math.max(0, Math.min(MAX_TRACKED_OVERFLOW_EXP, safeExponent));
+    const overflowExp = Math.max(0, safeExponent - 307);
+    const localExp = safeExponent - overflowExp;
+    const value = Math.max(0, Math.floor(clampToInfinitySoftCap(safeMantissa * Math.pow(10, localExp))));
+    return { value, overflowExp };
+}
+
+function addOverflowAmounts(leftValue, leftOverflowExp, rightValue, rightOverflowExp) {
+    const left = toMantissaExponentFromOverflow(leftValue, leftOverflowExp);
+    const right = toMantissaExponentFromOverflow(rightValue, rightOverflowExp);
+    const summed = sumMantissaExponent(left, right);
+    return composeOverflowFromMantissaExponent(summed.mantissa, summed.exponent);
+}
+
+function addHoneyAndScoreGainWithOverflow(gainAmount, gainOverflowExp = 0) {
+    const amount = toSafeAmount(gainAmount);
+    const overflowExp = toSafeOverflowExp(gainOverflowExp);
+    if (amount <= 0) return;
+
+    if (overflowExp <= 0) {
+        addHoneyAndScoreGain(amount);
+        return;
+    }
+
+    const honeySum = addOverflowAmounts(honey, honeyOverflowExp, amount, overflowExp);
+    const totalSum = addOverflowAmounts(totalHoneyEarned, totalHoneyOverflowExp, amount, overflowExp);
+    honey = honeySum.value;
+    honeyOverflowExp = honeySum.overflowExp;
+    totalHoneyEarned = totalSum.value;
+    totalHoneyOverflowExp = totalSum.overflowExp;
+}
+
+function addSimpleCurrencyWithOverflow(currentValue, grantAmount, grantOverflowExp = 0) {
+    const sum = addOverflowAmounts(currentValue, 0, grantAmount, grantOverflowExp);
+    if (sum.overflowExp > 0) return Math.floor(INFINITY_SOFT_CAP);
+    return toSafeAmount(sum.value);
+}
+
+function toMantissaExponentFromLeaderboard(total, totalExp = 0) {
+    const safeTotal = toSafeAmount(total);
+    if (safeTotal <= 0) {
+        return { mantissa: 0, exponent: 0 };
+    }
+    const baseExp = Math.floor(Math.log10(Math.max(1, safeTotal)));
+    const exponent = Math.max(baseExp, toSafeOverflowExp(totalExp));
+    const mantissa = safeTotal / Math.pow(10, baseExp);
+    return { mantissa, exponent };
+}
+
+function composeLeaderboardFromMantissaExponent(mantissa, exponent) {
+    const packed = composeOverflowFromMantissaExponent(mantissa, exponent);
+    const total = toSafeAmount(packed.value);
+    if (total <= 0) return { total: 0, totalExp: 0 };
+    const baseExp = Math.floor(Math.log10(Math.max(1, total)));
+    return { total, totalExp: Math.max(baseExp, baseExp + toSafeOverflowExp(packed.overflowExp)) };
+}
+
+function addLeaderboardAmountWithOverflow(currentTotal, currentTotalExp, addTotal, addOverflowExp = 0) {
+    const current = toMantissaExponentFromLeaderboard(currentTotal, currentTotalExp);
+    const incoming = toMantissaExponentFromOverflow(addTotal, addOverflowExp);
+    const summed = sumMantissaExponent(current, incoming);
+    return composeLeaderboardFromMantissaExponent(summed.mantissa, summed.exponent);
+}
+
+async function addHoneyToPlayerScore(targetPlayer, amount, amountOverflowExp = 0) {
     const normalizedName = normalizePlayerName(targetPlayer);
     const sanitizedName = sanitizeFirebaseKey(normalizedName);
     if (!normalizedName || !sanitizedName) {
@@ -2091,23 +2250,23 @@ async function addHoneyToPlayerScore(targetPlayer, amount) {
         }
     }
 
+    const safeAmount = toSafeAmount(amount);
+    const safeAmountOverflowExp = toSafeOverflowExp(amountOverflowExp);
     await leaderboardRef.child(keyToUse).transaction((current) => {
         const safeCurrent = current && typeof current === 'object' ? current : {};
         const currentTotal = toSafeAmount(safeCurrent.total);
         const currentExp = getLeaderboardEntryExp(safeCurrent);
-        if (currentExp > Math.floor(Math.log10(Math.max(1, currentTotal)))) {
-            return {
-                ...safeCurrent,
-                name: normalizedName,
-                total: currentTotal,
-                totalExp: currentExp
-            };
-        }
+        const summed = addLeaderboardAmountWithOverflow(
+            currentTotal,
+            currentExp,
+            safeAmount,
+            safeAmountOverflowExp
+        );
         return {
             ...safeCurrent,
             name: normalizedName,
-            total: currentTotal + amount,
-            totalExp: Math.floor(Math.log10(Math.max(1, currentTotal + amount)))
+            total: summed.total,
+            totalExp: summed.totalExp
         };
     });
 }
@@ -2675,7 +2834,7 @@ async function banPlayerPermanently(targetPlayer) {
 let claimingAdminGrant = false;
 let adminGrantWatchRefs = [];
 
-async function queueAdminGrant(targetPlayer, stat, amount) {
+async function queueAdminGrant(targetPlayer, stat, amount, amountOverflowExp = 0) {
     const sanitizedTarget = normalizePlayerName(targetPlayer);
     const grantKeys = getPlayerGrantKeys(sanitizedTarget);
     const key = grantKeys[0];
@@ -2683,7 +2842,9 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
         throw new Error('Invalid target player');
     }
 
-    console.log(`Queueing ${stat} ${amount} for ${sanitizedTarget}`);
+    const safeAmount = toSafeAmount(amount);
+    const safeAmountOverflowExp = toSafeOverflowExp(amountOverflowExp);
+    console.log(`Queueing ${stat} ${formatWithOverflow(safeAmount, safeAmountOverflowExp)} for ${sanitizedTarget}`);
 
     await adminGrantsRef.child(key).transaction((current) => {
         const safeCurrent = current && typeof current === 'object' ? current : {};
@@ -2692,9 +2853,13 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
         const next = {
             name: sanitizedTarget,
             honey: toSafeAmount(safeCurrent.honey),
+            honeyExp: toSafeOverflowExp(safeCurrent.honeyExp),
             rp: toSafeAmount(safeCurrent.rp),
+            rpExp: toSafeOverflowExp(safeCurrent.rpExp),
             sp: toSafeAmount(safeCurrent.sp),
+            spExp: toSafeOverflowExp(safeCurrent.spExp),
             ap: toSafeAmount(safeCurrent.ap),
+            apExp: toSafeOverflowExp(safeCurrent.apExp),
             resetHoney: parseBoolean(safeCurrent.resetHoney, false),
             resetRp: parseBoolean(safeCurrent.resetRp, false),
             resetSp: parseBoolean(safeCurrent.resetSp, false),
@@ -2705,20 +2870,28 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
 
         // Add the amount to the correct stat
         if (stat === 'honey') {
-            next.honey += amount;
-            console.log(`Added ${amount} honey, new total: ${next.honey}`);
+            const summed = addOverflowAmounts(next.honey, next.honeyExp, safeAmount, safeAmountOverflowExp);
+            next.honey = summed.value;
+            next.honeyExp = summed.overflowExp;
+            console.log(`Added honey, new total: ${formatWithOverflow(next.honey, next.honeyExp)}`);
         }
         if (stat === 'rp') {
-            next.rp += amount;
-            console.log(`Added ${amount} RP, new total: ${next.rp}`);
+            const summed = addOverflowAmounts(next.rp, next.rpExp, safeAmount, safeAmountOverflowExp);
+            next.rp = summed.value;
+            next.rpExp = summed.overflowExp;
+            console.log(`Added RP, new total: ${formatWithOverflow(next.rp, next.rpExp)}`);
         }
         if (stat === 'sp') {
-            next.sp += amount;
-            console.log(`Added ${amount} SP, new total: ${next.sp}`);
+            const summed = addOverflowAmounts(next.sp, next.spExp, safeAmount, safeAmountOverflowExp);
+            next.sp = summed.value;
+            next.spExp = summed.overflowExp;
+            console.log(`Added SP, new total: ${formatWithOverflow(next.sp, next.spExp)}`);
         }
         if (stat === 'ap') {
-            next.ap += amount;
-            console.log(`Added ${amount} AP, new total: ${next.ap}`);
+            const summed = addOverflowAmounts(next.ap, next.apExp, safeAmount, safeAmountOverflowExp);
+            next.ap = summed.value;
+            next.apExp = summed.overflowExp;
+            console.log(`Added AP, new total: ${formatWithOverflow(next.ap, next.apExp)}`);
         }
         
         return next;
@@ -2726,7 +2899,7 @@ async function queueAdminGrant(targetPlayer, stat, amount) {
     console.log(`Successfully queued ${stat} for ${sanitizedTarget}`);
 }
 
-async function queueAdminGrantBulk(targetPlayers, stat, amount) {
+async function queueAdminGrantBulk(targetPlayers, stat, amount, amountOverflowExp = 0) {
     const normalizedTargets = Array.from(new Set(
         (Array.isArray(targetPlayers) ? targetPlayers : [])
             .map(name => normalizePlayerName(name))
@@ -2734,6 +2907,8 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
     ));
     if (normalizedTargets.length === 0) return;
 
+    const safeAmount = toSafeAmount(amount);
+    const safeAmountOverflowExp = toSafeOverflowExp(amountOverflowExp);
     try {
         await adminGrantsRef.transaction((current) => {
             const root = current && typeof current === 'object' ? current : {};
@@ -2747,9 +2922,13 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
                 const next = {
                     name: targetName,
                     honey: toSafeAmount(safeCurrent.honey),
+                    honeyExp: toSafeOverflowExp(safeCurrent.honeyExp),
                     rp: toSafeAmount(safeCurrent.rp),
+                    rpExp: toSafeOverflowExp(safeCurrent.rpExp),
                     sp: toSafeAmount(safeCurrent.sp),
+                    spExp: toSafeOverflowExp(safeCurrent.spExp),
                     ap: toSafeAmount(safeCurrent.ap),
+                    apExp: toSafeOverflowExp(safeCurrent.apExp),
                     resetHoney: parseBoolean(safeCurrent.resetHoney, false),
                     resetRp: parseBoolean(safeCurrent.resetRp, false),
                     resetSp: parseBoolean(safeCurrent.resetSp, false),
@@ -2758,10 +2937,26 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
                     updatedAt: now
                 };
 
-                if (stat === 'honey') next.honey += amount;
-                if (stat === 'rp') next.rp += amount;
-                if (stat === 'sp') next.sp += amount;
-                if (stat === 'ap') next.ap += amount;
+                if (stat === 'honey') {
+                    const summed = addOverflowAmounts(next.honey, next.honeyExp, safeAmount, safeAmountOverflowExp);
+                    next.honey = summed.value;
+                    next.honeyExp = summed.overflowExp;
+                }
+                if (stat === 'rp') {
+                    const summed = addOverflowAmounts(next.rp, next.rpExp, safeAmount, safeAmountOverflowExp);
+                    next.rp = summed.value;
+                    next.rpExp = summed.overflowExp;
+                }
+                if (stat === 'sp') {
+                    const summed = addOverflowAmounts(next.sp, next.spExp, safeAmount, safeAmountOverflowExp);
+                    next.sp = summed.value;
+                    next.spExp = summed.overflowExp;
+                }
+                if (stat === 'ap') {
+                    const summed = addOverflowAmounts(next.ap, next.apExp, safeAmount, safeAmountOverflowExp);
+                    next.ap = summed.value;
+                    next.apExp = summed.overflowExp;
+                }
                 root[key] = next;
             }
 
@@ -2772,7 +2967,7 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount) {
         let successCount = 0;
         for (const targetName of normalizedTargets) {
             try {
-                await queueAdminGrant(targetName, stat, amount);
+                await queueAdminGrant(targetName, stat, safeAmount, safeAmountOverflowExp);
                 successCount++;
             } catch (error) {
                 console.warn(`Failed to queue admin grant for ${targetName}:`, error);
@@ -2796,9 +2991,13 @@ async function queueAdminReset(targetPlayer, resetStat) {
         const next = {
             name: sanitizedTarget,
             honey: toSafeAmount(safeCurrent.honey),
+            honeyExp: toSafeOverflowExp(safeCurrent.honeyExp),
             rp: toSafeAmount(safeCurrent.rp),
+            rpExp: toSafeOverflowExp(safeCurrent.rpExp),
             sp: toSafeAmount(safeCurrent.sp),
+            spExp: toSafeOverflowExp(safeCurrent.spExp),
             ap: toSafeAmount(safeCurrent.ap),
+            apExp: toSafeOverflowExp(safeCurrent.apExp),
             resetHoney: parseBoolean(safeCurrent.resetHoney, false),
             resetRp: parseBoolean(safeCurrent.resetRp, false),
             resetSp: parseBoolean(safeCurrent.resetSp, false),
@@ -2842,9 +3041,13 @@ async function queueAdminResetBulk(targetPlayers, resetStat) {
             const next = {
                 name: targetName,
                 honey: toSafeAmount(safeCurrent.honey),
+                honeyExp: toSafeOverflowExp(safeCurrent.honeyExp),
                 rp: toSafeAmount(safeCurrent.rp),
+                rpExp: toSafeOverflowExp(safeCurrent.rpExp),
                 sp: toSafeAmount(safeCurrent.sp),
+                spExp: toSafeOverflowExp(safeCurrent.spExp),
                 ap: toSafeAmount(safeCurrent.ap),
+                apExp: toSafeOverflowExp(safeCurrent.apExp),
                 resetHoney: parseBoolean(safeCurrent.resetHoney, false),
                 resetRp: parseBoolean(safeCurrent.resetRp, false),
                 resetSp: parseBoolean(safeCurrent.resetSp, false),
@@ -2872,7 +3075,7 @@ async function queueAdminResetBulk(targetPlayers, resetStat) {
     });
 }
 
-async function addHoneyToPlayersScoreBulk(targetPlayers, amount) {
+async function addHoneyToPlayersScoreBulk(targetPlayers, amount, amountOverflowExp = 0) {
     const normalizedTargets = Array.from(new Set(
         (Array.isArray(targetPlayers) ? targetPlayers : [])
             .map(name => normalizePlayerName(name))
@@ -2880,6 +3083,8 @@ async function addHoneyToPlayersScoreBulk(targetPlayers, amount) {
     ));
     if (normalizedTargets.length === 0) return;
 
+    const safeAmount = toSafeAmount(amount);
+    const safeAmountOverflowExp = toSafeOverflowExp(amountOverflowExp);
     try {
         await leaderboardRef.transaction((current) => {
             const root = current && typeof current === 'object' ? current : {};
@@ -2902,21 +3107,17 @@ async function addHoneyToPlayersScoreBulk(targetPlayers, amount) {
                 const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
                 const currentTotal = toSafeAmount(safeCurrent.total);
                 const currentExp = getLeaderboardEntryExp(safeCurrent);
-                if (currentExp > Math.floor(Math.log10(Math.max(1, currentTotal)))) {
-                    root[key] = {
-                        ...safeCurrent,
-                        name: targetName,
-                        total: currentTotal,
-                        totalExp: currentExp
-                    };
-                    existingKeyByName.set(nameKey, key);
-                    continue;
-                }
+                const summed = addLeaderboardAmountWithOverflow(
+                    currentTotal,
+                    currentExp,
+                    safeAmount,
+                    safeAmountOverflowExp
+                );
                 root[key] = {
                     ...safeCurrent,
                     name: targetName,
-                    total: currentTotal + amount,
-                    totalExp: Math.floor(Math.log10(Math.max(1, currentTotal + amount)))
+                    total: summed.total,
+                    totalExp: summed.totalExp
                 };
                 existingKeyByName.set(nameKey, key);
             }
@@ -2928,7 +3129,7 @@ async function addHoneyToPlayersScoreBulk(targetPlayers, amount) {
         let successCount = 0;
         for (const targetName of normalizedTargets) {
             try {
-                await addHoneyToPlayerScore(targetName, amount);
+                await addHoneyToPlayerScore(targetName, safeAmount, safeAmountOverflowExp);
                 successCount++;
             } catch (error) {
                 console.warn(`Failed leaderboard add for ${targetName}:`, error);
@@ -3099,9 +3300,13 @@ async function claimAdminGrants() {
         const sourceRefs = [];
         const merged = {
             honey: 0,
+            honeyExp: 0,
             rp: 0,
+            rpExp: 0,
             sp: 0,
+            spExp: 0,
             ap: 0,
+            apExp: 0,
             resetAll: false,
             resetHoney: false,
             resetRp: false,
@@ -3113,10 +3318,18 @@ async function claimAdminGrants() {
             if (!snapshot.exists()) return;
             sourceRefs.push(adminGrantsRef.child(keys[index]));
             const data = snapshot.val() || {};
-            merged.honey += toSafeAmount(data.honey);
-            merged.rp += toSafeAmount(data.rp);
-            merged.sp += toSafeAmount(data.sp);
-            merged.ap += toSafeAmount(data.ap);
+            const mergedHoney = addOverflowAmounts(merged.honey, merged.honeyExp, data.honey, data.honeyExp);
+            merged.honey = mergedHoney.value;
+            merged.honeyExp = mergedHoney.overflowExp;
+            const mergedRp = addOverflowAmounts(merged.rp, merged.rpExp, data.rp, data.rpExp);
+            merged.rp = mergedRp.value;
+            merged.rpExp = mergedRp.overflowExp;
+            const mergedSp = addOverflowAmounts(merged.sp, merged.spExp, data.sp, data.spExp);
+            merged.sp = mergedSp.value;
+            merged.spExp = mergedSp.overflowExp;
+            const mergedAp = addOverflowAmounts(merged.ap, merged.apExp, data.ap, data.apExp);
+            merged.ap = mergedAp.value;
+            merged.apExp = mergedAp.overflowExp;
             merged.resetAll = merged.resetAll || parseBoolean(data.resetAll, false);
             merged.resetHoney = merged.resetHoney || parseBoolean(data.resetHoney, false);
             merged.resetRp = merged.resetRp || parseBoolean(data.resetRp, false);
@@ -3132,19 +3345,26 @@ async function claimAdminGrants() {
         console.log('Found grants:', merged);
         
         const honeyGrant = merged.honey;
+        const honeyGrantExp = merged.honeyExp;
         const rpGrant = merged.rp;
+        const rpGrantExp = merged.rpExp;
         const spGrant = merged.sp;
+        const spGrantExp = merged.spExp;
         const apGrant = merged.ap;
+        const apGrantExp = merged.apExp;
         const resetAll = merged.resetAll;
         const resetHoney = merged.resetHoney;
         const resetRp = merged.resetRp;
         const resetSp = merged.resetSp;
         const resetAp = merged.resetAp;
-        
-        const totalGrant = honeyGrant + rpGrant + spGrant + apGrant;
+        const hasNumericGrant =
+            honeyGrant > 0 || honeyGrantExp > 0 ||
+            rpGrant > 0 || rpGrantExp > 0 ||
+            spGrant > 0 || spGrantExp > 0 ||
+            apGrant > 0 || apGrantExp > 0;
 
         // If nothing to do, just remove the grant
-        if (totalGrant <= 0 && !resetAll && !resetHoney && !resetRp && !resetSp && !resetAp) {
+        if (!hasNumericGrant && !resetAll && !resetHoney && !resetRp && !resetSp && !resetAp) {
             console.log('No grants to apply, removing empty grant');
             await Promise.all(sourceRefs.map((ref) => ref.remove().catch(() => {})));
             return;
@@ -3155,6 +3375,8 @@ async function claimAdminGrants() {
             console.log('Resetting honey');
             honey = 0;
             totalHoneyEarned = 0;
+            honeyOverflowExp = 0;
+            totalHoneyOverflowExp = 0;
             await resetPlayerHoneyScore(playerName);
         }
         if (resetAll || resetRp) {
@@ -3172,24 +3394,25 @@ async function claimAdminGrants() {
         }
 
         // Apply grants
-        if (honeyGrant > 0) {
-            console.log(`Adding ${honeyGrant} honey`);
-            addHoneyAndScoreGain(honeyGrant);
+        if (honeyGrant > 0 || honeyGrantExp > 0) {
+            console.log(`Adding ${formatWithOverflow(honeyGrant, honeyGrantExp)} honey`);
+            addHoneyAndScoreGainWithOverflow(honeyGrant, honeyGrantExp);
         }
-        if (rpGrant > 0) {
-            console.log(`Adding ${rpGrant} RP`);
-            rebirthPoints += rpGrant;
+        if (rpGrant > 0 || rpGrantExp > 0) {
+            console.log(`Adding ${formatWithOverflow(rpGrant, rpGrantExp)} RP`);
+            rebirthPoints = addSimpleCurrencyWithOverflow(rebirthPoints, rpGrant, rpGrantExp);
         }
-        if (spGrant > 0) {
-            console.log(`Adding ${spGrant} SP`);
-            sacrificePoints += spGrant;
+        if (spGrant > 0 || spGrantExp > 0) {
+            console.log(`Adding ${formatWithOverflow(spGrant, spGrantExp)} SP`);
+            sacrificePoints = addSimpleCurrencyWithOverflow(sacrificePoints, spGrant, spGrantExp);
         }
-        if (apGrant > 0) {
-            console.log(`Adding ${apGrant} AP`);
-            ascendPoints += apGrant;
-            ascendPowerPoints += apGrant;
+        if (apGrant > 0 || apGrantExp > 0) {
+            console.log(`Adding ${formatWithOverflow(apGrant, apGrantExp)} AP`);
+            ascendPoints = addSimpleCurrencyWithOverflow(ascendPoints, apGrant, apGrantExp);
+            ascendPowerPoints = addSimpleCurrencyWithOverflow(ascendPowerPoints, apGrant, apGrantExp);
+            ascendPowerPoints = Math.max(ascendPowerPoints, ascendPoints);
         }
-        if (resetAll || resetAp || apGrant > 0) {
+        if (resetAll || resetAp || apGrant > 0 || apGrantExp > 0) {
             refreshAscendMultiplier();
         }
 
@@ -3205,7 +3428,7 @@ async function claimAdminGrants() {
         saveGame();
         
         // Submit score if honey was added
-        if (honeyGrant > 0) {
+        if (honeyGrant > 0 || honeyGrantExp > 0) {
             await submitScore(totalHoneyEarned);
         }
 
@@ -3216,10 +3439,10 @@ async function claimAdminGrants() {
         if (!resetAll && resetRp) grantParts.push('Reset RP');
         if (!resetAll && resetSp) grantParts.push('Reset SP');
         if (!resetAll && resetAp) grantParts.push('Reset AP');
-        if (honeyGrant > 0) grantParts.push(`${formatNumber(honeyGrant)} Honey`);
-        if (rpGrant > 0) grantParts.push(`${formatNumber(rpGrant)} RP`);
-        if (spGrant > 0) grantParts.push(`${formatNumber(spGrant)} SP`);
-        if (apGrant > 0) grantParts.push(`${formatNumber(apGrant)} AP`);
+        if (honeyGrant > 0 || honeyGrantExp > 0) grantParts.push(`${formatWithOverflow(honeyGrant, honeyGrantExp)} Honey`);
+        if (rpGrant > 0 || rpGrantExp > 0) grantParts.push(`${formatWithOverflow(rpGrant, rpGrantExp)} RP`);
+        if (spGrant > 0 || spGrantExp > 0) grantParts.push(`${formatWithOverflow(spGrant, spGrantExp)} SP`);
+        if (apGrant > 0 || apGrantExp > 0) grantParts.push(`${formatWithOverflow(apGrant, apGrantExp)} AP`);
         
         if (grantParts.length > 0) {
             alert(`✨ Admin update claimed: ${grantParts.join(', ')}`);
@@ -3424,14 +3647,17 @@ menuAdminAddBtn.addEventListener('click', async () => {
     try {
         let targetPlayer = getAdminTargetPlayer();
         const stat = menuAdminStatSelect.value;
-        const amount = toSafeAmount(menuAdminAmount.value);
+        const parsedAmount = parseAdminAmountInput(menuAdminAmount.value);
+        const amount = parsedAmount.amount;
+        const amountOverflowExp = parsedAmount.overflowExp;
+        const amountLabel = formatWithOverflow(amount, amountOverflowExp);
     
         if (!['honey', 'leaderboard_honey', 'rp', 'sp', 'ap'].includes(stat)) {
             alert('Invalid currency type');
             return;
         }
 
-        if (amount <= 0) {
+        if (!parsedAmount.valid || amount <= 0) {
             alert('Please enter an amount greater than 0');
             return;
         }
@@ -3456,30 +3682,31 @@ menuAdminAddBtn.addEventListener('click', async () => {
 
             if (selfIncluded) {
                 if (stat === 'honey') {
-                    addHoneyAndScoreGain(amount);
+                    addHoneyAndScoreGainWithOverflow(amount, amountOverflowExp);
                     await submitScore(totalHoneyEarned);
                 } else if (stat === 'leaderboard_honey') {
-                    await addHoneyToPlayerScore(playerName, amount);
+                    await addHoneyToPlayerScore(playerName, amount, amountOverflowExp);
                     leaderboardHoneyUpdated = true;
                 } else if (stat === 'rp') {
-                    rebirthPoints += amount;
+                    rebirthPoints = addSimpleCurrencyWithOverflow(rebirthPoints, amount, amountOverflowExp);
                 } else if (stat === 'sp') {
-                    sacrificePoints += amount;
+                    sacrificePoints = addSimpleCurrencyWithOverflow(sacrificePoints, amount, amountOverflowExp);
                 } else if (stat === 'ap') {
-                    ascendPoints += amount;
-                    ascendPowerPoints += amount;
+                    ascendPoints = addSimpleCurrencyWithOverflow(ascendPoints, amount, amountOverflowExp);
+                    ascendPowerPoints = addSimpleCurrencyWithOverflow(ascendPowerPoints, amount, amountOverflowExp);
+                    ascendPowerPoints = Math.max(ascendPowerPoints, ascendPoints);
                     refreshAscendMultiplier();
                 }
             }
 
             if (otherPlayers.length > 0) {
                 if (stat === 'leaderboard_honey') {
-                    await addHoneyToPlayersScoreBulk(otherPlayers, amount);
+                    await addHoneyToPlayersScoreBulk(otherPlayers, amount, amountOverflowExp);
                     leaderboardHoneyUpdated = true;
                 } else {
-                    await queueAdminGrantBulk(otherPlayers, stat, amount);
+                    await queueAdminGrantBulk(otherPlayers, stat, amount, amountOverflowExp);
                     if (stat === 'honey') {
-                        await addHoneyToPlayersScoreBulk(otherPlayers, amount);
+                        await addHoneyToPlayersScoreBulk(otherPlayers, amount, amountOverflowExp);
                         leaderboardHoneyUpdated = true;
                     }
                 }
@@ -3493,34 +3720,35 @@ menuAdminAddBtn.addEventListener('click', async () => {
 
             const statLabel = stat === 'leaderboard_honey' ? 'LEADERBOARD HONEY' : stat.toUpperCase();
             const bannedSuffix = skippedBannedCount > 0 ? ` (skipped ${skippedBannedCount} banned)` : '';
-            alert(`✅ Added ${amount} ${statLabel} to ALL (${allPlayers.length}) players${bannedSuffix}`);
+            alert(`✅ Added ${amountLabel} ${statLabel} to ALL (${allPlayers.length}) players${bannedSuffix}`);
             return;
         }
 
         if (isSamePlayerName(targetPlayer, playerName)) {
             if (stat === 'honey') {
-                addHoneyAndScoreGain(amount);
+                addHoneyAndScoreGainWithOverflow(amount, amountOverflowExp);
                 await submitScore(totalHoneyEarned);
             } else if (stat === 'leaderboard_honey') {
-                await addHoneyToPlayerScore(playerName, amount);
+                await addHoneyToPlayerScore(playerName, amount, amountOverflowExp);
                 leaderboardHoneyUpdated = true;
             } else if (stat === 'rp') {
-                rebirthPoints += amount;
+                rebirthPoints = addSimpleCurrencyWithOverflow(rebirthPoints, amount, amountOverflowExp);
             } else if (stat === 'sp') {
-                sacrificePoints += amount;
+                sacrificePoints = addSimpleCurrencyWithOverflow(sacrificePoints, amount, amountOverflowExp);
             } else if (stat === 'ap') {
-                ascendPoints += amount;
-                ascendPowerPoints += amount;
+                ascendPoints = addSimpleCurrencyWithOverflow(ascendPoints, amount, amountOverflowExp);
+                ascendPowerPoints = addSimpleCurrencyWithOverflow(ascendPowerPoints, amount, amountOverflowExp);
+                ascendPowerPoints = Math.max(ascendPowerPoints, ascendPoints);
                 refreshAscendMultiplier();
             }
         } else {
             if (stat === 'leaderboard_honey') {
-                await addHoneyToPlayerScore(targetPlayer, amount);
+                await addHoneyToPlayerScore(targetPlayer, amount, amountOverflowExp);
                 leaderboardHoneyUpdated = true;
             } else {
-                await queueAdminGrant(targetPlayer, stat, amount);
+                await queueAdminGrant(targetPlayer, stat, amount, amountOverflowExp);
                 if (stat === 'honey') {
-                    await addHoneyToPlayerScore(targetPlayer, amount);
+                    await addHoneyToPlayerScore(targetPlayer, amount, amountOverflowExp);
                     leaderboardHoneyUpdated = true;
                 }
             }
@@ -3532,7 +3760,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
         updateSPUI();
         saveGame();
         const statLabel = stat === 'leaderboard_honey' ? 'LEADERBOARD HONEY' : stat.toUpperCase();
-        alert(`✅ Added ${amount} ${statLabel} to ${targetPlayer}`);
+        alert(`✅ Added ${amountLabel} ${statLabel} to ${targetPlayer}`);
 
     } catch (error) {
         console.error('Admin add failed:', error);
