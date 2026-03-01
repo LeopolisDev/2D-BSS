@@ -399,6 +399,13 @@
             border-bottom: 5px solid #1f1138;
             box-shadow: 0 4px 0 #11081f;
         }
+        .loop-btn {
+            background: #292929;
+            color: #ffffff;
+            border: 2px solid #ffffff;
+            border-bottom: 5px solid #7f7f7f;
+            box-shadow: 0 4px 0 #0a0a0a;
+        }
         .rebirth-shop-row {
             display: flex;
             flex-wrap: wrap;
@@ -843,8 +850,9 @@
 
         <!-- TRUE END / INFINITY -->
         <div class="endgame-row" id="endgameRow" style="display:none;">
-    <button class="tool-btn true-end-btn" id="trueEndResetBtn">🖤 TRUE END RESET (100Qa🍯 + 1M RP + 25k SP + 100 AP)</button>
+    <button class="tool-btn true-end-btn" id="trueEndResetBtn">🖤 TRUE END RESET (250Qa🍯 + 2.5M RP + 25k SP + 100 AP)</button>
     <button class="tool-btn break-infinity-btn" id="breakInfinityBtn" style="display:none;">💜 BREAK INFINITY</button>
+    <button class="tool-btn loop-btn" id="loopBtn" style="display:none;">🔁 LOOP</button>
 </div>
 
         <!-- Rebirth Shop -->
@@ -1037,6 +1045,7 @@ const sacrificeBtn = document.getElementById('sacrificeBtn');
 const ascendBtn = document.getElementById('ascendBtn');
 const trueEndResetBtn = document.getElementById('trueEndResetBtn');
 const breakInfinityBtn = document.getElementById('breakInfinityBtn');
+const loopBtn = document.getElementById('loopBtn');
 const rebirthBtn = document.getElementById('rebirthBtn');
 const buyAutoUpgrade = document.getElementById('buyAutoUpgrade');
 const buyBeeSpeed = document.getElementById('buyBeeSpeed');
@@ -1129,8 +1138,10 @@ function clampToInfinitySoftCap(value) {
     const n = Number(value);
     if (Number.isNaN(n)) return 0;
     if (!Number.isFinite(n)) return n < 0 ? -INFINITY_SOFT_CAP : INFINITY_SOFT_CAP;
-    if (n > INFINITY_SOFT_CAP) return INFINITY_SOFT_CAP;
-    if (n < -INFINITY_SOFT_CAP) return -INFINITY_SOFT_CAP;
+    if (!trueEndInfinityBroken) {
+        if (n > INFINITY_SOFT_CAP) return INFINITY_SOFT_CAP;
+        if (n < -INFINITY_SOFT_CAP) return -INFINITY_SOFT_CAP;
+    }
     return n;
 }
 
@@ -1140,6 +1151,24 @@ function formatScientific(absNum, decimals = 2) {
     const exponent = Math.floor(Math.log10(safe));
     const mantissa = safe / Math.pow(10, exponent);
     return `${mantissa.toFixed(decimals)}e${exponent}`;
+}
+
+function formatWithOverflow(num, overflowExp = 0, decimals = 2, integerIfSmall = true) {
+    const safeNum = clampToInfinitySoftCap(num);
+    if (safeNum === 0) return '0';
+    const sign = safeNum < 0 ? '-' : '';
+    const absNum = Math.abs(safeNum);
+    const baseExp = Math.floor(Math.log10(Math.max(1, absNum)));
+    const totalExp = baseExp + Math.max(0, Math.floor(Number(overflowExp) || 0));
+    const mantissa = absNum / Math.pow(10, baseExp);
+
+    if (totalExp >= 33 || absNum >= SCIENTIFIC_NOTATION_THRESHOLD || overflowExp > 0) {
+        return `${sign}${mantissa.toFixed(decimals)}e${totalExp}`;
+    }
+    if (integerIfSmall) {
+        return formatNumber(safeNum);
+    }
+    return `${sign}${absNum.toFixed(decimals)}`;
 }
 
 function formatNumber(num) {
@@ -1304,8 +1333,7 @@ function redeemCode(code) {
 
     const reward = validCodes[lowerCode];
 
-    honey += reward.honey;
-    totalHoneyEarned += reward.honey;
+    addHoneyAndScoreGain(reward.honey);
     rebirthPoints += reward.rp;
     sacrificePoints += reward.sp;
 
@@ -1524,9 +1552,14 @@ function applyLoadedSaveData(saveData) {
     ascensionCorePowerFixApplied = parseBoolean(saveData.ascensionCorePowerFixApplied, false);
     trueEndResetDone = parseBoolean(saveData.trueEndResetDone, false);
     trueEndInfinityBroken = parseBoolean(saveData.trueEndInfinityBroken, false);
-    trueEndGrowthActive = parseBoolean(saveData.trueEndGrowthActive, trueEndResetDone && !trueEndInfinityBroken);
-    if (trueEndInfinityBroken) {
-        trueEndGrowthActive = false;
+    trueEndGrowthActive = parseBoolean(saveData.trueEndGrowthActive, trueEndResetDone);
+    trueEndHoneyGrowthTicks = Math.max(0, Math.floor(finiteOr(saveData.trueEndHoneyGrowthTicks, 0)));
+    loopCount = Math.max(0, Math.floor(finiteOr(saveData.loopCount, 0)));
+    loopMultiplier = Math.max(1, finiteOr(saveData.loopMultiplier, Math.pow(2, loopCount)));
+    honeyOverflowExp = Math.max(0, Math.floor(finiteOr(saveData.honeyOverflowExp, 0)));
+    totalHoneyOverflowExp = Math.max(0, Math.floor(finiteOr(saveData.totalHoneyOverflowExp, 0)));
+    if (trueEndResetDone && !trueEndGrowthActive) {
+        trueEndGrowthActive = true;
     }
     if (ascensionCorePurchased && !ascensionCorePowerFixApplied && ascendPoints > 0 && ascendPowerPoints <= ascendPoints) {
         ascendPowerPoints = ascendPoints + ASCENSION_SHOP_COST_AP;
@@ -1600,6 +1633,12 @@ function applyLoadedSaveData(saveData) {
     if (rpAutoBuyInterval) {
         clearInterval(rpAutoBuyInterval);
         rpAutoBuyInterval = null;
+    }
+    // SP auto is always OFF after reload/load; player must enable manually.
+    spAutobuyEnabled = false;
+    if (spAutobuyInterval) {
+        clearInterval(spAutobuyInterval);
+        spAutobuyInterval = null;
     }
 
     if (rpAutobuyEnabled && rpAutoBuyActive) {
@@ -2050,10 +2089,21 @@ async function addHoneyToPlayerScore(targetPlayer, amount) {
 
     await leaderboardRef.child(keyToUse).transaction((current) => {
         const safeCurrent = current && typeof current === 'object' ? current : {};
+        const currentTotal = toSafeAmount(safeCurrent.total);
+        const currentExp = getLeaderboardEntryExp(safeCurrent);
+        if (currentExp > Math.floor(Math.log10(Math.max(1, currentTotal)))) {
+            return {
+                ...safeCurrent,
+                name: normalizedName,
+                total: currentTotal,
+                totalExp: currentExp
+            };
+        }
         return {
             ...safeCurrent,
             name: normalizedName,
-            total: toSafeAmount(safeCurrent.total) + amount
+            total: currentTotal + amount,
+            totalExp: Math.floor(Math.log10(Math.max(1, currentTotal + amount)))
         };
     });
 }
@@ -2080,7 +2130,8 @@ async function resetPlayerHoneyScore(targetPlayer) {
 
     await leaderboardRef.child(keyToUse).set({
         name: normalizedName,
-        total: 0
+        total: 0,
+        totalExp: 0
     });
 
     if (isSamePlayerName(normalizedName, playerName)) {
@@ -2140,6 +2191,8 @@ function applyLocalCurrencyReset(resetStat) {
     if (resetStat === 'honey' || resetStat === 'all') {
         honey = 0;
         totalHoneyEarned = 0;
+        honeyOverflowExp = 0;
+        totalHoneyOverflowExp = 0;
     }
     if (resetStat === 'rp' || resetStat === 'all') {
         rebirthPoints = 0;
@@ -2158,6 +2211,9 @@ function applyLocalCurrencyReset(resetStat) {
 function resetAllGameDataState() {
     honey = 0;
     totalHoneyEarned = 0;
+    honeyOverflowExp = 0;
+    totalHoneyOverflowExp = 0;
+    trueEndHoneyGrowthTicks = 0;
 
     bees = [];
     flowers = [];
@@ -2203,7 +2259,7 @@ function resetAllGameDataState() {
     spCompoundingLevel = 0;
     spCompoundingMultiplier = 1.0;
     spAutobuyEnabled = false;
-    trueEndGrowthActive = trueEndResetDone && !trueEndInfinityBroken;
+    trueEndGrowthActive = trueEndResetDone;
 
     autoActive = false;
     rpAutobuyEnabled = false;
@@ -2255,6 +2311,8 @@ function resetAllGameDataState() {
 function applyAscendResetState() {
     honey = 0;
     totalHoneyEarned = 0;
+    honeyOverflowExp = 0;
+    totalHoneyOverflowExp = 0;
 
     bees = [];
     flowers = [];
@@ -2294,7 +2352,7 @@ function applyAscendResetState() {
     autoActive = false;
     rpAutobuyEnabled = false;
     autoSpendPercent = DEFAULT_AUTO_SPEND_PERCENT;
-    trueEndGrowthActive = trueEndResetDone && !trueEndInfinityBroken;
+    trueEndGrowthActive = trueEndResetDone;
 
     if (autoInterval) {
         clearInterval(autoInterval);
@@ -2350,11 +2408,27 @@ async function performFullDataReset(options = {}) {
     // Full reset wipes AP upgrades too.
     ascensionCorePurchased = false;
     ascensionCorePowerFixApplied = false;
+    trueEndResetDone = false;
+    trueEndGrowthActive = false;
+    trueEndInfinityBroken = false;
+    trueEndHoneyGrowthTicks = 0;
+    loopCount = 0;
+    loopMultiplier = 1;
+    honeyOverflowExp = 0;
+    totalHoneyOverflowExp = 0;
 
     resetAllGameDataState();
     // Enforce AP-upgrade wipe even if reset ordering changes.
     ascensionCorePurchased = false;
     ascensionCorePowerFixApplied = false;
+    trueEndResetDone = false;
+    trueEndGrowthActive = false;
+    trueEndInfinityBroken = false;
+    trueEndHoneyGrowthTicks = 0;
+    loopCount = 0;
+    loopMultiplier = 1;
+    honeyOverflowExp = 0;
+    totalHoneyOverflowExp = 0;
     // Full reset always wipes AP currency and AP power progression.
     ascendPoints = 0;
     ascendPowerPoints = 0;
@@ -2822,10 +2896,23 @@ async function addHoneyToPlayersScoreBulk(targetPlayers, amount) {
                 if (!key) continue;
 
                 const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
+                const currentTotal = toSafeAmount(safeCurrent.total);
+                const currentExp = getLeaderboardEntryExp(safeCurrent);
+                if (currentExp > Math.floor(Math.log10(Math.max(1, currentTotal)))) {
+                    root[key] = {
+                        ...safeCurrent,
+                        name: targetName,
+                        total: currentTotal,
+                        totalExp: currentExp
+                    };
+                    existingKeyByName.set(nameKey, key);
+                    continue;
+                }
                 root[key] = {
                     ...safeCurrent,
                     name: targetName,
-                    total: toSafeAmount(safeCurrent.total) + amount
+                    total: currentTotal + amount,
+                    totalExp: Math.floor(Math.log10(Math.max(1, currentTotal + amount)))
                 };
                 existingKeyByName.set(nameKey, key);
             }
@@ -2879,7 +2966,8 @@ async function resetPlayersHoneyScoreBulk(targetPlayers) {
             root[key] = {
                 ...safeCurrent,
                 name: targetName,
-                total: 0
+                total: 0,
+                totalExp: 0
             };
             existingKeyByName.set(nameKey, key);
         }
@@ -3082,8 +3170,7 @@ async function claimAdminGrants() {
         // Apply grants
         if (honeyGrant > 0) {
             console.log(`Adding ${honeyGrant} honey`);
-            honey += honeyGrant;
-            totalHoneyEarned += honeyGrant;
+            addHoneyAndScoreGain(honeyGrant);
         }
         if (rpGrant > 0) {
             console.log(`Adding ${rpGrant} RP`);
@@ -3365,8 +3452,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
 
             if (selfIncluded) {
                 if (stat === 'honey') {
-                    honey += amount;
-                    totalHoneyEarned += amount;
+                    addHoneyAndScoreGain(amount);
                     await submitScore(totalHoneyEarned);
                 } else if (stat === 'leaderboard_honey') {
                     await addHoneyToPlayerScore(playerName, amount);
@@ -3409,8 +3495,7 @@ menuAdminAddBtn.addEventListener('click', async () => {
 
         if (isSamePlayerName(targetPlayer, playerName)) {
             if (stat === 'honey') {
-                honey += amount;
-                totalHoneyEarned += amount;
+                addHoneyAndScoreGain(amount);
                 await submitScore(totalHoneyEarned);
             } else if (stat === 'leaderboard_honey') {
                 await addHoneyToPlayerScore(playerName, amount);
@@ -3635,6 +3720,33 @@ menuAdminUnbanBtn.addEventListener('click', async () => {
 });
 
 // ========== FIREBASE LEADERBOARD FUNCTIONS ==========
+function getLeaderboardEntryExp(entry) {
+    if (!entry || typeof entry !== 'object') return 0;
+    const rawExp = Number(entry.totalExp);
+    if (Number.isFinite(rawExp) && rawExp >= 0) return Math.floor(rawExp);
+    const total = Number(entry.total);
+    if (!Number.isFinite(total) || total <= 0) return 0;
+    return Math.floor(Math.log10(total));
+}
+
+function compareLeaderboardEntries(left, right) {
+    const leftExp = getLeaderboardEntryExp(left);
+    const rightExp = getLeaderboardEntryExp(right);
+    if (leftExp !== rightExp) return leftExp - rightExp;
+    const leftTotal = Number(left?.total) || 0;
+    const rightTotal = Number(right?.total) || 0;
+    return leftTotal - rightTotal;
+}
+
+function formatLeaderboardScore(entry) {
+    const total = Math.max(0, Number(entry?.total) || 0);
+    const scoreExp = getLeaderboardEntryExp(entry);
+    if (total <= 0) return '0';
+    const baseExp = Math.floor(Math.log10(total));
+    const overflowExp = Math.max(0, scoreExp - baseExp);
+    return formatWithOverflow(total, overflowExp);
+}
+
 function fetchLeaderboard() {
     document.getElementById('leaderboardList').innerHTML = '<div class="loading">Loading leaderboard...</div>';
     
@@ -3647,14 +3759,17 @@ function fetchLeaderboard() {
                 if (data[key] && data[key].name && typeof data[key].total === 'number') {
                     const name = normalizePlayerName(data[key].name);
                     const total = toSafeAmount(data[key].total);
+                    const totalExp = Math.max(0, Math.floor(Number(data[key].totalExp) || 0));
                     const nameKey = normalizePlayerNameKey(name);
                     if (!nameKey) return;
 
                     const current = leaderboardByName.get(nameKey);
-                    if (!current || total > current.total) {
+                    const candidate = { name, total, totalExp };
+                    if (!current || compareLeaderboardEntries(candidate, current) > 0) {
                         leaderboardByName.set(nameKey, {
                             name,
-                            total
+                            total,
+                            totalExp
                         });
                     }
                 }
@@ -3677,9 +3792,10 @@ function fetchLeaderboard() {
     });
 }
 
-function upsertLocalLeaderboardEntry(name, total) {
+function upsertLocalLeaderboardEntry(name, total, totalExp = 0) {
     const normalizedName = normalizePlayerName(name);
     const safeTotal = toSafeAmount(total);
+    const safeExp = Math.max(0, Math.floor(Number(totalExp) || 0));
     if (!normalizedName) return;
 
     if (!Array.isArray(leaderboard)) {
@@ -3688,15 +3804,20 @@ function upsertLocalLeaderboardEntry(name, total) {
 
     const existingIndex = leaderboard.findIndex(entry => isSamePlayerName(entry?.name, normalizedName));
     if (existingIndex >= 0) {
+        const currentEntry = leaderboard[existingIndex];
+        const candidate = { name: normalizedName, total: safeTotal, totalExp: safeExp };
+        if (compareLeaderboardEntries(candidate, currentEntry) <= 0) return;
         leaderboard[existingIndex] = {
-            ...leaderboard[existingIndex],
+            ...currentEntry,
             name: normalizedName,
-            total: Math.max(toSafeAmount(leaderboard[existingIndex]?.total), safeTotal)
+            total: safeTotal,
+            totalExp: safeExp
         };
     } else {
         leaderboard.push({
             name: normalizedName,
-            total: safeTotal
+            total: safeTotal,
+            totalExp: safeExp
         });
     }
 }
@@ -3728,25 +3849,39 @@ async function submitScore(score) {
         const keyToUse = existingKey || sanitizedName;
 
         const incomingTotal = toSafeAmount(score);
+        const incomingExp = getDisplayScoreExp(incomingTotal, totalHoneyOverflowExp);
         const txResult = await leaderboardRef.child(keyToUse).transaction((current) => {
             const safeCurrent = current && typeof current === 'object' ? current : {};
             const currentTotal = toSafeAmount(safeCurrent.total);
+            const currentExp = getLeaderboardEntryExp(safeCurrent);
+            const candidate = { total: incomingTotal, totalExp: incomingExp };
+            const existing = { total: currentTotal, totalExp: currentExp };
+            const useIncoming = compareLeaderboardEntries(candidate, existing) >= 0;
             return {
                 ...safeCurrent,
                 name: normalizedName,
-                // Prevent cross-site score bouncing: never allow this write path to decrease total.
-                total: Math.max(currentTotal, incomingTotal)
+                // Prevent cross-site score bouncing: never allow this write path to decrease score.
+                total: useIncoming ? incomingTotal : currentTotal,
+                totalExp: useIncoming ? incomingExp : currentExp
             };
         });
 
-        const finalTotal = toSafeAmount(txResult?.snapshot?.val()?.total);
+        const finalPayload = txResult?.snapshot?.val() || {};
+        const finalTotal = toSafeAmount(finalPayload.total);
+        const finalExp = getLeaderboardEntryExp(finalPayload);
+        const localScoreExp = getDisplayScoreExp(totalHoneyEarned, totalHoneyOverflowExp);
         if (Number.isFinite(finalTotal) && finalTotal > totalHoneyEarned) {
             totalHoneyEarned = finalTotal;
+        }
+        if (finalExp > localScoreExp) {
+            totalHoneyEarned = Math.max(1, finalTotal);
+            const localBaseExp = Math.floor(Math.log10(Math.max(1, totalHoneyEarned)));
+            totalHoneyOverflowExp = Math.max(0, finalExp - localBaseExp);
         }
 
         // Immediate UI update for newly registered/updated players.
         const localTotalForUi = Number.isFinite(finalTotal) ? finalTotal : incomingTotal;
-        upsertLocalLeaderboardEntry(normalizedName, localTotalForUi);
+        upsertLocalLeaderboardEntry(normalizedName, localTotalForUi, finalExp);
         renderLeaderboard();
     } catch (error) {
         console.error('Failed to submit score:', error);
@@ -3818,6 +3953,7 @@ async function renameLeaderboardPlayer(oldName, newName) {
 
     let oldKey = null;
     let oldTotal = 0;
+    let oldExp = 0;
     let newNameKey = null;
 
     for (const [key, value] of Object.entries(data)) {
@@ -3825,6 +3961,7 @@ async function renameLeaderboardPlayer(oldName, newName) {
         if (value.name === normalizedOld) {
             oldKey = key;
             oldTotal = toSafeAmount(value.total);
+            oldExp = getLeaderboardEntryExp(value);
         }
         if (value.name === normalizedNew) {
             newNameKey = key;
@@ -3838,7 +3975,8 @@ async function renameLeaderboardPlayer(oldName, newName) {
 
     await leaderboardRef.child(oldKey).update({
         name: normalizedNew,
-        total: oldTotal
+        total: oldTotal,
+        totalExp: oldExp
     });
     return oldTotal;
 }
@@ -3850,7 +3988,7 @@ function renderLeaderboard() {
         return;
     }
     
-    const sorted = [...leaderboard].sort((a, b) => b.total - a.total);
+    const sorted = [...leaderboard].sort((a, b) => compareLeaderboardEntries(b, a));
     const top10 = sorted.slice(0, 10);
     
     let html = '';
@@ -3862,7 +4000,7 @@ function renderLeaderboard() {
         html += `<div class="leaderboard-entry ${isYou}">
             <span class="leaderboard-rank">${rankSymbol}</span>
             <span class="leaderboard-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
-            <span class="leaderboard-score">🍯 ${formatNumber(entry.total)}</span>
+            <span class="leaderboard-score">🍯 ${formatLeaderboardScore(entry)}</span>
         </div>`;
     });
     
@@ -3874,7 +4012,7 @@ function renderLeaderboard() {
             html += `<div class="leaderboard-entry you-row">
                 <span class="leaderboard-rank">${playerRank}.</span>
                 <span class="leaderboard-name">${escapeHtml(playerEntry?.name || playerName)}</span>
-                <span class="leaderboard-score">🍯 ${formatNumber(playerEntry.total)}</span>
+                <span class="leaderboard-score">🍯 ${formatLeaderboardScore(playerEntry)}</span>
             </div>`;
         }
     }
@@ -4021,11 +4159,12 @@ const SP_GENERATOR_BASE_SECONDS = 25;
 const SP_GENERATOR_SECONDS_PER_LEVEL = 5;
 const SP_COMPOUNDING_GROWTH = 1.25;
 const TRUE_END_UNLOCK_AP = 100;
-const TRUE_END_HONEY_COST = 100_000_000_000_000_000; // 100 Qa / 100 QD
-const TRUE_END_RP_COST = 1_000_000;
+const TRUE_END_HONEY_COST = 250_000_000_000_000_000; // 250 Qa / 250 QD
+const TRUE_END_RP_COST = 2_500_000;
 const TRUE_END_SP_COST = 25_000;
 const TRUE_END_AP_COST = 100;
 const TRUE_END_GROWTH_MULTIPLIER = 2;
+const LOG10_2 = Math.log10(2);
 const SAVE_KEY = 'beeSwarmSave';
 
 // ========== RP PRICING ==========
@@ -4204,10 +4343,15 @@ let spCompoundingLevel = 0;
 let spCompoundingMultiplier = 1.0;
 let spAutobuyInterval = null;
 let spAutobuyEnabled = false;
-let trueEndResetDone = false;
-let trueEndGrowthActive = false;
-let trueEndInfinityBroken = false;
-let trueEndGrowthInterval = null;
+var trueEndResetDone = false;
+var trueEndGrowthActive = false;
+var trueEndInfinityBroken = false;
+var trueEndGrowthInterval = null;
+var trueEndHoneyGrowthTicks = 0;
+var loopCount = 0;
+var loopMultiplier = 1;
+var honeyOverflowExp = 0;
+var totalHoneyOverflowExp = 0;
 
 // Automation
 let autoActive = false;
@@ -4354,9 +4498,9 @@ function update() {
             const dx = HIVE_X - b.x, dy = HIVE_Y - b.y;
             const dist = Math.hypot(dx, dy);
             if (dist < 20) {
-                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * getAscensionHoneyMultiplier() * (x10HoneyPurchased ? 10 : 1));
-                honey += deposited;
-                totalHoneyEarned += deposited;
+                const honeyGainMultiplier = getLoopGainMultiplier() * getTrueEndHoneyMultiplierForMath();
+                let deposited = Math.floor(b.carrying * toolMultiplier * honeyMultUpgrade * compoundingMultiplier * getAscensionHoneyMultiplier() * honeyGainMultiplier * (x10HoneyPurchased ? 10 : 1));
+                addHoneyAndScoreGain(deposited);
                 b.carrying = 0;
                 b.returning = false;
             } else {
@@ -4419,6 +4563,7 @@ function update() {
 function updateRebirthUI() {
     clampCoreProgressValues();
     beeSpeedMultiplier = clampBeeSpeedMultiplier(beeSpeedMultiplier);
+    const loopGainMult = getLoopGainMultiplier();
 
     rpSpan.textContent = formatNumber(rebirthPoints);
     rpBadge.textContent = `RP: ${formatNumber(rebirthPoints)}`;
@@ -4427,36 +4572,40 @@ function updateRebirthUI() {
     apDisplay.textContent = formatNumber(ascendPoints);
     spBadge.textContent = `SP: ${formatNumber(sacrificePoints)}`;
     spShopDisplay.textContent = `SP: ${formatNumber(sacrificePoints)}`;
-    honeySpan.textContent = formatNumber(honey);
-    totalEarnedSpan.textContent = formatNumber(totalHoneyEarned);
+    honeySpan.textContent = formatWithOverflow(honey, honeyOverflowExp);
+    totalEarnedSpan.textContent = formatWithOverflow(totalHoneyEarned, totalHoneyOverflowExp);
 
     const maxRP = getMaxRPFromHoney();
     const ascensionRpMult = getAscensionRPMultiplier();
     if (maxRP > 0) {
         const rawRP = maxRP;
-        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier * ascensionRpMult);
+        const multipliedRP = Math.floor(rawRP * rpCompoundingMultiplier * ascensionRpMult * loopGainMult);
         const rpBonusText = ascensionRpMult > 1 ? ` * ASC x${formatMultiplierValue(ascensionRpMult)}` : '';
-        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (COMP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText})`;
+        const loopText = loopGainMult > 1 ? ` * LOOP x${formatMultiplierValue(loopGainMult)}` : '';
+        rebirthInfo.textContent = `${multipliedRP} RP = ${formatNumber(getRPCost(maxRP))}🍯 (COMP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText}${loopText})`;
     } else {
         const rpBonusText = ascensionRpMult > 1 ? ` * ASC x${formatMultiplierValue(ascensionRpMult)}` : '';
-        rebirthInfo.textContent = `1 RP = 10k (COMP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText})`;
+        const loopText = loopGainMult > 1 ? ` * LOOP x${formatMultiplierValue(loopGainMult)}` : '';
+        rebirthInfo.textContent = `1 RP = 10k (COMP x${rpCompoundingMultiplier.toFixed(2)}${rpBonusText}${loopText})`;
     }
 
     const maxSP = getMaxSPFromResources();
     const ascensionSpMult = getAscensionSPMultiplier();
-    const totalSpGainMult = spCompoundingMultiplier * ascensionSpMult;
+    const totalSpGainMult = spCompoundingMultiplier * ascensionSpMult * loopGainMult;
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
         const multipliedSP = Math.max(1, Math.floor(maxSP * totalSpGainMult));
         const spBonusParts = [];
         if (spCompoundingMultiplier > 1) spBonusParts.push(`COMP x${formatMultiplierValue(spCompoundingMultiplier)}`);
         if (ascensionSpMult > 1) spBonusParts.push(`ASC x${formatMultiplierValue(ascensionSpMult)}`);
+        if (loopGainMult > 1) spBonusParts.push(`LOOP x${formatMultiplierValue(loopGainMult)}`);
         const spBonusText = spBonusParts.length ? ` (${spBonusParts.join(' * ')})` : '';
         sacrificeInfo.textContent = `${multipliedSP} SP = ${formatNumber(cost.honey)}🍯 + ${cost.rp} RP${spBonusText}`;
     } else {
         const spBonusParts = [];
         if (spCompoundingMultiplier > 1) spBonusParts.push(`COMP x${formatMultiplierValue(spCompoundingMultiplier)}`);
         if (ascensionSpMult > 1) spBonusParts.push(`ASC x${formatMultiplierValue(ascensionSpMult)}`);
+        if (loopGainMult > 1) spBonusParts.push(`LOOP x${formatMultiplierValue(loopGainMult)}`);
         const spBonusText = spBonusParts.length ? ` (${spBonusParts.join(' * ')})` : '';
         sacrificeInfo.textContent = `1 SP = 100M🍯 + 10 RP${spBonusText}`;
     }
@@ -4529,6 +4678,7 @@ function updateRebirthUI() {
 }
 
 function updateSPUI() {
+    const loopGainMult = getLoopGainMultiplier();
     if (x10HoneyPurchased) {
         buyX10Honey.innerHTML = '🍯 x10 HONEY MAXED <span class="maxed-badge">MAX</span>';
         buyX10Honey.disabled = true;
@@ -4563,7 +4713,7 @@ function updateSPUI() {
     }
     rpGenTime.textContent = intervalTime + 's';
     
-    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier * getAscensionRPMultiplier());
+    const currentGenRP = Math.floor(1 * rpCompoundingMultiplier * getAscensionRPMultiplier() * loopGainMult);
     rpGenPreview.textContent = `(${currentGenRP} RP/s)`;
     
     if (rpGeneratorLevel >= 5) {
@@ -4603,13 +4753,14 @@ function updateSPUI() {
     spGenLevel.textContent = spGeneratorLevel;
     spGenCost.textContent = spGenCostValue;
     spGenTime.textContent = `${spGenInterval}s`;
-    spGenPreview.textContent = `(+1 SP / ${spGenInterval}s)`;
+    const spPerTick = Math.max(1, Math.floor(1 * loopGainMult));
+    spGenPreview.textContent = `(+${formatNumber(spPerTick)} SP / ${spGenInterval}s)`;
 
     if (spGeneratorLevel >= SP_GENERATOR_MAX_LEVEL) {
-        buySPGen.innerHTML = `⏱️ SP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+1 SP / ${spGenInterval}s)</span>`;
+        buySPGen.innerHTML = `⏱️ SP GENERATOR MAXED <span class="maxed-badge">MAX</span> <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+${formatNumber(spPerTick)} SP / ${spGenInterval}s)</span>`;
         buySPGen.disabled = true;
     } else {
-        buySPGen.innerHTML = `⏱️ SP GENERATOR lv<span id="spGenLevel">${spGeneratorLevel}</span> (<span id="spGenCost">${spGenCostValue}</span> AP) <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+1 SP / ${spGenInterval}s)</span>`;
+        buySPGen.innerHTML = `⏱️ SP GENERATOR lv<span id="spGenLevel">${spGeneratorLevel}</span> (<span id="spGenCost">${spGenCostValue}</span> AP) <span id="spGenTime">${spGenInterval}s</span> <span class="preview-text">(+${formatNumber(spPerTick)} SP / ${spGenInterval}s)</span>`;
         buySPGen.disabled = ascendPoints < spGenCostValue;
     }
 
@@ -4639,10 +4790,21 @@ function recalcMultiplier() {
     if (hasStormTotem) toolMult *= 3.0;
     if (hasGalaxyCrown) toolMult *= 5.0;
     toolMultiplier = toolMult;
-    
-    let totalMult = toolMult * honeyMultUpgrade * compoundingMultiplier * getAscensionHoneyMultiplier();
-    if (x10HoneyPurchased) totalMult *= 10;
-   totalMultDisplay.textContent = `✖️ ${formatMultiplierValue(totalMult)}`;
+
+    const baseMult = toolMult * honeyMultUpgrade * compoundingMultiplier * getAscensionHoneyMultiplier() * getLoopGainMultiplier() * (x10HoneyPurchased ? 10 : 1);
+    const baseLog = Math.log10(Math.max(1e-12, baseMult));
+    const trueEndLog = getTrueEndHoneyMultiplierLog10();
+    const totalLog = baseLog + trueEndLog;
+
+    let totalMultText = '1.00';
+    if (totalLog < 12) {
+        totalMultText = formatMultiplierValue(Math.pow(10, totalLog));
+    } else {
+        const exp = Math.floor(totalLog);
+        const mant = Math.pow(10, totalLog - exp);
+        totalMultText = `${mant.toFixed(2)}e${exp}`;
+    }
+    totalMultDisplay.textContent = `✖️ ${totalMultText}`;
 }
 
 function updateToolButtons() {
@@ -4665,7 +4827,7 @@ function setupRPGenerator() {
     if (rpGeneratorLevel > 0) {
         const intervalTime = Math.max(1000, 5000 - (rpGeneratorLevel - 1) * 1000);
         rpGeneratorInterval = setInterval(() => {
-            let rpGain = Math.floor(1 * rpCompoundingMultiplier * getAscensionRPMultiplier());
+            let rpGain = Math.floor(1 * rpCompoundingMultiplier * getAscensionRPMultiplier() * getLoopGainMultiplier());
             rebirthPoints += rpGain;
             updateRebirthUI();
             saveGame();
@@ -4701,7 +4863,7 @@ function setupSPGenerator() {
         const intervalMs = getSPGeneratorIntervalSeconds(spGeneratorLevel) * 1000;
         spGeneratorInterval = setInterval(() => {
             if (gameplayBlocked) return;
-            const spGain = 1;
+            const spGain = Math.max(1, Math.floor(1 * getLoopGainMultiplier()));
             sacrificePoints += spGain;
             updateRebirthUI();
             updateSPUI();
@@ -4842,6 +5004,15 @@ function updateAutoSpendButton() {
 }
 
 function clampCoreProgressValues() {
+    if (!Number.isFinite(honey)) {
+        honey = INFINITY_SOFT_CAP;
+        if (trueEndInfinityBroken) honeyOverflowExp++;
+    }
+    if (!Number.isFinite(totalHoneyEarned)) {
+        totalHoneyEarned = INFINITY_SOFT_CAP;
+        if (trueEndInfinityBroken) totalHoneyOverflowExp++;
+    }
+
     honey = Math.max(0, clampToInfinitySoftCap(honey));
     totalHoneyEarned = Math.max(0, clampToInfinitySoftCap(totalHoneyEarned));
     rebirthPoints = Math.max(0, clampToInfinitySoftCap(rebirthPoints));
@@ -4860,13 +5031,87 @@ function canAffordTrueEndReset() {
         ascendPoints >= TRUE_END_AP_COST;
 }
 
+function getLoopGainMultiplier() {
+    const parsed = Number(loopMultiplier);
+    if (!Number.isFinite(parsed) || parsed < 1) return 1;
+    return parsed;
+}
+
+function getTrueEndHoneyMultiplierForMath() {
+    if (!trueEndResetDone) return 1;
+    if (!trueEndGrowthActive) return 1;
+    if (trueEndHoneyGrowthTicks <= 0) return 1;
+    // Keep numeric math safe while still allowing giant display/leaderboard exponents.
+    if (trueEndHoneyGrowthTicks >= 1023) return Number.POSITIVE_INFINITY;
+    return Math.pow(TRUE_END_GROWTH_MULTIPLIER, trueEndHoneyGrowthTicks);
+}
+
+function getTrueEndHoneyMultiplierLog10() {
+    if (!trueEndResetDone || !trueEndGrowthActive || trueEndHoneyGrowthTicks <= 0) return 0;
+    return trueEndHoneyGrowthTicks * LOG10_2;
+}
+
+function formatTrueEndHoneyMultiplier() {
+    const log10Mult = getTrueEndHoneyMultiplierLog10();
+    if (log10Mult <= 0) return '1.00';
+    if (log10Mult < 12) {
+        return formatMultiplierValue(Math.pow(10, log10Mult));
+    }
+    const exp = Math.floor(log10Mult);
+    const mant = Math.pow(10, log10Mult - exp);
+    return `${mant.toFixed(2)}e${exp}`;
+}
+
+function getDisplayScoreExp(value, overflowExp = 0) {
+    const safeValue = Math.max(0, Number(value) || 0);
+    if (safeValue <= 0) return 0;
+    const baseExp = Math.floor(Math.log10(safeValue));
+    return Math.max(0, baseExp + Math.max(0, Math.floor(Number(overflowExp) || 0)));
+}
+
+function addHoneyAndScoreGain(gainAmount) {
+    let amount = Number(gainAmount);
+    if (!Number.isFinite(amount) || amount < 0) {
+        amount = INFINITY_SOFT_CAP;
+        if (trueEndInfinityBroken) {
+            honeyOverflowExp++;
+            totalHoneyOverflowExp++;
+        }
+    }
+
+    if (trueEndInfinityBroken && honey >= INFINITY_SOFT_CAP * 0.999 && amount > 0) {
+        const bonusOverflow = Math.max(1, Math.floor(Math.log10(Math.max(1, amount))) - 307);
+        honeyOverflowExp += bonusOverflow;
+    }
+    if (trueEndInfinityBroken && totalHoneyEarned >= INFINITY_SOFT_CAP * 0.999 && amount > 0) {
+        const bonusOverflow = Math.max(1, Math.floor(Math.log10(Math.max(1, amount))) - 307);
+        totalHoneyOverflowExp += bonusOverflow;
+    }
+
+    honey += amount;
+    totalHoneyEarned += amount;
+
+    if (!Number.isFinite(honey)) {
+        honey = INFINITY_SOFT_CAP;
+        if (trueEndInfinityBroken) honeyOverflowExp++;
+    }
+    if (!Number.isFinite(totalHoneyEarned)) {
+        totalHoneyEarned = INFINITY_SOFT_CAP;
+        if (trueEndInfinityBroken) totalHoneyOverflowExp++;
+    }
+
+    honey = Math.max(0, clampToInfinitySoftCap(honey));
+    totalHoneyEarned = Math.max(0, clampToInfinitySoftCap(totalHoneyEarned));
+}
+
 function updateEndgameUI() {
-    if (!endgameRow || !trueEndResetBtn || !breakInfinityBtn) return;
+    if (!endgameRow || !trueEndResetBtn || !breakInfinityBtn || !loopBtn) return;
 
     const unlocked = ascendPoints >= TRUE_END_UNLOCK_AP || trueEndResetDone;
     endgameRow.style.display = unlocked ? 'flex' : 'none';
     if (!unlocked) {
         breakInfinityBtn.style.display = 'none';
+        loopBtn.style.display = 'none';
         return;
     }
 
@@ -4882,28 +5127,24 @@ function updateEndgameUI() {
         breakInfinityBtn.style.display = 'inline-block';
         breakInfinityBtn.disabled = true;
         breakInfinityBtn.innerHTML = '💜 INFINITY BROKEN <span class="maxed-badge">MAX</span>';
+        loopBtn.style.display = 'inline-block';
+        loopBtn.disabled = false;
+        loopBtn.textContent = `🔁 LOOP (x${formatMultiplierValue(getLoopGainMultiplier())} -> x${formatMultiplierValue(getLoopGainMultiplier() * 2)})`;
         return;
     }
 
-    const canBreakInfinityNow = trueEndResetDone && honey >= INFINITY_SOFT_CAP;
+    const canBreakInfinityNow = trueEndResetDone && (honey >= INFINITY_SOFT_CAP || honeyOverflowExp > 0);
     breakInfinityBtn.style.display = canBreakInfinityNow ? 'inline-block' : 'none';
     breakInfinityBtn.disabled = !canBreakInfinityNow;
     if (canBreakInfinityNow) {
         breakInfinityBtn.textContent = '💜 BREAK INFINITY';
     }
+    loopBtn.style.display = 'none';
 }
 
 function applyTrueEndGrowthTick() {
-    if (!trueEndResetDone || !trueEndGrowthActive || trueEndInfinityBroken) return;
-
-    const mult = TRUE_END_GROWTH_MULTIPLIER;
-    honey = clampToInfinitySoftCap(Math.floor(honey * mult));
-    totalHoneyEarned = clampToInfinitySoftCap(Math.floor(totalHoneyEarned * mult));
-    rebirthPoints = clampToInfinitySoftCap(Math.floor(rebirthPoints * mult));
-    sacrificePoints = clampToInfinitySoftCap(Math.floor(sacrificePoints * mult));
-    ascendPoints = getSafeAscendPoints(clampToInfinitySoftCap(Math.floor(ascendPoints * mult)));
-    ascendPowerPoints = getSafeAscendPoints(clampToInfinitySoftCap(Math.floor(ascendPowerPoints * mult)));
-    refreshAscendMultiplier();
+    if (!trueEndResetDone || !trueEndGrowthActive) return;
+    trueEndHoneyGrowthTicks = Math.max(0, Math.floor(trueEndHoneyGrowthTicks + 1));
 
     recalcMultiplier();
     updateRebirthUI();
@@ -4918,7 +5159,7 @@ function setupTrueEndGrowth() {
         trueEndGrowthInterval = null;
     }
 
-    if (!trueEndResetDone || !trueEndGrowthActive || trueEndInfinityBroken) return;
+    if (!trueEndResetDone || !trueEndGrowthActive) return;
     trueEndGrowthInterval = setInterval(() => {
         if (gameplayBlocked) return;
         applyTrueEndGrowthTick();
@@ -5098,7 +5339,8 @@ rebirthBtn.addEventListener('click', () => {
     const maxRP = getMaxRPFromHoney();
     if (maxRP > 0) {
         const cost = getRPCost(maxRP);
-        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier * getAscensionRPMultiplier());
+        const loopGainMult = getLoopGainMultiplier();
+        const rpGain = Math.floor(maxRP * rpCompoundingMultiplier * getAscensionRPMultiplier() * loopGainMult);
         rebirthPoints += rpGain;
         
         bees = []; flowers = []; nextHireCost = HIRE_COST_BASE;
@@ -5108,12 +5350,14 @@ rebirthBtn.addEventListener('click', () => {
         addBee();
         resetFlowerFieldForCurrentLimits();
         honey = 0;
+        honeyOverflowExp = 0;
         
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); 
         updateHireCostDisplay();
         saveGame();
         const rpAscText = getAscensionRPMultiplier() > 1 ? ` * ASC x${formatMultiplierValue(getAscensionRPMultiplier())}` : '';
-        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)}${rpAscText} => ${rpGain}). Honey reset to 0.`);
+        const rpLoopText = loopGainMult > 1 ? ` * LOOP x${formatMultiplierValue(loopGainMult)}` : '';
+        showGameStatusMessage(`Purchased ${maxRP} RP (x${rpCompoundingMultiplier.toFixed(2)}${rpAscText}${rpLoopText} => ${rpGain}). Honey reset to 0.`);
     } else {
         showGameStatusMessage('Need at least 10,000 honey for 1 RP.');
     }
@@ -5124,7 +5368,8 @@ sacrificeBtn.addEventListener('click', () => {
     const maxSP = getMaxSPFromResources();
     if (maxSP > 0) {
         const cost = getSPCost(maxSP);
-        const totalSpGainMult = spCompoundingMultiplier * getAscensionSPMultiplier();
+        const loopGainMult = getLoopGainMultiplier();
+        const totalSpGainMult = spCompoundingMultiplier * getAscensionSPMultiplier() * loopGainMult;
         const spGain = Math.max(1, Math.floor(maxSP * totalSpGainMult));
         honey -= cost.honey;
         rebirthPoints -= cost.rp;
@@ -5165,6 +5410,7 @@ sacrificeBtn.addEventListener('click', () => {
         resetFlowerFieldForCurrentLimits();
         
         honey = 0;
+        honeyOverflowExp = 0;
         
         recalcMultiplier(); updateRebirthUI(); updateToolButtons(); updateSPUI();
         updateHireCostDisplay();
@@ -5173,6 +5419,7 @@ sacrificeBtn.addEventListener('click', () => {
         const spBonusParts = [];
         if (spCompoundingMultiplier > 1) spBonusParts.push(`COMP x${formatMultiplierValue(spCompoundingMultiplier)}`);
         if (getAscensionSPMultiplier() > 1) spBonusParts.push(`ASC x${formatMultiplierValue(getAscensionSPMultiplier())}`);
+        if (loopGainMult > 1) spBonusParts.push(`LOOP x${formatMultiplierValue(loopGainMult)}`);
         const spBonusText = spBonusParts.length ? ` (${spBonusParts.join(' * ')})` : '';
         showGameStatusMessage(`Sacrificed for ${spGain} SP${spBonusText}. Honey reset to 0. RP Compounding kept at lv${rpCompoundingLevel} (${rpCompoundingMultiplier.toFixed(2)}x).`);
     } else {
@@ -5192,13 +5439,14 @@ ascendBtn.addEventListener('click', () => {
     honey -= cost.honey;
     rebirthPoints -= cost.rp;
     sacrificePoints -= cost.sp;
-    ascendPoints = getSafeAscendPoints(ascendPoints + maxAP);
-    ascendPowerPoints = getSafeAscendPoints(ascendPowerPoints + maxAP);
+    const apGain = Math.max(1, Math.floor(maxAP * getLoopGainMultiplier()));
+    ascendPoints = getSafeAscendPoints(ascendPoints + apGain);
+    ascendPowerPoints = getSafeAscendPoints(ascendPowerPoints + apGain);
     refreshAscendMultiplier();
 
     applyAscendResetState();
     saveGame();
-    showGameStatusMessage(`Ascended for +${formatNumber(maxAP)} AP! AP is now ${formatNumber(ascendPoints)}.`);
+    showGameStatusMessage(`Ascended for +${formatNumber(apGain)} AP! AP is now ${formatNumber(ascendPoints)}.`);
 });
 
 // ========== SACRIFICE SHOP ==========
@@ -5449,35 +5697,68 @@ trueEndResetBtn.addEventListener('click', async () => {
     trueEndResetDone = true;
     trueEndInfinityBroken = false;
     trueEndGrowthActive = true;
+    trueEndHoneyGrowthTicks = 0;
+    honeyOverflowExp = 0;
+    totalHoneyOverflowExp = 0;
 
     resetAllGameDataState();
     // Keep the one-time TRUE END flag after full wipe.
     trueEndResetDone = true;
     trueEndInfinityBroken = false;
     trueEndGrowthActive = true;
+    trueEndHoneyGrowthTicks = 0;
+    honeyOverflowExp = 0;
+    totalHoneyOverflowExp = 0;
     setupTrueEndGrowth();
     recalcMultiplier();
     updateRebirthUI();
     updateToolButtons();
     updateSPUI();
     saveGame();
-    showGameStatusMessage('TRUE END RESET activated: x2 ALL STATS every second until BREAK INFINITY.');
+    showGameStatusMessage('TRUE END RESET activated: Honey multiplier doubles every second.');
 });
 
 breakInfinityBtn.addEventListener('click', () => {
     if (!trueEndResetDone) return;
     if (trueEndInfinityBroken) return;
-    if (honey < INFINITY_SOFT_CAP) {
+    if (honey < INFINITY_SOFT_CAP && honeyOverflowExp <= 0) {
         showGameStatusMessage(`Reach ${formatNumber(INFINITY_SOFT_CAP)} honey first.`);
         return;
     }
 
     trueEndInfinityBroken = true;
-    trueEndGrowthActive = false;
+    trueEndGrowthActive = true;
     setupTrueEndGrowth();
     updateEndgameUI();
     saveGame();
-    showGameStatusMessage('You broke Infinity.');
+    showGameStatusMessage('You broke Infinity. LOOP is now unlocked.');
+});
+
+loopBtn.addEventListener('click', () => {
+    if (!trueEndResetDone || !trueEndInfinityBroken) return;
+    const nextLoopMult = getLoopGainMultiplier() * 2;
+    if (!confirm(`LOOP will reset everything and set gain multiplier to x${formatMultiplierValue(nextLoopMult)}. Continue?`)) return;
+
+    loopCount = Math.max(0, loopCount + 1);
+    loopMultiplier = Math.max(1, nextLoopMult);
+
+    resetAllGameDataState();
+
+    // LOOP keeps endgame progression unlocked and active.
+    trueEndResetDone = true;
+    trueEndInfinityBroken = true;
+    trueEndGrowthActive = true;
+    trueEndHoneyGrowthTicks = 0;
+    honeyOverflowExp = 0;
+    totalHoneyOverflowExp = 0;
+    setupTrueEndGrowth();
+
+    recalcMultiplier();
+    updateRebirthUI();
+    updateToolButtons();
+    updateSPUI();
+    saveGame();
+    showGameStatusMessage(`Loop complete. Global gain multiplier is now x${formatMultiplierValue(loopMultiplier)}.`);
 });
 
 // ========== SAVE GAME FUNCTION ==========
@@ -5502,7 +5783,8 @@ function buildSaveData(includeWorldData = true) {
         spAutobuyerPurchased, spGeneratorLevel, spCompoundingLevel, spCompoundingMultiplier,
         ascensionCorePurchased,
         ascensionCorePowerFixApplied,
-        trueEndResetDone, trueEndGrowthActive, trueEndInfinityBroken,
+        trueEndResetDone, trueEndGrowthActive, trueEndInfinityBroken, trueEndHoneyGrowthTicks,
+        loopCount, loopMultiplier, honeyOverflowExp, totalHoneyOverflowExp,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled, spAutobuyEnabled,
         autoSpendPercent,
@@ -5605,9 +5887,14 @@ function loadGame() {
         ascensionCorePowerFixApplied = parseBoolean(data.ascensionCorePowerFixApplied, false);
         trueEndResetDone = parseBoolean(data.trueEndResetDone, false);
         trueEndInfinityBroken = parseBoolean(data.trueEndInfinityBroken, false);
-        trueEndGrowthActive = parseBoolean(data.trueEndGrowthActive, trueEndResetDone && !trueEndInfinityBroken);
-        if (trueEndInfinityBroken) {
-            trueEndGrowthActive = false;
+        trueEndGrowthActive = parseBoolean(data.trueEndGrowthActive, trueEndResetDone);
+        trueEndHoneyGrowthTicks = Math.max(0, Math.floor(finiteOr(data.trueEndHoneyGrowthTicks, 0)));
+        loopCount = Math.max(0, Math.floor(finiteOr(data.loopCount, 0)));
+        loopMultiplier = Math.max(1, finiteOr(data.loopMultiplier, Math.pow(2, loopCount)));
+        honeyOverflowExp = Math.max(0, Math.floor(finiteOr(data.honeyOverflowExp, 0)));
+        totalHoneyOverflowExp = Math.max(0, Math.floor(finiteOr(data.totalHoneyOverflowExp, 0)));
+        if (trueEndResetDone && !trueEndGrowthActive) {
+            trueEndGrowthActive = true;
         }
         if (ascensionCorePurchased && !ascensionCorePowerFixApplied && ascendPoints > 0 && ascendPowerPoints <= ascendPoints) {
             ascendPowerPoints = ascendPoints + ASCENSION_SHOP_COST_AP;
@@ -5685,6 +5972,12 @@ function loadGame() {
         if (rpAutoBuyInterval) {
             clearInterval(rpAutoBuyInterval);
             rpAutoBuyInterval = null;
+        }
+        // SP auto is always OFF after reload/load; player must enable manually.
+        spAutobuyEnabled = false;
+        if (spAutobuyInterval) {
+            clearInterval(spAutobuyInterval);
+            spAutobuyInterval = null;
         }
 
         setupRPGenerator();
