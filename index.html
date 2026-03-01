@@ -1442,6 +1442,12 @@ function applyLoadedSaveData(saveData) {
     sacrificePoints = finiteOr(saveData.sacrificePoints, 0);
     ascendPoints = getSafeAscendPoints(finiteOr(saveData.ascendPoints, 0));
     ascendPowerPoints = getSafeAscendPoints(finiteOr(saveData.ascendPowerPoints, ascendPoints));
+    ascensionCorePurchased = parseBoolean(saveData.ascensionCorePurchased, false);
+    ascensionCorePowerFixApplied = parseBoolean(saveData.ascensionCorePowerFixApplied, false);
+    if (ascensionCorePurchased && !ascensionCorePowerFixApplied && ascendPoints > 0 && ascendPowerPoints <= ascendPoints) {
+        ascendPowerPoints = ascendPoints + ASCENSION_SHOP_COST_AP;
+        ascensionCorePowerFixApplied = true;
+    }
     refreshAscendMultiplier();
 
     hasClippers = parseBoolean(saveData.hasClippers, false);
@@ -1471,7 +1477,6 @@ function applyLoadedSaveData(saveData) {
     rpCompoundingLevel = finiteOr(saveData.rpCompoundingLevel, 0);
     rpCompoundingMultiplier = finiteOr(saveData.rpCompoundingMultiplier, 1.0);
     flowerFieldUpgradePurchased = parseBoolean(saveData.flowerFieldUpgradePurchased, false);
-    ascensionCorePurchased = parseBoolean(saveData.ascensionCorePurchased, false);
     rpAutobuyEnabled = parseBoolean(saveData.rpAutobuyEnabled, false);
     autoActive = parseBoolean(saveData.autoActive, false);
     autoSpendPercent = normalizeAutoSpendPercent(saveData.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
@@ -3878,6 +3883,7 @@ let rpCompoundingLevel = 0;
 let rpCompoundingMultiplier = 1.0;
 let flowerFieldUpgradePurchased = false;
 let ascensionCorePurchased = false;
+let ascensionCorePowerFixApplied = false;
 
 // Automation
 let autoActive = false;
@@ -4739,10 +4745,13 @@ buyAscensionUpgrade.addEventListener('click', () => {
         return;
     }
 
+    const apPowerBeforePurchase = Math.max(getSafeAscendPoints(ascendPowerPoints), getSafeAscendPoints(ascendPoints));
     ascendPoints -= ASCENSION_SHOP_COST_AP;
     ascendPoints = getSafeAscendPoints(ascendPoints);
+    ascendPowerPoints = apPowerBeforePurchase;
     refreshAscendMultiplier();
     ascensionCorePurchased = true;
+    ascensionCorePowerFixApplied = true;
 
     applyAscensionAutomationBonuses();
     recalcMultiplier();
@@ -4858,6 +4867,7 @@ function buildSaveData(includeWorldData = true) {
         flowerHpLevel,
         flowerFieldUpgradePurchased,
         ascensionCorePurchased,
+        ascensionCorePowerFixApplied,
         autoActive, x10HoneyPurchased, rpAutoBuyActive, rpGeneratorLevel,
         rpCompoundingLevel, rpCompoundingMultiplier, rpAutobuyEnabled,
         autoSpendPercent,
@@ -4956,6 +4966,12 @@ function loadGame() {
         sacrificePoints = finiteOr(data.sacrificePoints, 0);
         ascendPoints = getSafeAscendPoints(finiteOr(data.ascendPoints, 0));
         ascendPowerPoints = getSafeAscendPoints(finiteOr(data.ascendPowerPoints, ascendPoints));
+        ascensionCorePurchased = parseBoolean(data.ascensionCorePurchased, false);
+        ascensionCorePowerFixApplied = parseBoolean(data.ascensionCorePowerFixApplied, false);
+        if (ascensionCorePurchased && !ascensionCorePowerFixApplied && ascendPoints > 0 && ascendPowerPoints <= ascendPoints) {
+            ascendPowerPoints = ascendPoints + ASCENSION_SHOP_COST_AP;
+            ascensionCorePowerFixApplied = true;
+        }
         refreshAscendMultiplier();
         autoUnlocked = data.autoUnlocked || false;
         beeSpeedMultiplier = clampBeeSpeedMultiplier(finiteOr(data.beeSpeedMultiplier, BEE_SPEED_MULTIPLIER_BASE));
@@ -4971,7 +4987,6 @@ function loadGame() {
         rpCompoundingLevel = finiteOr(data.rpCompoundingLevel, 0);
         rpCompoundingMultiplier = finiteOr(data.rpCompoundingMultiplier, 1.0);
         flowerFieldUpgradePurchased = parseBoolean(data.flowerFieldUpgradePurchased, false);
-        ascensionCorePurchased = parseBoolean(data.ascensionCorePurchased, false);
         rpAutobuyEnabled = data.rpAutobuyEnabled || false;
         autoSpendPercent = normalizeAutoSpendPercent(data.autoSpendPercent ?? DEFAULT_AUTO_SPEND_PERCENT);
         performanceMode = parseBoolean(data.performanceMode, false);
