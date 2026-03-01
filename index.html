@@ -3723,11 +3723,14 @@ menuAdminUnbanBtn.addEventListener('click', async () => {
 // ========== FIREBASE LEADERBOARD FUNCTIONS ==========
 function getLeaderboardEntryExp(entry) {
     if (!entry || typeof entry !== 'object') return 0;
-    const rawExp = Number(entry.totalExp);
-    if (Number.isFinite(rawExp) && rawExp >= 0) return Math.floor(rawExp);
     const total = Number(entry.total);
-    if (!Number.isFinite(total) || total <= 0) return 0;
-    return Math.floor(Math.log10(total));
+    const baseExp = Number.isFinite(total) && total > 0 ? Math.floor(Math.log10(total)) : 0;
+    const rawExp = Number(entry.totalExp);
+    if (Number.isFinite(rawExp) && rawExp >= 0) {
+        // Guard against stale/invalid low exponents (e.g., totalExp=0 on large totals).
+        return Math.max(baseExp, Math.floor(rawExp));
+    }
+    return baseExp;
 }
 
 function compareLeaderboardEntries(left, right) {
