@@ -2783,6 +2783,16 @@ async function startBanWatchers() {
     }
 }
 
+async function runAdminFirebaseStep(label, action) {
+    try {
+        return await action();
+    } catch (error) {
+        console.error(`${label} failed:`, error);
+        const message = error && error.message ? error.message : String(error);
+        throw new Error(`${label}: ${message}`);
+    }
+}
+
 async function banPlayerPermanently(targetPlayer) {
     const normalizedName = normalizePlayerName(targetPlayer);
     const key = sanitizeFirebaseKey(normalizedName);
@@ -2794,7 +2804,9 @@ async function banPlayerPermanently(targetPlayer) {
     }
 
     let knownIpHash = '';
-    const identitySnapshot = await playerIdentityRef.child(key).once('value');
+    const identitySnapshot = await runAdminFirebaseStep('Read player identity', () => {
+        return playerIdentityRef.child(key).once('value');
+    });
     const identityData = identitySnapshot.val() || {};
     if (typeof identityData.ipHash === 'string') {
         knownIpHash = identityData.ipHash.trim();
@@ -2802,10 +2814,10 @@ async function banPlayerPermanently(targetPlayer) {
 
     const now = Date.now();
 
-    await queueAdminReset(normalizedName, 'all');
-    await removePlayerFromLeaderboard(normalizedName);
+    await runAdminFirebaseStep('Queue full wipe', () => queueAdminReset(normalizedName, 'all'));
+    await runAdminFirebaseStep('Remove leaderboard entry', () => removePlayerFromLeaderboard(normalizedName));
 
-    await playerBansRef.child(key).set({
+    await runAdminFirebaseStep('Write player ban', () => playerBansRef.child(key).set({
         name: normalizedName,
         active: true,
         permanent: true,
@@ -2814,10 +2826,10 @@ async function banPlayerPermanently(targetPlayer) {
         bannedBy: playerName || 'Opleoni',
         bannedAt: now,
         updatedAt: now
-    });
+    }));
 
     if (knownIpHash) {
-        await ipBansRef.child(knownIpHash).set({
+        await runAdminFirebaseStep('Write IP ban', () => ipBansRef.child(knownIpHash).set({
             active: true,
             permanent: true,
             type: 'ip_permanent',
@@ -2825,7 +2837,7 @@ async function banPlayerPermanently(targetPlayer) {
             bannedBy: playerName || 'Opleoni',
             bannedAt: now,
             updatedAt: now
-        });
+        }));
     }
 }
 
@@ -3193,14 +3205,16 @@ async function banPlayersPermanentlyBulk(targetPlayers) {
     ));
     if (normalizedTargets.length === 0) return;
 
-    const identitySnapshot = await playerIdentityRef.once('value');
+    const identitySnapshot = await runAdminFirebaseStep('Read player identities', () => {
+        return playerIdentityRef.once('value');
+    });
     const identityData = identitySnapshot.val() || {};
     const now = Date.now();
 
-    await queueAdminResetBulk(normalizedTargets, 'all');
-    await removePlayersFromLeaderboardBulk(normalizedTargets);
+    await runAdminFirebaseStep('Queue full wipes', () => queueAdminResetBulk(normalizedTargets, 'all'));
+    await runAdminFirebaseStep('Remove leaderboard entries', () => removePlayersFromLeaderboardBulk(normalizedTargets));
 
-    const updates = {};
+    const banWrites = [];
     for (const targetName of normalizedTargets) {
         const key = sanitizeFirebaseKey(targetName);
         if (!key) continue;
@@ -3208,7 +3222,7 @@ async function banPlayersPermanentlyBulk(targetPlayers) {
         const identityEntry = identityData[key] && typeof identityData[key] === 'object' ? identityData[key] : {};
         const ipHash = typeof identityEntry.ipHash === 'string' ? identityEntry.ipHash.trim() : '';
 
-        updates[`playerBans/${key}`] = {
+        banWrites.push(runAdminFirebaseStep(`Write player ban for ${targetName}`, () => playerBansRef.child(key).set({
             name: targetName,
             active: true,
             permanent: true,
@@ -3217,10 +3231,10 @@ async function banPlayersPermanentlyBulk(targetPlayers) {
             bannedBy: playerName || 'Opleoni',
             bannedAt: now,
             updatedAt: now
-        };
+        })));
 
         if (ipHash) {
-            updates[`ipBans/${ipHash}`] = {
+            banWrites.push(runAdminFirebaseStep(`Write IP ban for ${targetName}`, () => ipBansRef.child(ipHash).set({
                 active: true,
                 permanent: true,
                 type: 'ip_permanent',
@@ -3228,13 +3242,11 @@ async function banPlayersPermanentlyBulk(targetPlayers) {
                 bannedBy: playerName || 'Opleoni',
                 bannedAt: now,
                 updatedAt: now
-            };
+            })));
         }
     }
 
-    if (Object.keys(updates).length > 0) {
-        await database.ref().update(updates);
-    }
+    await Promise.all(banWrites);
 }
 
 async function claimAdminGrants() {
@@ -3869,7 +3881,8 @@ menuAdminBanBtn.addEventListener('click', async () => {
         alert(`Permanent IP ban + wipe completed for ${targetPlayer}.`);
     } catch (error) {
         console.error('Admin ban failed:', error);
-        alert('Failed to ban player. Check Firebase permissions/rules and make sure the name is valid.');
+        const detail = error && error.message ? `\n\n${error.message}` : '';
+        alert(`Failed to ban player. Check Firebase permissions/rules and make sure the name is valid.${detail}`);
     } finally {
         adminBanInProgress = false;
         setButtonBusyState(menuAdminBanBtn, false);
