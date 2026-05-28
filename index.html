@@ -1758,9 +1758,6 @@ menuResetSelectedBtn.addEventListener('click', async () => {
     if (!confirm(`Reset your ${resetStat.toUpperCase()} stats?`)) return;
 
     applyLocalCurrencyReset(resetStat);
-    if (resetStat === 'honey') {
-        await resetPlayerHoneyScore(playerName);
-    }
     recalcMultiplier();
     updateRebirthUI();
     updateToolButtons();
@@ -2705,6 +2702,20 @@ function normalizeRestoreSnapshot(snapshot) {
     return hasAnyCurrency ? normalized : null;
 }
 
+function compareRestoreHoney(left, right) {
+    const leftSnapshot = normalizeRestoreSnapshot(left);
+    const rightSnapshot = normalizeRestoreSnapshot(right);
+    if (!leftSnapshot && !rightSnapshot) return null;
+    if (!leftSnapshot) return rightSnapshot;
+    if (!rightSnapshot) return leftSnapshot;
+
+    const leftExp = Math.floor(Math.log10(Math.max(1, leftSnapshot.honey))) + leftSnapshot.honeyExp;
+    const rightExp = Math.floor(Math.log10(Math.max(1, rightSnapshot.honey))) + rightSnapshot.honeyExp;
+    if (rightExp > leftExp) return rightSnapshot;
+    if (rightExp < leftExp) return leftSnapshot;
+    return rightSnapshot.honey > leftSnapshot.honey ? rightSnapshot : leftSnapshot;
+}
+
 async function writePlayerProfileSnapshot() {
     if (!playerName || gameplayBlocked || isProtectedAdminName(playerName)) return;
     const key = getPlayerDataKey(playerName);
@@ -2731,6 +2742,51 @@ async function readPlayerRestoreSnapshot(normalizedName) {
     }
 
     return null;
+}
+
+async function readLeaderboardRestoreSnapshot(normalizedName) {
+    const name = normalizePlayerName(normalizedName);
+    const nameKey = normalizePlayerNameKey(name);
+    if (!name || !nameKey) return null;
+
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val() || {};
+    for (const [key, value] of Object.entries(data)) {
+        if (!value || typeof value !== 'object') continue;
+        const entryName = normalizePlayerName(value.name || key);
+        if (normalizePlayerNameKey(entryName) !== nameKey) continue;
+        const honey = toSafeAmount(value.total);
+        const baseExp = honey > 0 ? Math.floor(Math.log10(Math.max(1, honey))) : 0;
+        const totalExp = Math.max(baseExp, Math.floor(Number(value.totalExp) || 0));
+        return normalizeRestoreSnapshot({
+            honey,
+            honeyExp: Math.max(0, totalExp - baseExp),
+            rp: 0,
+            sp: 0,
+            ap: 0,
+            updatedAt: Date.now()
+        });
+    }
+
+    return null;
+}
+
+async function readBestRestoreSnapshot(normalizedName) {
+    const [profileRestore, leaderboardRestore] = await Promise.all([
+        readPlayerRestoreSnapshot(normalizedName),
+        readLeaderboardRestoreSnapshot(normalizedName)
+    ]);
+
+    const bestHoney = compareRestoreHoney(profileRestore, leaderboardRestore);
+    if (!profileRestore) return bestHoney;
+    if (!bestHoney) return profileRestore;
+
+    return {
+        ...profileRestore,
+        honey: bestHoney.honey,
+        honeyExp: bestHoney.honeyExp,
+        updatedAt: Math.max(profileRestore.updatedAt || 0, bestHoney.updatedAt || 0)
+    };
 }
 
 function lockGameplayForBan(message) {
@@ -2882,7 +2938,7 @@ async function banPlayerPermanently(targetPlayer) {
 
     const now = Date.now();
     const restoreGrant = await runAdminFirebaseStep('Read restore snapshot', () => {
-        return readPlayerRestoreSnapshot(normalizedName);
+        return readBestRestoreSnapshot(normalizedName);
     });
 
     await runAdminFirebaseStep('Queue full wipe', () => queueAdminReset(normalizedName, 'all'));
@@ -3113,43 +3169,24 @@ async function queueAdminRestoreSnapshot(targetPlayer, snapshot) {
     if (!sanitizedTarget || !key || !restore) return false;
 
     await adminGrantsRef.child(key).transaction((current) => {
-        const safeCurrent = current && typeof current === 'object' ? current : {};
-        const next = {
+        return {
             name: sanitizedTarget,
-            honey: toSafeAmount(safeCurrent.honey),
-            honeyExp: toSafeOverflowExp(safeCurrent.honeyExp),
-            rp: toSafeAmount(safeCurrent.rp),
-            rpExp: toSafeOverflowExp(safeCurrent.rpExp),
-            sp: toSafeAmount(safeCurrent.sp),
-            spExp: toSafeOverflowExp(safeCurrent.spExp),
-            ap: toSafeAmount(safeCurrent.ap),
-            apExp: toSafeOverflowExp(safeCurrent.apExp),
-            resetHoney: parseBoolean(safeCurrent.resetHoney, false),
-            resetRp: parseBoolean(safeCurrent.resetRp, false),
-            resetSp: parseBoolean(safeCurrent.resetSp, false),
-            resetAp: parseBoolean(safeCurrent.resetAp, false),
-            resetAll: parseBoolean(safeCurrent.resetAll, false),
-            fullReset: parseBoolean(safeCurrent.fullReset, false),
+            honey: restore.honey,
+            honeyExp: restore.honeyExp,
+            rp: restore.rp,
+            rpExp: restore.rpExp,
+            sp: restore.sp,
+            spExp: restore.spExp,
+            ap: restore.ap,
+            apExp: restore.apExp,
+            resetHoney: true,
+            resetRp: true,
+            resetSp: true,
+            resetAp: true,
+            resetAll: true,
+            fullReset: false,
             updatedAt: Date.now()
         };
-
-        const honeySum = addOverflowAmounts(next.honey, next.honeyExp, restore.honey, restore.honeyExp);
-        next.honey = honeySum.value;
-        next.honeyExp = honeySum.overflowExp;
-
-        const rpSum = addOverflowAmounts(next.rp, next.rpExp, restore.rp, restore.rpExp);
-        next.rp = rpSum.value;
-        next.rpExp = rpSum.overflowExp;
-
-        const spSum = addOverflowAmounts(next.sp, next.spExp, restore.sp, restore.spExp);
-        next.sp = spSum.value;
-        next.spExp = spSum.overflowExp;
-
-        const apSum = addOverflowAmounts(next.ap, next.apExp, restore.ap, restore.apExp);
-        next.ap = apSum.value;
-        next.apExp = apSum.overflowExp;
-
-        return next;
     });
 
     return true;
@@ -3376,7 +3413,7 @@ async function banPlayersPermanentlyBulk(targetPlayers) {
     const identityData = identitySnapshot.val() || {};
     const restoreSnapshots = await runAdminFirebaseStep('Read restore snapshots', async () => {
         const pairs = await Promise.all(normalizedTargets.map(async (targetName) => {
-            return [normalizePlayerNameKey(targetName), await readPlayerRestoreSnapshot(targetName)];
+            return [normalizePlayerNameKey(targetName), await readBestRestoreSnapshot(targetName)];
         }));
         return new Map(pairs);
     });
@@ -3679,9 +3716,15 @@ async function unbanPlayerPermanently(targetPlayer) {
         throw new Error('Player is not currently banned');
     }
 
-    const restoreGrant = normalizeRestoreSnapshot(banData.restoreGrant);
+    let restoreGrant = normalizeRestoreSnapshot(banData.restoreGrant);
+    if (!restoreGrant) {
+        restoreGrant = await runAdminFirebaseStep('Read fallback restore snapshot', () => {
+            return readBestRestoreSnapshot(normalizedName);
+        });
+    }
+    let restoredCurrencies = false;
     if (restoreGrant) {
-        await runAdminFirebaseStep('Queue currency restore', () => {
+        restoredCurrencies = await runAdminFirebaseStep('Queue currency restore', () => {
             return queueAdminRestoreSnapshot(normalizedName, restoreGrant);
         });
     }
@@ -3707,6 +3750,7 @@ async function unbanPlayerPermanently(targetPlayer) {
     }
 
     await Promise.all(writes);
+    return { restoredCurrencies };
 }
 
 function setButtonBusyState(button, busy, busyLabel = 'WORKING...') {
@@ -3983,12 +4027,12 @@ menuAdminFullResetBtn.addEventListener('click', async () => {
         }
 
         if (targetPlayer === '__ALL__') {
-            const allPlayers = (await getAllKnownPlayerNamesForAdmin()).filter(name => !isProtectedAdminName(name));
+            const allPlayers = await getAllKnownPlayerNamesForAdmin();
             if (allPlayers.length === 0) {
-                alert('No non-admin players found to reset.');
+                alert('No players found to reset.');
                 return;
             }
-            if (!confirm(`RESET EVERYTHING for ALL ${allPlayers.length} non-admin players? This returns them to first-start progress.`)) return;
+            if (!confirm(`RESET EVERYTHING for ALL ${allPlayers.length} players? This returns them to first-start progress.`)) return;
 
             const selfIncluded = allPlayers.some(name => isSamePlayerName(name, playerName));
             const otherPlayers = allPlayers.filter(name => !isSamePlayerName(name, playerName));
@@ -4001,12 +4045,7 @@ menuAdminFullResetBtn.addEventListener('click', async () => {
                 await performFullDataReset({ clearRedeemedCodes: true, removeLeaderboardEntry: true });
             }
 
-            alert(`Reset EVERYTHING queued for ALL (${allPlayers.length}) players. Opleoni was skipped.`);
-            return;
-        }
-
-        if (isProtectedAdminName(targetPlayer)) {
-            alert('Reset EVERYTHING for Opleoni is blocked.');
+            alert(`Reset EVERYTHING queued for ALL (${allPlayers.length}) players.`);
             return;
         }
 
@@ -4090,8 +4129,9 @@ menuAdminUnbanBtn.addEventListener('click', async () => {
     adminUnbanInProgress = true;
     setButtonBusyState(menuAdminUnbanBtn, true, 'UNBANNING...');
     try {
-        await unbanPlayerPermanently(targetPlayer);
-        alert(`✅ Unbanned ${targetPlayer}.`);
+        const result = await unbanPlayerPermanently(targetPlayer);
+        const restoreText = result?.restoredCurrencies ? ' Currency restore was queued.' : ' No saved currency snapshot was found.';
+        alert(`✅ Unbanned ${targetPlayer}.${restoreText}`);
     } catch (error) {
         console.error('Admin unban failed:', error);
         alert(`Failed to unban ${targetPlayer}.`);
