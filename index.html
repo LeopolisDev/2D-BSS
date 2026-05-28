@@ -2371,6 +2371,14 @@ function applyLocalCurrencyReset(resetStat) {
     applyAscensionAutomationBonuses();
 }
 
+async function resetLocalLeaderboardHoneyOnly() {
+    totalHoneyEarned = 0;
+    totalHoneyOverflowExp = 0;
+    if (playerName) {
+        await resetPlayerHoneyScore(playerName);
+    }
+}
+
 function resetAllGameDataState() {
     honey = 0;
     totalHoneyEarned = 0;
@@ -3002,6 +3010,7 @@ async function queueAdminGrant(targetPlayer, stat, amount, amountOverflowExp = 0
             resetRp: parseBoolean(safeCurrent.resetRp, false),
             resetSp: parseBoolean(safeCurrent.resetSp, false),
             resetAp: parseBoolean(safeCurrent.resetAp, false),
+            resetLeaderboardHoney: parseBoolean(safeCurrent.resetLeaderboardHoney, false),
             resetAll: parseBoolean(safeCurrent.resetAll, false),
             fullReset: parseBoolean(safeCurrent.fullReset, false),
             updatedAt: Date.now()
@@ -3072,6 +3081,7 @@ async function queueAdminGrantBulk(targetPlayers, stat, amount, amountOverflowEx
                     resetRp: parseBoolean(safeCurrent.resetRp, false),
                     resetSp: parseBoolean(safeCurrent.resetSp, false),
                     resetAp: parseBoolean(safeCurrent.resetAp, false),
+                    resetLeaderboardHoney: parseBoolean(safeCurrent.resetLeaderboardHoney, false),
                     resetAll: parseBoolean(safeCurrent.resetAll, false),
                     fullReset: parseBoolean(safeCurrent.fullReset, false),
                     updatedAt: now
@@ -3142,6 +3152,7 @@ async function queueAdminReset(targetPlayer, resetStat) {
             resetRp: parseBoolean(safeCurrent.resetRp, false),
             resetSp: parseBoolean(safeCurrent.resetSp, false),
             resetAp: parseBoolean(safeCurrent.resetAp, false),
+            resetLeaderboardHoney: parseBoolean(safeCurrent.resetLeaderboardHoney, false),
             resetAll: parseBoolean(safeCurrent.resetAll, false),
             fullReset: parseBoolean(safeCurrent.fullReset, false),
             updatedAt: Date.now()
@@ -3183,6 +3194,7 @@ async function queueAdminRestoreSnapshot(targetPlayer, snapshot) {
             resetRp: true,
             resetSp: true,
             resetAp: true,
+            resetLeaderboardHoney: true,
             resetAll: true,
             fullReset: false,
             updatedAt: Date.now()
@@ -3190,6 +3202,37 @@ async function queueAdminRestoreSnapshot(targetPlayer, snapshot) {
     });
 
     return true;
+}
+
+async function queueAdminLeaderboardHoneyReset(targetPlayer) {
+    const sanitizedTarget = normalizePlayerName(targetPlayer);
+    const key = getPlayerGrantKeys(sanitizedTarget)[0];
+    if (!sanitizedTarget || !key) {
+        throw new Error('Invalid target player');
+    }
+
+    await adminGrantsRef.child(key).transaction((current) => {
+        const safeCurrent = current && typeof current === 'object' ? current : {};
+        return {
+            name: sanitizedTarget,
+            honey: toSafeAmount(safeCurrent.honey),
+            honeyExp: toSafeOverflowExp(safeCurrent.honeyExp),
+            rp: toSafeAmount(safeCurrent.rp),
+            rpExp: toSafeOverflowExp(safeCurrent.rpExp),
+            sp: toSafeAmount(safeCurrent.sp),
+            spExp: toSafeOverflowExp(safeCurrent.spExp),
+            ap: toSafeAmount(safeCurrent.ap),
+            apExp: toSafeOverflowExp(safeCurrent.apExp),
+            resetHoney: parseBoolean(safeCurrent.resetHoney, false),
+            resetRp: parseBoolean(safeCurrent.resetRp, false),
+            resetSp: parseBoolean(safeCurrent.resetSp, false),
+            resetAp: parseBoolean(safeCurrent.resetAp, false),
+            resetLeaderboardHoney: true,
+            resetAll: parseBoolean(safeCurrent.resetAll, false),
+            fullReset: parseBoolean(safeCurrent.fullReset, false),
+            updatedAt: Date.now()
+        };
+    });
 }
 
 async function queueAdminFullReset(targetPlayer) {
@@ -3215,6 +3258,7 @@ async function queueAdminFullReset(targetPlayer) {
             resetRp: true,
             resetSp: true,
             resetAp: true,
+            resetLeaderboardHoney: true,
             resetAll: true,
             fullReset: true,
             updatedAt: Date.now()
@@ -3242,6 +3286,17 @@ async function queueAdminFullResetBulk(targetPlayers) {
     if (normalizedTargets.length === 0) return;
 
     await Promise.all(normalizedTargets.map(targetName => queueAdminFullReset(targetName)));
+}
+
+async function queueAdminLeaderboardHoneyResetBulk(targetPlayers) {
+    const normalizedTargets = Array.from(new Set(
+        (Array.isArray(targetPlayers) ? targetPlayers : [])
+            .map(name => normalizePlayerName(name))
+            .filter(Boolean)
+    ));
+    if (normalizedTargets.length === 0) return;
+
+    await Promise.all(normalizedTargets.map(targetName => queueAdminLeaderboardHoneyReset(targetName)));
 }
 
 async function addHoneyToPlayersScoreBulk(targetPlayers, amount, amountOverflowExp = 0) {
@@ -3485,6 +3540,7 @@ async function claimAdminGrants() {
             resetRp: false,
             resetSp: false,
             resetAp: false,
+            resetLeaderboardHoney: false,
             fullReset: false
         };
 
@@ -3509,6 +3565,7 @@ async function claimAdminGrants() {
             merged.resetRp = merged.resetRp || parseBoolean(data.resetRp, false);
             merged.resetSp = merged.resetSp || parseBoolean(data.resetSp, false);
             merged.resetAp = merged.resetAp || parseBoolean(data.resetAp, false);
+            merged.resetLeaderboardHoney = merged.resetLeaderboardHoney || parseBoolean(data.resetLeaderboardHoney, false);
             merged.fullReset = merged.fullReset || parseBoolean(data.fullReset, false);
         });
 
@@ -3532,6 +3589,7 @@ async function claimAdminGrants() {
         const resetRp = merged.resetRp;
         const resetSp = merged.resetSp;
         const resetAp = merged.resetAp;
+        const resetLeaderboardHoney = merged.resetLeaderboardHoney;
         const fullReset = merged.fullReset;
         const hasNumericGrant =
             honeyGrant > 0 || honeyGrantExp > 0 ||
@@ -3547,7 +3605,7 @@ async function claimAdminGrants() {
         }
 
         // If nothing to do, just remove the grant
-        if (!hasNumericGrant && !resetAll && !resetHoney && !resetRp && !resetSp && !resetAp) {
+        if (!hasNumericGrant && !resetAll && !resetHoney && !resetRp && !resetSp && !resetAp && !resetLeaderboardHoney) {
             console.log('No grants to apply, removing empty grant');
             await Promise.all(sourceRefs.map((ref) => ref.remove().catch(() => {})));
             return;
@@ -3561,6 +3619,9 @@ async function claimAdminGrants() {
             honeyOverflowExp = 0;
             totalHoneyOverflowExp = 0;
             await resetPlayerHoneyScore(playerName);
+        } else if (resetLeaderboardHoney) {
+            console.log('Resetting leaderboard honey');
+            await resetLocalLeaderboardHoneyOnly();
         }
         if (resetAll || resetRp) {
             console.log('Resetting RP');
@@ -3618,6 +3679,7 @@ async function claimAdminGrants() {
         // Show summary
         const grantParts = [];
         if (resetAll) grantParts.push('Reset ALL');
+        if (!resetAll && resetLeaderboardHoney) grantParts.push('Reset Leaderboard Honey');
         if (!resetAll && resetHoney) grantParts.push('Reset Honey');
         if (!resetAll && resetRp) grantParts.push('Reset RP');
         if (!resetAll && resetSp) grantParts.push('Reset SP');
@@ -3941,7 +4003,13 @@ menuAdminResetBtn.addEventListener('click', async () => {
             const otherPlayers = allPlayers.filter(name => !isSamePlayerName(name, playerName));
 
             if (resetStat === 'leaderboard_honey') {
-                await removePlayersFromLeaderboardBulk(allPlayers);
+                if (selfIncluded) {
+                    await resetLocalLeaderboardHoneyOnly();
+                }
+                if (otherPlayers.length > 0) {
+                    await resetPlayersHoneyScoreBulk(otherPlayers);
+                    await queueAdminLeaderboardHoneyResetBulk(otherPlayers);
+                }
                 leaderboardResetDone = true;
             } else {
                 if (selfIncluded) {
@@ -3975,7 +4043,12 @@ menuAdminResetBtn.addEventListener('click', async () => {
         if (!confirm(`Reset ${resetStatName} for ${targetPlayer}?`)) return;
 
         if (resetStat === 'leaderboard_honey') {
-            await removePlayerFromLeaderboard(targetPlayer);
+            if (isSamePlayerName(targetPlayer, playerName)) {
+                await resetLocalLeaderboardHoneyOnly();
+            } else {
+                await resetPlayerHoneyScore(targetPlayer);
+                await queueAdminLeaderboardHoneyReset(targetPlayer);
+            }
             leaderboardResetDone = true;
         } else if (isSamePlayerName(targetPlayer, playerName)) {
             applyLocalCurrencyReset(resetStat);
