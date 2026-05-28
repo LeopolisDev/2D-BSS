@@ -724,10 +724,7 @@
                 <button class="menu-btn remove-btn" id="menuAdminBanBtn">PERMA IP BAN + WIPE</button>
             </div>
             <div class="menu-row">
-                <select id="menuAdminUnbanSelect" class="admin-select" style="width:100%;">
-                    <option value="">No active bans</option>
-                </select>
-                <button class="menu-btn" id="menuAdminUnbanBtn">UNBAN SELECTED</button>
+                <button class="menu-btn" id="menuAdminUnbanBtn">UNBAN TYPED PLAYER</button>
             </div>
             <div class="menu-row">
                 <button class="menu-btn" id="menuOpenAnnouncementBtn">📢 ANNOUNCE</button>
@@ -1016,7 +1013,6 @@ const menuAdminAddBtn = document.getElementById('menuAdminAddBtn');
 const menuAdminResetStatSelect = document.getElementById('menuAdminResetStatSelect');
 const menuAdminResetBtn = document.getElementById('menuAdminResetBtn');
 const menuAdminBanBtn = document.getElementById('menuAdminBanBtn');
-const menuAdminUnbanSelect = document.getElementById('menuAdminUnbanSelect');
 const menuAdminUnbanBtn = document.getElementById('menuAdminUnbanBtn');
 const menuOpenAnnouncementBtn = document.getElementById('menuOpenAnnouncementBtn');
 const menuRedeemCodeInput = document.getElementById('menuRedeemCodeInput');
@@ -3462,123 +3458,61 @@ function updateMenuAdminSelect() {
         return;
     }
     menuAdminSection.style.display = 'block';
-    refreshAdminUnbanList().catch((error) => {
-        console.error('Failed to refresh admin unban list:', error);
-    });
-}
-
-function formatAdminTimestamp(timestamp) {
-    if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
-    try {
-        return new Date(timestamp).toLocaleString();
-    } catch (error) {
-        return '';
-    }
-}
-
-function setAdminUnbanOptions(bannedPlayers) {
-    if (!menuAdminUnbanSelect) return;
-
-    menuAdminUnbanSelect.innerHTML = '';
-    const list = Array.isArray(bannedPlayers) ? bannedPlayers : [];
-    if (list.length === 0) {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'No active bans';
-        menuAdminUnbanSelect.appendChild(option);
-        menuAdminUnbanSelect.disabled = true;
-        return;
-    }
-
-    for (const player of list) {
-        const name = normalizePlayerName(player?.name);
-        if (!name) continue;
-        const option = document.createElement('option');
-        option.value = name;
-        const stamp = formatAdminTimestamp(Number(player?.updatedAt || 0));
-        option.textContent = stamp ? `${name} (${stamp})` : name;
-        menuAdminUnbanSelect.appendChild(option);
-    }
-
-    menuAdminUnbanSelect.disabled = menuAdminUnbanSelect.options.length === 0;
-}
-
-async function refreshAdminUnbanList() {
-    if (!menuAdminUnbanSelect) return;
-    if (!isAdminUser()) {
-        setAdminUnbanOptions([]);
-        return;
-    }
-
-    menuAdminUnbanSelect.disabled = true;
-    menuAdminUnbanSelect.innerHTML = '';
-    const loadingOption = document.createElement('option');
-    loadingOption.value = '';
-    loadingOption.textContent = 'Loading banned players...';
-    menuAdminUnbanSelect.appendChild(loadingOption);
-
-    try {
-        const snapshot = await playerBansRef.once('value');
-        const data = snapshot.val() || {};
-        const bansByName = new Map();
-
-        for (const [key, value] of Object.entries(data)) {
-            if (!value || typeof value !== 'object') continue;
-            if (!parseBoolean(value.active, true)) continue;
-            const normalizedName = normalizePlayerName(value.name || key);
-            const nameKey = normalizePlayerNameKey(normalizedName);
-            if (!nameKey || isProtectedAdminName(normalizedName)) continue;
-
-            const updatedAt = Number(value.updatedAt || value.bannedAt || 0);
-            const current = bansByName.get(nameKey);
-            if (!current || updatedAt > current.updatedAt) {
-                bansByName.set(nameKey, {
-                    name: normalizedName,
-                    updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0
-                });
-            }
-        }
-
-        const bannedPlayers = Array.from(bansByName.values()).sort((a, b) => {
-            return a.name.localeCompare(b.name);
-        });
-        setAdminUnbanOptions(bannedPlayers);
-    } catch (error) {
-        console.error('Failed loading banned players:', error);
-        setAdminUnbanOptions([]);
-    }
 }
 
 async function unbanPlayerPermanently(targetPlayer) {
     const normalizedName = normalizePlayerName(targetPlayer);
-    const key = sanitizeFirebaseKey(normalizedName);
-    if (!normalizedName || !key) {
+    const fallbackKey = sanitizeFirebaseKey(normalizedName);
+    if (!normalizedName || !fallbackKey) {
         throw new Error('Invalid target player');
     }
 
-    const banSnapshot = await playerBansRef.child(key).once('value');
-    const banData = banSnapshot.val();
+    let key = fallbackKey;
+    let banData = null;
+    const directBanSnapshot = await playerBansRef.child(fallbackKey).once('value');
+    const directBanData = directBanSnapshot.val();
+    if (directBanData && parseBoolean(directBanData.active, true)) {
+        banData = directBanData;
+    } else {
+        const allBansSnapshot = await playerBansRef.once('value');
+        const allBans = allBansSnapshot.val() || {};
+        const targetNameKey = normalizePlayerNameKey(normalizedName);
+        for (const [candidateKey, value] of Object.entries(allBans)) {
+            if (!value || typeof value !== 'object') continue;
+            if (!parseBoolean(value.active, true)) continue;
+            const candidateName = normalizePlayerName(value.name || candidateKey);
+            if (normalizePlayerNameKey(candidateName) !== targetNameKey) continue;
+            key = candidateKey;
+            banData = value;
+            break;
+        }
+    }
+
     if (!banData || !parseBoolean(banData.active, true)) {
         throw new Error('Player is not currently banned');
     }
 
     const ipHash = typeof banData.ipHash === 'string' ? banData.ipHash.trim() : '';
     const now = Date.now();
-    const updates = {
-        [`playerBans/${key}/active`]: false,
-        [`playerBans/${key}/updatedAt`]: now,
-        [`playerBans/${key}/unbannedAt`]: now,
-        [`playerBans/${key}/unbannedBy`]: playerName || 'Opleoni'
-    };
+    const writes = [
+        playerBansRef.child(key).update({
+            active: false,
+            updatedAt: now,
+            unbannedAt: now,
+            unbannedBy: playerName || 'Opleoni'
+        })
+    ];
 
     if (ipHash) {
-        updates[`ipBans/${ipHash}/active`] = false;
-        updates[`ipBans/${ipHash}/updatedAt`] = now;
-        updates[`ipBans/${ipHash}/unbannedAt`] = now;
-        updates[`ipBans/${ipHash}/unbannedBy`] = playerName || 'Opleoni';
+        writes.push(ipBansRef.child(ipHash).update({
+            active: false,
+            updatedAt: now,
+            unbannedAt: now,
+            unbannedBy: playerName || 'Opleoni'
+        }));
     }
 
-    await database.ref().update(updates);
+    await Promise.all(writes);
 }
 
 function setButtonBusyState(button, busy, busyLabel = 'WORKING...') {
@@ -3863,7 +3797,6 @@ menuAdminBanBtn.addEventListener('click', async () => {
             if (!confirm(`PERMANENT IP BAN + FULL WIPE for ALL ${allPlayers.length} non-admin players?`)) return;
 
             await banPlayersPermanentlyBulk(allPlayers);
-            await refreshAdminUnbanList();
 
             alert(`Permanent IP ban + wipe completed for ALL (${allPlayers.length}) players. Opleoni was skipped.`);
             return;
@@ -3877,7 +3810,6 @@ menuAdminBanBtn.addEventListener('click', async () => {
         if (!confirm(`PERMANENT IP BAN + FULL WIPE for ${targetPlayer}? This cannot be undone in-game.`)) return;
 
         await banPlayerPermanently(targetPlayer);
-        await refreshAdminUnbanList();
         alert(`Permanent IP ban + wipe completed for ${targetPlayer}.`);
     } catch (error) {
         console.error('Admin ban failed:', error);
@@ -3893,22 +3825,21 @@ menuAdminUnbanBtn.addEventListener('click', async () => {
     if (adminUnbanInProgress) return;
     if (!await ensureAdminAccess()) return;
 
-    const selectedName = normalizePlayerName(menuAdminUnbanSelect.value);
-    if (!selectedName) {
-        alert('Select a banned player first.');
+    const targetPlayer = getAdminBanTargetPlayer();
+    if (!targetPlayer || targetPlayer === '__ALL__') {
+        alert('Type one banned player name first.');
         return;
     }
-    if (!confirm(`Unban ${selectedName}?`)) return;
+    if (!confirm(`Unban ${targetPlayer}?`)) return;
 
     adminUnbanInProgress = true;
     setButtonBusyState(menuAdminUnbanBtn, true, 'UNBANNING...');
     try {
-        await unbanPlayerPermanently(selectedName);
-        await refreshAdminUnbanList();
-        alert(`✅ Unbanned ${selectedName}.`);
+        await unbanPlayerPermanently(targetPlayer);
+        alert(`✅ Unbanned ${targetPlayer}.`);
     } catch (error) {
         console.error('Admin unban failed:', error);
-        alert(`Failed to unban ${selectedName}.`);
+        alert(`Failed to unban ${targetPlayer}.`);
     } finally {
         adminUnbanInProgress = false;
         setButtonBusyState(menuAdminUnbanBtn, false);
