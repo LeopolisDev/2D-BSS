@@ -1610,11 +1610,11 @@ function applyLoadedSaveData(saveData) {
     updatePerformanceButton();
     updatePopupBlockButton();
 
-    const rawBeeCount = finiteOr(saveData.beeCount, 1);
-    const loadedBeeCount = Math.max(1, Math.min(500, Math.floor(rawBeeCount)));
+    const loadedBeeCount = getSafeBeeCount(saveData.beeCount, 1);
     nextHireCost = computeNextHireCostFromBeeCount(loadedBeeCount);
     bees = [];
     for (let i = 0; i < loadedBeeCount; i++) addBee();
+    enforceBeeLimitNoRefund();
     resetFlowerFieldForCurrentLimits();
 
     if (ascensionCorePurchased) {
@@ -4269,6 +4269,7 @@ const BEE_SPEED_UPGRADE_MULTIPLIER = 1.5;
 const BEE_SPEED_MULTIPLIER_MAX = BEE_SPEED_UPGRADE_MULTIPLIER;
 const BEE_CAPACITY_BASE = 8;
 const HIRE_COST_BASE = 20;
+const MAX_BEE_LIMIT = 250;
 const FLOWER_HP_COST_BASE = 50;
 const FLOWER_HP_MAX_LEVEL = 5;
 const FLOWER_HP_PER_LEVEL = 5;
@@ -5064,6 +5065,10 @@ function spawnFlower(spawnType = 'random') {
 }
 
 function addBee() {
+    if (Array.isArray(bees) && bees.length >= MAX_BEE_LIMIT) {
+        return false;
+    }
+
     let capacity = Math.floor(BEE_CAPACITY_BASE * capacityMultiplier);
     bees.push({
         x: HIVE_X + (Math.random() * 30 - 15),
@@ -5074,12 +5079,26 @@ function addBee() {
         targetFlower: null,
         returning: false
     });
+    return true;
 }
 
 function getSafeBeeCount(value, fallback = 1) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-    return Math.max(1, Math.floor(parsed));
+    return Math.max(1, Math.min(MAX_BEE_LIMIT, Math.floor(parsed)));
+}
+
+function enforceBeeLimitNoRefund() {
+    if (!Array.isArray(bees)) {
+        bees = [];
+    }
+    if (bees.length > MAX_BEE_LIMIT) {
+        bees = bees.slice(0, MAX_BEE_LIMIT);
+    }
+    if (bees.length === 0) {
+        addBee();
+    }
+    nextHireCost = computeNextHireCostFromBeeCount(bees.length);
 }
 
 function clampBeeSpeedMultiplier(value) {
@@ -5109,7 +5128,9 @@ function getFlowerHpCost(level = flowerHpLevel) {
 }
 
 function updateHireCostDisplay() {
-    hireCostSpan.textContent = formatNumber(nextHireCost);
+    const atBeeLimit = Array.isArray(bees) && bees.length >= MAX_BEE_LIMIT;
+    hireCostSpan.textContent = atBeeLimit ? 'MAX' : formatNumber(nextHireCost);
+    if (hireBtn) hireBtn.disabled = atBeeLimit;
     if (sellBeeBtn) sellBeeBtn.disabled = bees.length <= 1;
 }
 
@@ -5340,7 +5361,7 @@ function autoBuy() {
         if (!hasStormTotem && spendWithinBudget(100000000000, () => { hasStormTotem = true; recalcMultiplier(); buyStormTotem.disabled = true; })) { madePurchase = true; continue; }
         if (!hasGalaxyCrown && spendWithinBudget(250000000000, () => { hasGalaxyCrown = true; recalcMultiplier(); buyGalaxyCrown.disabled = true; })) { madePurchase = true; continue; }
 
-        if (spendWithinBudget(nextHireCost, () => {
+        if (bees.length < MAX_BEE_LIMIT && spendWithinBudget(nextHireCost, () => {
             addBee();
             nextHireCost = Math.floor(nextHireCost * 1.5);
         })) {
@@ -5435,10 +5456,17 @@ canvas.addEventListener('click', (e) => {
 });
 
 hireBtn.addEventListener('click', () => {
+    if (bees.length >= MAX_BEE_LIMIT) {
+        updateHireCostDisplay();
+        showGameStatusMessage(`Bee limit reached (${MAX_BEE_LIMIT}).`);
+        return;
+    }
+
     if (honey >= nextHireCost) {
         honey -= nextHireCost;
-        addBee();
-        nextHireCost = Math.floor(nextHireCost * 1.5);
+        if (addBee()) {
+            nextHireCost = Math.floor(nextHireCost * 1.5);
+        }
         updateHireCostDisplay();
         saveGame();
     }
@@ -5916,6 +5944,7 @@ loopBtn.addEventListener('click', async () => {
 
 // ========== SAVE GAME FUNCTION ==========
 function buildSaveData(includeWorldData = true) {
+    enforceBeeLimitNoRefund();
     const safeBees = Array.isArray(bees) ? bees : [];
     const safeFlowers = Array.isArray(flowers) ? flowers : [];
     const saveData = {
@@ -6086,12 +6115,12 @@ function loadGame() {
 
         const savedBeeCount = getSafeBeeCount(data.beeCount, 1);
         if (Array.isArray(data.bees) && data.bees.length > 0) {
-            bees = data.bees;
+            bees = data.bees.slice(0, MAX_BEE_LIMIT);
         } else {
             bees = [];
             for (let i = 0; i < savedBeeCount; i++) addBee();
         }
-        if (!Array.isArray(bees) || bees.length === 0) addBee();
+        enforceBeeLimitNoRefund();
 
         if (Array.isArray(data.flowers) && data.flowers.length > 0) {
             flowers = data.flowers.map(f => ({
