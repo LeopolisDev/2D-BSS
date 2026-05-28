@@ -2321,30 +2321,28 @@ async function removePlayerFromLeaderboard(targetPlayer) {
         sanitizeFirebaseKey(normalizePlayerNameKey(normalizedName))
     ].filter(Boolean));
 
-    await leaderboardRef.transaction((current) => {
-        const root = current && typeof current === 'object' ? current : {};
-        let removedAny = false;
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val() || {};
+    const keysToRemove = new Set();
 
-        for (const [key, value] of Object.entries(root)) {
-            if (!value || typeof value !== 'object') continue;
-            const entryName = normalizePlayerName(value.name);
-            if (!entryName) continue;
-            if (isSamePlayerName(entryName, normalizedName)) {
-                delete root[key];
-                removedAny = true;
+    for (const [key, value] of Object.entries(data)) {
+        if (!value || typeof value !== 'object') continue;
+        const entryName = normalizePlayerName(value.name);
+        if (!entryName) continue;
+        if (isSamePlayerName(entryName, normalizedName)) {
+            keysToRemove.add(key);
+        }
+    }
+
+    if (keysToRemove.size === 0) {
+        for (const key of fallbackKeys) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                keysToRemove.add(key);
             }
         }
+    }
 
-        if (!removedAny) {
-            for (const key of fallbackKeys) {
-                if (Object.prototype.hasOwnProperty.call(root, key)) {
-                    delete root[key];
-                }
-            }
-        }
-
-        return root;
-    });
+    await Promise.all(Array.from(keysToRemove, (key) => leaderboardRef.child(key).remove()));
 
     leaderboard = leaderboard.filter((entry) => !isSamePlayerName(entry?.name, normalizedName));
     renderLeaderboard();
@@ -3029,50 +3027,7 @@ async function queueAdminResetBulk(targetPlayers, resetStat) {
     ));
     if (normalizedTargets.length === 0) return;
 
-    await adminGrantsRef.transaction((current) => {
-        const root = current && typeof current === 'object' ? current : {};
-        const now = Date.now();
-
-        for (const targetName of normalizedTargets) {
-            const key = getPlayerGrantKeys(targetName)[0];
-            if (!key) continue;
-
-            const safeCurrent = root[key] && typeof root[key] === 'object' ? root[key] : {};
-            const next = {
-                name: targetName,
-                honey: toSafeAmount(safeCurrent.honey),
-                honeyExp: toSafeOverflowExp(safeCurrent.honeyExp),
-                rp: toSafeAmount(safeCurrent.rp),
-                rpExp: toSafeOverflowExp(safeCurrent.rpExp),
-                sp: toSafeAmount(safeCurrent.sp),
-                spExp: toSafeOverflowExp(safeCurrent.spExp),
-                ap: toSafeAmount(safeCurrent.ap),
-                apExp: toSafeOverflowExp(safeCurrent.apExp),
-                resetHoney: parseBoolean(safeCurrent.resetHoney, false),
-                resetRp: parseBoolean(safeCurrent.resetRp, false),
-                resetSp: parseBoolean(safeCurrent.resetSp, false),
-                resetAp: parseBoolean(safeCurrent.resetAp, false),
-                resetAll: parseBoolean(safeCurrent.resetAll, false),
-                updatedAt: now
-            };
-
-            if (resetStat === 'all') {
-                next.resetAll = true;
-            } else if (resetStat === 'honey') {
-                next.resetHoney = true;
-            } else if (resetStat === 'rp') {
-                next.resetRp = true;
-            } else if (resetStat === 'sp') {
-                next.resetSp = true;
-            } else if (resetStat === 'ap') {
-                next.resetAp = true;
-            }
-
-            root[key] = next;
-        }
-
-        return root;
-    });
+    await Promise.all(normalizedTargets.map(targetName => queueAdminReset(targetName, resetStat)));
 }
 
 async function addHoneyToPlayersScoreBulk(targetPlayers, amount, amountOverflowExp = 0) {
@@ -3189,44 +3144,40 @@ async function removePlayersFromLeaderboardBulk(targetPlayers) {
     ));
     if (normalizedTargets.length === 0) return;
 
-    await leaderboardRef.transaction((current) => {
-        const root = current && typeof current === 'object' ? current : {};
-        const targetNameKeys = new Set(
-            normalizedTargets
-                .map(name => normalizePlayerNameKey(name))
-                .filter(Boolean)
-        );
-        const fallbackKeys = new Set();
-        for (const targetName of normalizedTargets) {
-            const directKey = sanitizeFirebaseKey(targetName);
-            const normalizedKey = sanitizeFirebaseKey(normalizePlayerNameKey(targetName));
-            if (directKey) fallbackKeys.add(directKey);
-            if (normalizedKey) fallbackKeys.add(normalizedKey);
-        }
-
-        for (const [key, value] of Object.entries(root)) {
-            if (!value || typeof value !== 'object') continue;
-            const nameKey = normalizePlayerNameKey(value.name);
-            if (!nameKey) continue;
-            if (targetNameKeys.has(nameKey)) {
-                delete root[key];
-            }
-        }
-
-        for (const key of fallbackKeys) {
-            if (Object.prototype.hasOwnProperty.call(root, key)) {
-                delete root[key];
-            }
-        }
-
-        return root;
-    });
-
     const targetNameKeys = new Set(
         normalizedTargets
             .map(name => normalizePlayerNameKey(name))
             .filter(Boolean)
     );
+    const fallbackKeys = new Set();
+    for (const targetName of normalizedTargets) {
+        const directKey = sanitizeFirebaseKey(targetName);
+        const normalizedKey = sanitizeFirebaseKey(normalizePlayerNameKey(targetName));
+        if (directKey) fallbackKeys.add(directKey);
+        if (normalizedKey) fallbackKeys.add(normalizedKey);
+    }
+
+    const snapshot = await leaderboardRef.once('value');
+    const data = snapshot.val() || {};
+    const keysToRemove = new Set();
+
+    for (const [key, value] of Object.entries(data)) {
+        if (!value || typeof value !== 'object') continue;
+        const nameKey = normalizePlayerNameKey(value.name);
+        if (!nameKey) continue;
+        if (targetNameKeys.has(nameKey)) {
+            keysToRemove.add(key);
+        }
+    }
+
+    for (const key of fallbackKeys) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+            keysToRemove.add(key);
+        }
+    }
+
+    await Promise.all(Array.from(keysToRemove, (key) => leaderboardRef.child(key).remove()));
+
     leaderboard = leaderboard.filter((entry) => {
         const nameKey = normalizePlayerNameKey(entry?.name);
         return !nameKey || !targetNameKeys.has(nameKey);
