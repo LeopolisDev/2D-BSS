@@ -3598,9 +3598,9 @@ async function claimAdminGrants() {
             apGrant > 0 || apGrantExp > 0;
 
         if (fullReset) {
-            await Promise.all(sourceRefs.map((ref) => ref.remove().catch(() => {})));
             await performFullDataReset({ clearRedeemedCodes: true, removeLeaderboardEntry: true });
-            alert('✨ Admin update claimed: Reset EVERYTHING');
+            await Promise.all(sourceRefs.map((ref) => ref.remove().catch(() => {})));
+            console.log('Admin full reset claimed and saved');
             return;
         }
 
@@ -3660,11 +3660,7 @@ async function claimAdminGrants() {
             refreshAscendMultiplier();
         }
 
-        // Remove the grant BEFORE updating UI to prevent double-processing
-        await Promise.all(sourceRefs.map((ref) => ref.remove().catch(() => {})));
-        console.log('Grants removed from database');
-
-        // Update UI
+        // Update UI and save first to ensure persistence before removing the grant from Firebase
         recalcMultiplier();
         updateRebirthUI();
         updateToolButtons();
@@ -3676,22 +3672,9 @@ async function claimAdminGrants() {
             await submitScore(totalHoneyEarned);
         }
 
-        // Show summary
-        const grantParts = [];
-        if (resetAll) grantParts.push('Reset ALL');
-        if (!resetAll && resetLeaderboardHoney) grantParts.push('Reset Leaderboard Honey');
-        if (!resetAll && resetHoney) grantParts.push('Reset Honey');
-        if (!resetAll && resetRp) grantParts.push('Reset RP');
-        if (!resetAll && resetSp) grantParts.push('Reset SP');
-        if (!resetAll && resetAp) grantParts.push('Reset AP');
-        if (honeyGrant > 0 || honeyGrantExp > 0) grantParts.push(`${formatWithOverflow(honeyGrant, honeyGrantExp)} Honey`);
-        if (rpGrant > 0 || rpGrantExp > 0) grantParts.push(`${formatWithOverflow(rpGrant, rpGrantExp)} RP`);
-        if (spGrant > 0 || spGrantExp > 0) grantParts.push(`${formatWithOverflow(spGrant, spGrantExp)} SP`);
-        if (apGrant > 0 || apGrantExp > 0) grantParts.push(`${formatWithOverflow(apGrant, apGrantExp)} AP`);
-        
-        if (grantParts.length > 0) {
-            alert(`✨ Admin update claimed: ${grantParts.join(', ')}`);
-        }
+        // Remove the grant from database AFTER saving locally
+        await Promise.all(sourceRefs.map((ref) => ref.remove().catch(() => {})));
+        console.log('Grants removed from database and changes persisted');
         
     } catch (error) {
         console.error('Failed to claim admin grants:', error);
