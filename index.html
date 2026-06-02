@@ -50,9 +50,6 @@
             box-shadow: 0 1px 0 #6b4f1c;
         }
         .discord-button {
-            position: absolute;
-            top: 20px;
-            left: 30px;
             background: #3f7dff;
             border: none;
             border-radius: 50px;
@@ -685,7 +682,10 @@
     </div>
 
 <div class="game-wrapper">
+<div style="position: absolute; top: 20px; left: 30px; display: flex; align-items: center; gap: 12px; z-index: 100;">
     <a class="discord-button" href="https://discord.gg/tYawMKj9vC" target="_blank" rel="noopener noreferrer">Discord</a>
+    <span style="color: #ffd966; font-weight: bold; text-shadow: 1px 1px 2px #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 0.9rem;">version: V1.2.1</span>
+</div>
     <!-- Menu Button (top right) -->
     <button class="menu-button" id="menuToggleBtn">☰ MENU</button>
     
